@@ -6,14 +6,15 @@ pub struct Parser {
     context: Context,
     config: Config,
     scanner: Scanner,
+    parsed: Vec<node::Node>,
 }
 
 struct Context {
-    is_assignment_target: bool,
-    is_binding_element: bool,
-    in_function_body: bool,
-    in_iteration: bool,
-    in_switch: bool,
+    pub is_assignment_target: bool,
+    pub is_binding_element: bool,
+    pub in_function_body: bool,
+    pub in_iteration: bool,
+    pub in_switch: bool,
 }
 
 impl Default for Context {
@@ -30,13 +31,14 @@ impl Default for Context {
 
 
 pub struct Config {
-    allow_in: bool,
-    allow_strict: bool,
-    allow_yield: bool,
-    allow_await: bool,
-    allow_async: bool,
-    strict: bool,
+    pub allow_in: bool,
+    pub allow_strict: bool,
+    pub allow_yield: bool,
+    pub allow_await: bool,
+    pub allow_async: bool,
+    pub strict: bool,
 }
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -56,6 +58,7 @@ impl Parser {
             scanner: Scanner::new(text),
             config: Config::default(),
             context: Context::default(),
+            parsed: vec![],
         }
     }
     pub fn parse(self) -> Vec<Item> {
@@ -66,8 +69,4 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }

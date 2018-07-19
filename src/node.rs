@@ -1,6 +1,6 @@
 use either::Either;
 
-enum Node {
+pub enum Node {
     Program(Program),
     Function(Function),
     Statement(Statement),
@@ -10,34 +10,41 @@ enum Node {
     Expression(Expression),
     Property(Property),
     Pattern(Pattern),
+    Super,
 }
 
 pub enum Program {
-    Module(Vec<Either<ModuleDecl, Statement>>),
-    Script(Vec<Either<Directive, Statement>>)
+    Module(Vec<ModulePart>),
+    Script(Vec<ScriptPart>),
+}
+
+pub enum ModulePart {
+    Declaration(ModuleDecl),
+    Statement(Statement),
+}
+
+pub enum ScriptPart {
+    Directive(Directive),
+    Statement(Statement)
 }
 
 pub enum ModuleDecl {
-
+    Import(ModuleImport),
+    Export(ModuleExport),
 }
+pub struct ModuleImport;
+pub struct ModuleExport;
+
 pub enum Declaration {
     Variable(VariableDeclaration),
 }
-pub struct VariableDeclaration {
-    pub declarations: Vec<VariableDeclarator>,
-    pub kind: VariableKind,
+
+pub enum VariableDeclaration {
+    Var(Pattern, Option<Expression>),
+    Let(Pattern, Option<Expression>),
+    Const(Pattern, Option<Expression>),
 }
 
-pub struct VariableDeclarator {
-    pub id: Pattern,
-    pub init: Option<Expression>,
-}
-
-pub enum VariableKind {
-    Var,
-    Let,
-    Const,
-}
 pub enum Statement {
     Expression(Expression),
     Block(Vec<Statement>),
@@ -174,16 +181,10 @@ pub enum Expression {
     Call(CallExpression),
     New(NewExpression),
     Sequence(SequenceExpression),
-
+    Spread(Box<Expression>)
 }
-
-pub struct ArrayExpression {
-    pub elements: Vec<Option<Expression>>,
-}
-
-pub struct ObjectExpression {
-    pub properties: Vec<Property>,
-}
+pub type ArrayExpression = Vec<Option<Expression>>;
+pub type ObjectExpression = Vec<Property>;
 
 pub struct Property {
     pub key: Either<Literal, Identifier>,
