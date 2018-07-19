@@ -7,4 +7,3 @@ repository = "https://github.com/FreeMasen/RESP"
 
 [dependencies]
 ress = "0.3.0"
-either = "1.5.0"

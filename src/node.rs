@@ -1,16 +1,26 @@
-use either::Either;
+pub struct Node {
+    pub position: Position,
+    pub item: Item,
+}
+#[derive(Debug)]
+pub struct Position {
+    pub line: usize,
+    pub column: usize,
+}
 
-pub enum Node {
+pub enum Item {
     Program(Program),
     Function(Function),
     Statement(Statement),
     SwitchCase(SwitchCase),
     CatchClause(CatchClause),
-    VariableDeclaration(VariableDeclaration),
-    Expression(Expression),
+    VariableDecl(VariableDecl),
+    ModuleDecl(ModuleDecl),
+    Expr(Expression),
     Property(Property),
     Pattern(Pattern),
     Super,
+    Class(Class),
 }
 
 pub enum Program {
@@ -19,7 +29,7 @@ pub enum Program {
 }
 
 pub enum ModulePart {
-    Declaration(ModuleDecl),
+    Decl(ModuleDecl),
     Statement(Statement),
 }
 
@@ -32,21 +42,70 @@ pub enum ModuleDecl {
     Import(ModuleImport),
     Export(ModuleExport),
 }
-pub struct ModuleImport;
-pub struct ModuleExport;
-
-pub enum Declaration {
-    Variable(VariableDeclaration),
+pub struct ModuleImport {
+    pub specifiers: Vec<ImportSpecifier>,
+    pub source: Literal,
 }
 
-pub enum VariableDeclaration {
-    Var(Pattern, Option<Expression>),
-    Let(Pattern, Option<Expression>),
-    Const(Pattern, Option<Expression>),
+pub enum ImportSpecifier {
+    Normal(Identifier, Identifier),
+    Default(Identifier),
+    Namespace(Identifier),
+}
+
+pub enum ModuleExport {
+    ///```js
+    /// export {foo} from 'mod';
+    /// //or
+    /// export {foo as bar} from 'mod';
+    /// ```
+    Named(NamedExportDecl),
+    /// ```js
+    /// export default function() {};
+    /// //or
+    /// export default 1;
+    /// ```
+    Default(DefaultExportDecl),
+    /// ```js
+    /// export * from 'mod';
+    /// ```
+    All(Literal),
+}
+
+pub struct NamedExportDecl {
+    pub local: Identifier,
+    pub decl: Option<Declaration>,
+    pub specifiers: Vec<ExportSpecifier>,
+    pub source: Option<Literal>,
+}
+pub enum DefaultExportDecl {
+    Decl(Declaration),
+    Expr(Expression),
+}
+pub struct ExportSpecifier {
+    pub local: Identifier,
+    pub exported: Option<Identifier>,
+}
+
+pub enum Declaration {
+    Variable(VariableDecl),
+    Class(Identifier, Class),
+}
+
+pub enum VariableDecl {
+    kind: VariableKind,
+    pattern: Pattern,
+    expression: Option<Expression>,
+}
+
+pub enum VariableKind {
+    Var,
+    Let,
+    Const,
 }
 
 pub enum Statement {
-    Expression(Expression),
+    Expr(Expression),
     Block(Vec<Statement>),
     Empty,
     Debugger,
@@ -100,7 +159,7 @@ pub struct TryStatement {
 }
 
 pub struct CatchClause {
-    pub param: Pattern,
+    pub param: Option<Pattern>,
     pub body: BlockStatement,
 }
 
@@ -115,21 +174,35 @@ pub struct DoWhileStatement {
 }
 
 pub struct ForStatement {
-    pub init: Option<Either<VariableDeclaration, Expression>>,
+    pub init: Option<LoopInit>,
     pub test: Option<Expression>,
     pub update: Option<Expression>,
     pub body: Box<Statement>,
 }
 
+pub enum LoopInit {
+    Variable(VariableDecl),
+    Expr(Expression),
+}
+
 pub struct ForInStatement {
-    pub left: Either<VariableDeclaration,  Pattern>,
+    pub left: LoopLeft,
     pub right: Expression,
     pub body: Box<Statement>,
 }
+
+
+
 pub struct ForOfStatement {
-    pub left: Either<VariableDeclaration,  Pattern>,
+    pub left: LoopLeft,
     pub right: Expression,
     pub body: Box<Statement>,
+    pub await: bool,
+}
+
+pub enum LoopLeft {
+    Variable(VariableDecl),
+    Pattern(Pattern),
 }
 pub type Identifier = String;
 
@@ -138,9 +211,10 @@ pub struct Function {
     pub params: Vec<String>,
     pub body: FunctionBody,
     pub generator: bool,
+    pub async: bool,
 }
 
-pub type FunctionBody = Vec<Either<Directive, Statement>>;
+pub type FunctionBody = Vec<ScriptPart>;
 
 pub struct Directive {
     pub expression: Literal,
@@ -153,11 +227,12 @@ pub enum Literal {
     Number(f32),
     Boolean(bool),
     RegEx(RegEx),
+    Template(TemplateLiteral),
 }
 
 pub struct RegEx {
-    pattern: String,
-    flags: String,
+    pub pattern: String,
+    pub flags: String,
 }
 
 pub struct SwitchCase {
@@ -181,15 +256,46 @@ pub enum Expression {
     Call(CallExpression),
     New(NewExpression),
     Sequence(SequenceExpression),
-    Spread(Box<Expression>)
+    Spread(Box<Expression>),
+    ArrowFunction(ArrowFunctionExpression),
+    Yield(YieldExpression),
+    Class(Class),
+    MetaProperty(MetaProperty),
+    Await(Box<Expression>)
 }
 pub type ArrayExpression = Vec<Option<Expression>>;
-pub type ObjectExpression = Vec<Property>;
-
+pub type ObjectExpression = Vec<ObjectProperty>;
+pub enum ObjectProperty {
+    Property(Property),
+    Spread(Box<Expression>)
+}
 pub struct Property {
-    pub key: Either<Literal, Identifier>,
-    pub value: Expression,
+    pub key: PropertyKey,
+    pub value: PropertyValue,
     pub kind: PropertyKind,
+    pub method: bool,
+}
+
+pub enum PropertyKey {
+    Literal(Literal),
+    Ident(Identifier),
+    Pattern(Pattern),
+}
+
+pub enum PropertyValue {
+    Expr(Expression),
+    Pattern(Pattern),
+}
+
+impl Property {
+    pub fn assignment(key: PropertyKey, value: PropertyValue) -> Property {
+        Property {
+            key,
+            value,
+            kind: PropertyKind::Init,
+            method: false,
+        }
+    }
 }
 
 pub enum PropertyKind {
@@ -199,6 +305,21 @@ pub enum PropertyKind {
 }
 pub enum Pattern {
     Identifier(Identifier),
+    Object(ObjectPattern),
+    Array(Vec<Option<Pattern>>),
+    RestElement(Box<Pattern>),
+    Assignment(AssignmentPattern),
+
+}
+
+pub type ObjectPattern = Vec<Property>;
+pub enum ObjectPatternPart {
+    Assignment(Property),
+    Rest(Box<Pattern>),
+}
+pub struct AssignmentPattern {
+    pub left: Box<Pattern>,
+    pub right: Box<Expression>,
 }
 
 pub struct UnaryExpression {
@@ -254,12 +375,18 @@ pub enum BinaryOperator {
     And,
     In,
     InstanceOf,
+    PowerOf,
 }
 
 pub struct AssignmentExpression {
     pub operator: AssignmentOperator,
-    pub left: Either<Pattern, Box<Expression>>,
+    pub left: AssignmentLeft,
     pub right: Box<Expression>,
+}
+
+pub enum AssignmentLeft {
+    Pattern(Pattern),
+    Expr(Box<Expression>),
 }
 
 pub enum AssignmentOperator {
@@ -275,6 +402,7 @@ pub enum AssignmentOperator {
     OrEqual,
     XOrEqual,
     AndEqual,
+    PowerOfEqual,
 }
 
 pub struct LogicalExpression {
@@ -310,6 +438,63 @@ pub struct NewExpression {
     pub arguments: Vec<Expression>,
 }
 
-pub struct SequenceExpression {
+pub type SequenceExpression = Vec<Expression>;
+
+pub struct ArrowFunctionExpression {
+    pub id: Option<String>,
+    pub params: Vec<String>,
+    pub body: ArrowFunctionBody,
+    pub expression: bool,
+    pub generator: bool,
+}
+
+pub enum ArrowFunctionBody {
+    FunctionBody(FunctionBody),
+    Expr(Box<Expression>)
+}
+
+pub struct YieldExpression {
+    pub argument: Option<Box<Expression>>,
+    pub delegate: bool,
+}
+
+pub struct TemplateLiteral {
+    pub quasis: Vec<TemplateElement>,
     pub expressions: Vec<Expression>,
+}
+
+pub struct TaggedTemplateExpression {
+    pub tag: Expression,
+    pub quasi: TemplateLiteral,
+}
+
+pub struct TemplateElement {
+    pub tail: bool,
+    pub cooked: Option<String>,
+    pub raw: String,
+}
+
+pub struct Class {
+    pub id: Option<Identifier>,
+    pub super_class: Option<Box<Expression>>,
+    pub body: Vec<MethodDef>,
+}
+pub struct MethodDef {
+    pub key: Expression,
+    pub value: Expression,
+    pub kind: MethodKind,
+    pub computed: bool,
+    pub is_static: bool,
+}
+
+pub enum MethodKind {
+    Constructor,
+    Method,
+    Get,
+    Set,
+}
+
+pub struct MetaProperty {
+    pub meta: Identifier,
+    pub property: Identifier,
 }
