@@ -353,34 +353,71 @@ impl Parser {
 
     fn parse_assignment_expr(&mut self) -> Res<node::Expression> {
         if !self.context.allow_yield && self.matches_keyword(Keyword::Yield) {
-            self.parse_yield_expr();
+            return self.parse_yield_expr()
         } else {
             let start = self.look_ahead.clone();
-            let expr = self.parse_conditional_expr()?;
-            let start_line = self.get_item_position(&start).line;
+            let mut expr = self.parse_conditional_expr()?;
             let curr_line = self.get_item_position(&self.look_ahead).line;
-            if start.token.matches_ident_str("async") && start_line == curr_line {
-                if self.look_ahead.token.is_ident() || self.look_ahead.token.matches_keyword(Keyword::Yield) {
-                    let arg = self.parse_primary_expression()?;
-                    let arg = match arg {
-                        node::Expression::Ident(i) => i,
-                        _ => 
-                    }
-                    let patt = Self::reinterpret_expr_as_pat(expr);
-
-                }
-
+            let start_line = self.get_item_position(&start).line;
+            if start.token.matches_ident_str("async") && curr_line == start_line &&
+                (self.look_ahead.token.is_ident() || self.matches_keyword(Keyword::Yield)) {
+                let arg = self.parse_primary_expression()?;
+                let arg = Self::reinterpret_expr_as_pat(arg)?;
+                let arg = node::FunctionArg::Pattern(arg);
+                expr = node::Expression::ArrowParamPlaceHolder(vec![arg], true);
             }
-            unimplemented!()
+
+            if expr.is_arrow_param_placeholder() || self.matches_punct(Punct::FatArrow) {
+                self.context.is_assignment_target = false;
+                self.context.is_binding_element = false;
+                let _is_async = expr.is_async();
+                //TOOD: see esprima::parser::reinterpretAsCoverFormalsList
+            } else {
+                if self.matches_assign() {
+                    if !self.context.is_assignment_target {
+                        return self.error(&self.look_ahead, &["not assignment"])
+                    }
+                    if self.context.strict && expr.is_ident() {
+                        if let node::Expression::Ident(ref i) = expr {
+                                if Self::is_restricted_word(i) {
+                                    return self.error(&self.look_ahead, &[&format!("not {}", i)]);
+                                }
+                                if Self::is_strict_reserved(i) {
+                                    return self.error(&self.look_ahead, &[&format!("not {}", i)])
+                                }
+                        }
+                    }
+                    let left = if !self.matches_punct(Punct::Assign) {
+                        self.context.is_assignment_target = false;
+                        self.context.is_binding_element = false;
+                        node::AssignmentLeft::Expr(Box::new(expr))
+                    } else {
+                        let p = Self::reinterpret_expr_as_pat(expr)?;
+                        node::AssignmentLeft::Pattern(p)
+                        //TODO: reinterpret expression as pattern...
+                    };
+                    let item = self.next_item()?;
+                    let op = match &item.token {
+                        &Token::Punct(ref p) => {
+                            if let Some(op) = node::AssignmentOperator::from_punct(p) {
+                                op
+                            } else {
+                                return self.error(&item, &["=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=", "<<=", ">>=", ">>>="]);
+                            }
+                        },
+                        _ => return self.error(&item, &["=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=", "<<=", ">>=", ">>>="]),
+                    };
+                    let right = self.isolate_cover_grammar(&Self::parse_assignment_expr)?;
+                    self.context.first_covert_initialized_name_error = None;
+                    return Ok(node::Expression::Assignment(node::AssignmentExpression {
+                        operator: op,
+                        left,
+                        right: Box::new(right),
+                    }))
+                }
+            }
+            return Ok(expr)
         }
-        unimplemented!()
-    }
-
-    fn parse_arrow_fn(&mut self, is_async: bool, &expr: node::Expression) {
-        self.context.is_assignment_target = false;
-        self.context.is_binding_element = false;
-        let params = vec![];
-
     }
 
     fn reinterpret_expr_as_pat(expr: node::Expression) -> Res<node::Pattern> {
@@ -427,9 +464,6 @@ impl Parser {
         }
     }
 
-    fn reinterpret_as_cover_formals_list(expr: &node::Expression) -> Res<node::Expression> {
-
-    }
 
     fn parse_yield_expr(&mut self) -> Res<node::Expression> {
         self.expect_keyword(Keyword::Yield)?;
@@ -807,6 +841,18 @@ impl Parser {
         word == "eval" || word == "arguments"
     }
 
+    fn is_strict_reserved(word: &str) -> bool {
+        word == "implements"
+        || word == "interface"
+        || word == "package"
+        || word == "private"
+        || word == "protected"
+        || word == "public"
+        || word == "static"
+        || word == "yield"
+        || word == "let"
+    }
+
     fn is_start_of_expr(&self) -> bool {
         let mut ret = true;
         let token = &self.look_ahead.token;
@@ -865,21 +911,15 @@ impl Parser {
     }
 }
 
+struct CoverFormalListOptions {
+    simple: bool,
+    params: Vec<node::FunctionArg>,
+    stricted: bool,
+    first_restricted: Option<node::Expression>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn parse() {
-        let js = "function() {\n\r\n\n}";
-        let mut p = Parser::new(js);
-        p.parse().unwrap();
-    }
-    #[test]
-    fn parse_function_decl() {
-        let js = r#"export default function test(arg1, arg2, arg3,) { \
-            console.log('test', arg1, arg2, arg3); \
-        }"#;
-        let mut p = Parser::new(js);
-        p.parse().unwrap();
-    }
+
 }

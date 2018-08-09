@@ -1,3 +1,5 @@
+use ress;
+
 pub struct Node {
     pub position: Position,
     pub item: Item,
@@ -219,10 +221,14 @@ pub type Identifier = String;
 
 pub struct Function {
     pub id: Option<String>,
-    pub params: Vec<String>,
+    pub params: Vec<FunctionArg>,
     pub body: FunctionBody,
     pub generator: bool,
-    pub async: bool,
+    pub is_async: bool,
+}
+pub enum FunctionArg {
+    Expr(Expression),
+    Pattern(Pattern),
 }
 
 pub type FunctionBody = Vec<ScriptPart>;
@@ -274,6 +280,7 @@ pub enum Expression {
     MetaProperty(MetaProperty),
     Await(Box<Expression>),
     Ident(Identifier),
+    ArrowParamPlaceHolder(Vec<FunctionArg>, bool),
 }
 impl Expression {
     pub fn is_ident(&self) -> bool {
@@ -287,6 +294,22 @@ impl Expression {
         match self {
             &Expression::Unary(_) => true,
             _ => false,
+        }
+    }
+
+    pub fn is_arrow_param_placeholder(&self) -> bool {
+        match self {
+            &Expression::ArrowParamPlaceHolder(_, _) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_async(&self) -> bool {
+        match self {
+            &Expression::Function(ref f) => f.is_async,
+            &Expression::ArrowFunction(ref f) => f.is_async,
+            &Expression::ArrowParamPlaceHolder(_, b) => b,
+            _ => false
         }
     }
 }
@@ -445,6 +468,27 @@ pub enum AssignmentOperator {
     PowerOfEqual,
 }
 
+impl AssignmentOperator {
+    pub fn from_punct(p: &ress::Punct) -> Option<Self> {
+        match p {
+            ress::Punct::Equal => Some(AssignmentOperator::Equal),
+            ress::Punct::AddAssign => Some(AssignmentOperator::PlusEqual),
+            ress::Punct::SubtractAssign => Some(AssignmentOperator::MinusEqual),
+            ress::Punct::MultiplyAssign => Some(AssignmentOperator::TimesEqual),
+            ress::Punct::DivideAssign => Some(AssignmentOperator::DivEqual),
+            ress::Punct::ModuloAssign => Some(AssignmentOperator::ModEqual),
+            ress::Punct::LeftShiftAssign => Some(AssignmentOperator::LeftShiftEqual),
+            ress::Punct::RightShiftAssign => Some(AssignmentOperator::RightShiftEqual),
+            ress::Punct::UnsignedRightShiftAssign => Some(AssignmentOperator::UnsignedRightShiftEqual),
+            ress::Punct::BitwiseOrAssign => Some(AssignmentOperator::OrEqual),
+            ress::Punct::BitwiseXOrAssign => Some(AssignmentOperator::XOrEqual),
+            ress::Punct::BitwiseAndAssign => Some(AssignmentOperator::AndEqual),
+            ress::Punct::ExponentAssign => Some(AssignmentOperator::PowerOfEqual),
+            _ => None,
+        }
+    }
+}
+
 pub struct LogicalExpression {
     pub operator: LogicalOperator,
     pub left: Box<Expression>,
@@ -482,10 +526,11 @@ pub type SequenceExpression = Vec<Expression>;
 
 pub struct ArrowFunctionExpression {
     pub id: Option<String>,
-    pub params: Vec<String>,
+    pub params: Vec<FunctionArg>,
     pub body: ArrowFunctionBody,
     pub expression: bool,
     pub generator: bool,
+    pub is_async: bool,
 }
 
 pub enum ArrowFunctionBody {
