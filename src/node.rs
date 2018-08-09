@@ -8,6 +8,15 @@ pub struct Position {
     pub column: usize,
 }
 
+impl Position {
+    pub fn start() -> Self {
+        Self {
+            line: 0,
+            column: 0,
+        }
+    }
+}
+
 pub enum Item {
     Program(Program),
     Function(Function),
@@ -54,18 +63,23 @@ pub enum ImportSpecifier {
 }
 
 pub enum ModuleExport {
-    ///```js
-    /// export {foo} from 'mod';
-    /// //or
-    /// export {foo as bar} from 'mod';
-    /// ```
-    Named(NamedExportDecl),
     /// ```js
     /// export default function() {};
     /// //or
     /// export default 1;
     /// ```
     Default(DefaultExportDecl),
+    ///```js
+    /// export {foo} from 'mod';
+    /// //or
+    /// export {foo as bar} from 'mod';
+    /// //or
+    /// export var foo = 1;
+    /// //or
+    /// export function bar() {
+    /// }
+    /// ```
+    Named(NamedExportDecl),
     /// ```js
     /// export * from 'mod';
     /// ```
@@ -73,7 +87,6 @@ pub enum ModuleExport {
 }
 
 pub struct NamedExportDecl {
-    pub local: Identifier,
     pub decl: Option<Declaration>,
     pub specifiers: Vec<ExportSpecifier>,
     pub source: Option<Literal>,
@@ -88,14 +101,14 @@ pub struct ExportSpecifier {
 }
 
 pub enum Declaration {
-    Variable(VariableDecl),
+    Variable(VariableKind, Vec<VariableDecl>),
+    Function(Function),
     Class(Identifier, Class),
 }
 
-pub enum VariableDecl {
-    kind: VariableKind,
-    pattern: Pattern,
-    expression: Option<Expression>,
+pub struct VariableDecl {
+    pub id: Pattern,
+    pub init: Option<Expression>,
 }
 
 pub enum VariableKind {
@@ -191,8 +204,6 @@ pub struct ForInStatement {
     pub body: Box<Statement>,
 }
 
-
-
 pub struct ForOfStatement {
     pub left: LoopLeft,
     pub right: Expression,
@@ -261,8 +272,25 @@ pub enum Expression {
     Yield(YieldExpression),
     Class(Class),
     MetaProperty(MetaProperty),
-    Await(Box<Expression>)
+    Await(Box<Expression>),
+    Ident(Identifier),
 }
+impl Expression {
+    pub fn is_ident(&self) -> bool {
+        match self {
+            &Expression::Ident(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_unary(&self) -> bool {
+        match self {
+            &Expression::Unary(_) => true,
+            _ => false,
+        }
+    }
+}
+
 pub type ArrayExpression = Vec<Option<Expression>>;
 pub type ObjectExpression = Vec<ObjectProperty>;
 pub enum ObjectProperty {
@@ -309,10 +337,9 @@ pub enum Pattern {
     Array(Vec<Option<Pattern>>),
     RestElement(Box<Pattern>),
     Assignment(AssignmentPattern),
-
 }
 
-pub type ObjectPattern = Vec<Property>;
+pub type ObjectPattern = Vec<ObjectPatternPart>;
 pub enum ObjectPatternPart {
     Assignment(Property),
     Rest(Box<Pattern>),
@@ -327,6 +354,18 @@ pub struct UnaryExpression {
     pub prefix: bool,
     pub argument: Box<Expression>,
 }
+
+impl UnaryExpression {
+    pub fn has_operator(&self, op: &UnaryOperator) -> bool {
+        &self.operator == op
+    }
+
+    pub fn has_ident_arg(&self) -> bool {
+        self.argument.is_ident()
+    }
+}
+
+#[derive(PartialEq)]
 pub enum UnaryOperator {
     Minus,
     Plus,
@@ -334,6 +373,7 @@ pub enum UnaryOperator {
     Tilde,
     TypeOf,
     Void,
+    Delete,
 }
 
 pub struct UpdateExpression {

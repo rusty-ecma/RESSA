@@ -6,4 +6,4 @@ repository = "https://github.com/FreeMasen/RESP"
 
 
 [dependencies]
-ress = "0.3.0"
+ress = {path = "../ress"}
