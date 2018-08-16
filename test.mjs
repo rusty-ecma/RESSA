@@ -1,4 +1,6 @@
 
-export let a,
-            blur,caches,
-            d
+
+export function Thing() {
+    this.a = 1;
+}
+

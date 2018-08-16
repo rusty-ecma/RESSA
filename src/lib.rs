@@ -1,3 +1,4 @@
+#![allow(unused)]
 extern crate ress;
 
 use ress::{Scanner, Item, Keyword, Token, Punct};
@@ -160,7 +161,6 @@ impl Parser {
 
     fn parse_directive_prologues(&mut self) -> Res<Vec<node::ScriptPart>> {
         let mut ret = vec![];
-        let mut found_octal = false;
         loop {
             if !self.look_ahead.token.is_string() {
                 break;
@@ -265,7 +265,8 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Res<node::Statement> {
-        let stmt = match &self.look_ahead.token {
+        let lh = self.look_ahead.token.clone();
+        let stmt = match lh {
             Token::Boolean(_)
             | Token::Null
             | Token::Numeric(_)
@@ -314,7 +315,7 @@ impl Parser {
                 Keyword::Switch => node::Statement::Switch(self.parse_switch_stmt()?),
                 Keyword::Throw => node::Statement::Throw(self.parse_throw_stmt()?),
                 Keyword::Try => node::Statement::Try(self.parse_try_stmt()?),
-                Keyword::Var => node::Statement::Var(self.parse_var_stmt()?),
+                Keyword::Var => self.parse_var_stmt()?,
                 Keyword::While => node::Statement::While(self.parse_while_stmt()?),
                 Keyword::With => node::Statement::With(self.parse_with_stmt()?),
                 _ => node::Statement::Expr(self.parse_expression_statement()?)
@@ -325,35 +326,212 @@ impl Parser {
     }
 
     fn parse_with_stmt(&mut self) -> Res<node::WithStatement> {
-        unimplemented!("parse_with_stmt")
+        if self.context.strict {
+            // error
+        }
+        self.expect_keyword(Keyword::With)?;
+        self.expect_punct(Punct::OpenParen)?;
+        let obj = self.parse_expression()?;
+        Ok(if !self.at_punct(Punct::CloseParen) && self.config.tolerant {
+            //tolerate error
+            node::WithStatement {
+                object: obj,
+                body: Box::new(node::Statement::Empty),
+            }
+        } else {
+            self.expect_punct(Punct::CloseParen)?;
+            node::WithStatement {
+                object: obj,
+                body: Box::new(self.parse_statement()?)
+            }
+        })
     }
 
     fn parse_while_stmt(&mut self) -> Res<node::WhileStatement> {
-        unimplemented!("parse_while_stmt")
+        self.expect_keyword(Keyword::While)?;
+        self.expect_punct(Punct::OpenParen)?;
+        let test = self.parse_expression()?;
+        let body = if !self.at_punct(Punct::CloseParen) && self.config.tolerant {
+            //tolerate error
+            node::Statement::Empty
+        } else {
+            self.expect_punct(Punct::CloseParen)?;
+            let prev_iter = self.context.in_iteration;
+            let body = self.parse_statement()?;
+            self.context.in_iteration = prev_iter;
+            body
+        };
+        Ok(node::WhileStatement {
+            test,
+            body: Box::new(body),
+        })
     }
 
-    fn parse_var_stmt(&mut self) -> Res<node::VariableDecl> {
-        unimplemented!("parse_var_stmt")
+    fn parse_var_stmt(&mut self) -> Res<node::Statement> {
+        self.expect_keyword(Keyword::Var)?;
+        let decls = self.parse_binding_list(&node::VariableKind::Var, false)?;
+        let stmt = node::Statement::Var(decls);
+        self.consume_semicolon()?;
+        Ok(stmt)
     }
 
     fn parse_try_stmt(&mut self) -> Res<node::TryStatement> {
-        unimplemented!("parse_try_stmt")
+        self.expect_keyword(Keyword::Try)?;
+        let block = self.parse_block()?;
+        let handler = if self.at_keyword(Keyword::Catch) {
+            Some(self.parse_catch_clause()?)
+        } else {
+            None
+        };
+        let finalizer = if self.at_keyword(Keyword::Finally) {
+            Some(self.parse_finally_clause()?)
+        } else {
+            None
+        };
+        if handler.is_none() && finalizer.is_none() {
+            //error: one or the other must be declared
+        }
+        Ok(node::TryStatement {
+            block,
+            handler,
+            finalizer,
+        })
+    }
+
+    fn parse_catch_clause(&mut self) -> Res<node::CatchClause> {
+        self.expect_keyword(Keyword::Catch)?;
+        self.expect_punct(Punct::OpenParen)?;
+        if self.at_punct(Punct::CloseParen) {
+            //error variable named required
+        }
+        let mut params = vec![];
+        let param = self.parse_pattern(None, &mut params)?;
+        let body = self.parse_block()?;
+        Ok(node::CatchClause {
+            param,
+            body,
+        })
+    }
+
+    fn parse_finally_clause(&mut self) -> Res<node::BlockStatement> {
+        self.expect_keyword(Keyword::Finally)?;
+        self.parse_block()
     }
 
     fn parse_throw_stmt(&mut self) -> Res<node::Expression> {
-        unimplemented!("parse_throw_stmt")
+        self.expect_keyword(Keyword::Throw)?;
+        if self.context.has_line_term {
+            //error: no new line allowed after throw
+        }
+        let arg = self.parse_expression()?;
+        self.consume_semicolon()?;
+        Ok(arg)
     }
 
     fn parse_switch_stmt(&mut self) -> Res<node::SwitchStatement> {
-        unimplemented!("parse_switch_stmt")
+        self.expect_keyword(Keyword::Switch)?;
+        self.expect_punct(Punct::OpenParen)?;
+        let discriminant = self.parse_expression()?;
+        self.expect_punct(Punct::CloseParen)?;
+        self.expect_punct(Punct::OpenBrace)?;
+        
+        let prev_sw = self.context.in_switch;
+        self.context.in_switch = true;
+        let mut found_default = false;
+        let mut cases = vec![];
+        loop {
+            if self.at_punct(Punct::CloseBrace) {
+                break;
+            }
+            let case = self.parse_switch_case()?;
+            if case.test.is_none() {
+                if found_default {
+                    return self.error(&self.look_ahead, &[])
+                }
+                found_default = true;
+            }
+            cases.push(case);
+        }
+        self.expect_punct(Punct::CloseBrace)?;
+        self.context.in_switch = prev_sw;
+        Ok(node::SwitchStatement {
+            discriminant,
+            cases,
+        })
+    }
+
+    fn parse_switch_case(&mut self) -> Res<node::SwitchCase> {
+        let test = if self.at_keyword(Keyword::Default) {
+            None
+        } else {
+            self.expect_keyword(Keyword::Case)?;
+            Some(self.parse_expression()?)
+        };
+        self.expect_punct(Punct::Colon)?;
+        let mut consequent = vec![];
+        loop {
+            if self.at_punct(Punct::CloseBrace) || self.at_keyword(Keyword::Default) || self.at_keyword(Keyword::Case) {
+                break;
+            }
+            consequent.push(self.parse_statement_list_item_script()?)
+        }
+        Ok(node::SwitchCase {
+            test,
+            consequent,
+        })
     }
 
     fn parse_return_stmt(&mut self) -> Res<Option<node::Expression>> {
-        unimplemented!("parse_return_stmt")
+        if !self.context.in_function_body {
+            //tolerate error
+        }
+        self.expect_keyword(Keyword::Return)?;
+        // if we are at a semi-colon,or close curly brace or eof
+        //the return doesn't have an arg. If we are at a line term
+        //we need to account for a string literal or template literal
+        //since they both can have new lines
+        let ret = if (!self.at_punct(Punct::SemiColon) 
+                    && !self.at_punct(Punct::CloseBrace)
+                    && !self.context.has_line_term
+                    && !self.look_ahead.token.is_eof())
+                    || self.look_ahead.token.is_string() {
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+        self.consume_semicolon()?;
+        Ok(ret)
     }
 
     fn parse_if_stmt(&mut self) -> Res<node::IfStatement> {
-        unimplemented!("parse_if_stmt")
+        self.expect_keyword(Keyword::If)?;
+        self.expect_punct(Punct::OpenParen)?;
+        let test = self.parse_expression()?;
+        let (consequent, alternate) = if !self.at_punct(Punct::CloseParen) && self.config.tolerant {
+            //tolerate error
+            (Box::new(node::Statement::Empty), None)
+        } else {
+            self.expect_punct(Punct::CloseParen)?;
+            let c = self.parse_if_clause()?;
+            let a = if self.at_keyword(Keyword::Else) {
+                Some(Box::new(self.parse_if_clause()?))
+            } else {
+                None
+            };
+            (Box::new(c), a)
+        };
+        Ok(node::IfStatement {
+            test,
+            consequent,
+            alternate,
+        })
+    }
+
+    fn parse_if_clause(&mut self) -> Res<node::Statement> {
+        if self.context.strict && self.at_keyword(Keyword::Function) {
+            //tolerate error
+        }
+        self.parse_statement()
     }
 
     fn parse_fn_stmt(&mut self) -> Res<node::Expression> {
@@ -385,19 +563,24 @@ impl Parser {
             let _ = self.next_item()?;
             let prev_in = self.context.allow_in;
             self.context.allow_in = false;
-            let bindings = self.parse_binding_list(&kind, true)?;
+            let mut bindings = self.parse_binding_list(&kind, true)?;
             self.context.allow_in = prev_in;
             if bindings.len() == 1 {
+                let decl = if let Some(d) = bindings.pop() {
+                    d
+                } else {
+                    return self.error(&self.look_ahead, &["variable decl"])
+                };
                 if self.at_keyword(Keyword::In) {
-                    let left = node::LoopLeft::Variable(bindings[0]);
+                    let left = node::LoopLeft::Variable(decl);
                     let stmt = self.parse_for_in_loop(left)?;
                     return Ok(node::Statement::ForIn(stmt))
                 } else if self.at_keyword(Keyword::Of) {
-                    let left = node::LoopLeft::Variable(bindings[0]);
+                    let left = node::LoopLeft::Variable(decl);
                     let stmt = self.parse_for_of_loop(left)?;
                     return Ok(node::Statement::ForOf(stmt))
                 } else {
-                    let init = node::LoopInit::Variable(bindings);
+                    let init = node::LoopInit::Variable(vec![decl]);
                     let stmt = self.parse_for_loop_cont(Some(init))?;
                     return Ok(node::Statement::For(stmt))
                 }
@@ -432,9 +615,13 @@ impl Parser {
             } else {
                 let prev_in = self.context.allow_in;
                 self.context.allow_in = false;
-                let decls = self.parse_binding_list(&kind, true)?;
+                let mut decls = self.parse_binding_list(&kind, true)?;
                 if decls.len() == 1 {
-                    let decl = decls.get(0).ok_or(self.error(&self.look_ahead, &["variable decl"]))?;
+                    let decl = if let Some(d) = decls.pop() {
+                        d
+                    } else {
+                        return self.error(&self.look_ahead, &["variable decl"])
+                    };
                     if decl.init.is_none() && self.at_keyword(Keyword::In) {
                         let left = node::LoopLeft::Variable(decl);
                         let _in = self.next_item()?;
@@ -506,7 +693,7 @@ impl Parser {
                 }))
             } else {
                 let init = if self.at_punct(Punct::Comma) {
-                    let seq = vec![init];
+                    let mut seq = vec![init];
                     while self.at_punct(Punct::Comma) {
                         let _comma = self.next_item()?;
                         seq.push(self.inherit_cover_grammar(&Self::parse_assignment_expr)?)
@@ -883,9 +1070,9 @@ impl Parser {
         let mut key: Option<node::PropertyKey> = None;
         let mut value: Option<node::PropertyValue> = None;
         let mut computed = false;
-        let mut method = false;
+        let method = false;
         let mut is_static = false;
-        let mut is_async = false;
+        let is_async = false;
         if self.at_punct(Punct::Asterisk) {
             let _ = self.next_item()?;
         } else {
@@ -1069,7 +1256,7 @@ impl Parser {
         //         unimplemented!()
         //     }
         // }
-        unimplemented!()
+        unimplemented!("parse_primary_expression")
     }
 
     fn parse_function_expr(&mut self) -> Res<node::Expression> {
@@ -1233,7 +1420,9 @@ impl Parser {
                 false
             };
             let ident = self.parse_var_ident(is_var)?;
-            params.push(self.look_ahead.clone());
+            params.push(
+                self.look_ahead.clone()
+            );
             Ok(node::Pattern::Identifier(ident))
         }
     }
@@ -1535,7 +1724,71 @@ impl Parser {
     }
 
     fn parse_left_hand_side_expr_allow_call(&mut self) -> Res<node::Expression> {
-        unimplemented!("parse_left_hand_side_expr_allow_call")
+        let start_pos = self.get_item_position(&self.look_ahead);
+        let is_async = self.matches_contextual_keyword("async");
+        let prev_in = self.context.allow_in;
+        self.context.allow_in = true;
+
+        let mut expr = if self.at_keyword(Keyword::Super) && self.context.in_function_body {
+            let _ = self.next_item()?;
+            if !self.at_punct(Punct::OpenParen) && !self.at_punct(Punct::Period) && !self.at_punct(Punct::OpenBracket) {
+                return self.error(&self.look_ahead, &["(", ".", "["])
+            }
+            node::Expression::SuperExpression
+        } else {
+            if self.at_keyword(Keyword::New) {
+                self.inherit_cover_grammar(&Self::parse_new_expr)?
+            } else {
+                self.inherit_cover_grammar(&Self::parse_primary_expression)?
+            }
+        };
+        loop {
+            if self.at_punct(Punct::Period) {
+                self.context.is_binding_element = false;
+                self.context.is_assignment_target = true;
+                self.expect_punct(Punct::Period)?;
+                let prop = node::Expression::Ident(self.parse_ident_name()?);
+                expr = node::Expression::Member(node::MemberExpression {
+                    object: Box::new(expr),
+                    property: Box::new(prop),
+                    computed: false
+                })
+            } else if self.at_punct(Punct::OpenParen) {
+                let current_pos = self.get_item_position(&self.look_ahead);
+                let async_arrow = is_async && start_pos.line == current_pos.line;
+                self.context.is_binding_element = false;
+                self.context.is_assignment_target = false;
+                let args = if async_arrow {
+                    self.parse_async_args()?
+                } else {
+                    self.parse_args()?
+                };
+                unimplemented!("parse_left_hand_side_expr_allow_call -> while -> CallExpression");
+                if async_arrow && self.at_punct(Punct::FatArrow) {
+                    unimplemented!("arrow function def")
+                }
+            } else if self.at_punct(Punct::OpenBracket) {
+                unimplemented!("parse_left_hand_side_expr_allow_call -> while -> OpenBracket")
+            } else if self.look_ahead.token.is_template_head() {
+                unimplemented!("parse_left_hand_side_expr_allow_call -> while -> TemplateHead")
+            } else {
+                break;
+            }
+        }
+        self.context.allow_in = prev_in;
+        Ok(expr)
+    }
+
+    fn parse_async_args(&mut self) -> Res<Vec<node::FunctionArg>> {
+        unimplemented!("parse_async_args")
+    }
+
+    fn parse_args(&mut self) -> Res<Vec<node::FunctionArg>> {
+        unimplemented!("parse_args")
+    }
+
+    fn parse_new_expr(&mut self) -> Res<node::Expression> {
+        unimplemented!("parse_new_expr")
     }
 
     fn bin_precedence(&self, tok: &Token) -> usize {
@@ -1820,6 +2073,7 @@ impl Parser {
     }
 }
 
+#[allow(unused)]
 struct FormalParams {
     simple: bool,
     params: Vec<node::FunctionArg>,
@@ -1827,7 +2081,7 @@ struct FormalParams {
     first_restricted: Option<Item>,
 
 }
-
+#[allow(unused)]
 struct CoverFormalListOptions {
     simple: bool,
     params: Vec<node::FunctionArg>,

@@ -176,7 +176,7 @@ pub enum Statement{
     For(ForStatement),
     ForIn(ForInStatement),
     ForOf(ForOfStatement),
-    Var(VariableDecl),
+    Var(Vec<VariableDecl>),
 }
 
 #[derive(Debug)]
@@ -214,7 +214,7 @@ pub struct TryStatement{
 
 #[derive(Debug)]
 pub struct CatchClause{
-    pub param: Option<Pattern>,
+    pub param: Pattern,
     pub body: BlockStatement,
 }
 
@@ -228,12 +228,6 @@ pub struct WhileStatement{
 pub struct DoWhileStatement{
     pub test: Expression,
     pub body: Box<Statement>,
-}
-
-pub enum ForTop {
-    For { init: Option<LoopInit>, test: Option<Expression>, update: Option<Expression>},
-    Of { left: LoopLeft, right: Expression },
-    In { Left: LoopLeft, right: Expression },
 }
 
 #[derive(Debug)]
@@ -328,7 +322,7 @@ pub struct RegEx{
 #[derive(Debug)]
 pub struct SwitchCase{
     pub test: Option<Expression>,
-    pub consequent: Vec<Statement>,
+    pub consequent: Vec<ScriptPart>,
 }
 
 #[derive(Debug)]
@@ -517,6 +511,7 @@ pub enum ObjectPatternPart{
     Assignment(Property),
     Rest(Box<Pattern>),
 }
+
 #[derive(Debug)]
 pub struct AssignmentPattern{
     pub left: Box<Pattern>,

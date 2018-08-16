@@ -1,10 +1,14 @@
 {
     "cSpell.words": [
+        "Paren",
         "Punct",
         "curr",
+        "esprima",
         "finalizer",
         "patts",
         "quasis",
-        "ress"
+        "redecl",
+        "ress",
+        "stricted"
     ]
 }
