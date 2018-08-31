@@ -11,7 +11,7 @@ use error::Error;
 use node::Position;
 use std::{collections::HashSet, mem::replace};
 
-
+static mut DEBUG: bool = false;
 #[allow(unused)]
 struct Config {
     range: bool,
@@ -515,9 +515,6 @@ impl Parser {
             //tolerate error
         }
         self.expect_keyword(Keyword::Return)?;
-        if self.look_ahead.token.matches_punct(Punct::OpenBrace) {
-            ();
-        }
         // if we are at a semi-colon,or close curly brace or eof
         //the return doesn't have an arg. If we are at a line term
         //we need to account for a string literal or template literal
@@ -860,11 +857,13 @@ impl Parser {
         let ret = self.parse_expression()?;
         if ret.is_ident() && self.at_punct(Punct::Colon) {
             let _colon = self.next_item()?;
-            let id = ret
-                .as_ident()
-                .ok_or(self.reinterpret_error("expression", "ident"))?;
+            let id = if let node::Expression::Ident(ref ident) = ret {
+                ident.clone()
+            } else {
+                return Err(self.reinterpret_error("expression", "ident"))
+            };
             if !self.context.label_set.insert(format!("${}", id)) {
-                return Err(self.redecl_error(&id));
+                //error, multiple ids in this scope.
             }
             let body = if self.at_keyword(Keyword::Class) {
                 let body = self.parse_class_body()?;
@@ -2870,12 +2869,24 @@ impl Parser {
         Ok(res)
     }
 
+
+
     /// Request the next token from the scanner
     /// swap the last look ahead with this new token
     /// and return the last token
     fn next_item(&mut self) -> Res<Item> {
+        unsafe {
+            if self.scanner.cursor > 52710 {
+                DEBUG = true
+            }
+        }
         loop {
             if let Some(look_ahead) = self.scanner.next() {
+                unsafe {
+                    if DEBUG {
+                        // println!("{:?}", look_ahead);
+                    }
+                }
                 if look_ahead.token.is_comment() {
                     if self.config.comment {
                         self.comments.push(look_ahead);

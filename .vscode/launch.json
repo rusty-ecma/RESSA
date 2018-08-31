@@ -17,17 +17,18 @@
             "cargo": {
                 "args": [
                     "test",
-                    "--lib",
-                    "--no-run"
+                    "--no-run",
+                    "--features=major_libs",
+                    "--test=major_libs"
                 ]
             },
             "program": "${cargo:program}",
-            "args": ["--nocapture"],
+            "args": ["--nocapture", "react_dom"],
             "sourceLanguages": [
                 "rust"
             ],
             "env": {
-                "RUST_LOG": "resp:debug"
+                // "RUST_LOG": "resp:debug"
             },
         },
         {
