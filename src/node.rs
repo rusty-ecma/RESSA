@@ -5,10 +5,16 @@ pub struct Node{
     pub position: Position,
     pub item: Item,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Position{
     pub line: usize,
     pub column: usize,
+}
+
+impl ::std::fmt::Display for Position {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "line: {}, column: {}", &self.line, &self.column)
+    }
 }
 
 impl Position {
@@ -48,32 +54,32 @@ pub enum ModulePart{
     Statement(Statement),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ScriptPart{
     Directive(Directive),
     Statement(Statement),
     Decl(Declaration),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ModuleDecl{
     Import(ModuleImport),
     Export(ModuleExport),
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ModuleImport{
     pub specifiers: Vec<ImportSpecifier>,
     pub source: Literal,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ImportSpecifier{
     Normal(Identifier, Identifier),
     Default(Identifier),
     Namespace(Identifier),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ModuleExport{
     /// ```js
     /// export default function() {};
@@ -98,24 +104,24 @@ pub enum ModuleExport{
     All(Literal),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NamedExportDecl{
     pub decl: Option<Declaration>,
     pub specifiers: Vec<ExportSpecifier>,
     pub source: Option<Literal>,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DefaultExportDecl{
     Decl(Declaration),
     Expr(Expression),
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExportSpecifier{
     pub local: Identifier,
     pub exported: Option<Identifier>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Declaration{
     Variable(VariableKind, Vec<VariableDecl>),
     Function(Function),
@@ -124,7 +130,7 @@ pub enum Declaration{
     Export(Box<ModuleExport>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VariableDecl{
     pub id: Pattern,
     pub init: Option<Expression>,
@@ -156,7 +162,7 @@ impl ToString for VariableKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement{
     Expr(Expression),
     Block(Vec<Statement>),
@@ -179,58 +185,58 @@ pub enum Statement{
     Var(Vec<VariableDecl>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WithStatement{
     pub object: Expression,
     pub body: Box<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LabeledStatement{
     pub label: Identifier,
     pub body: Box<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IfStatement{
     pub test: Expression,
     pub consequent: Box<Statement>,
     pub alternate: Option<Box<Statement>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SwitchStatement{
     pub discriminant: Expression,
     pub cases: Vec<SwitchCase>,
 }
 
 pub type BlockStatement = Vec<Statement>;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TryStatement{
     pub block: BlockStatement,
     pub handler: Option<CatchClause>,
     pub finalizer: Option<BlockStatement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CatchClause{
     pub param: Pattern,
     pub body: BlockStatement,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WhileStatement{
     pub test: Expression,
     pub body: Box<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DoWhileStatement{
     pub test: Expression,
     pub body: Box<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ForStatement{
     pub init: Option<LoopInit>,
     pub test: Option<Expression>,
@@ -238,20 +244,20 @@ pub struct ForStatement{
     pub body: Box<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LoopInit{
     Variable(Vec<VariableDecl>),
     Expr(Expression),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ForInStatement{
     pub left: LoopLeft,
     pub right: Expression,
     pub body: Box<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ForOfStatement{
     pub left: LoopLeft,
     pub right: Expression,
@@ -259,14 +265,14 @@ pub struct ForOfStatement{
     pub await: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LoopLeft{
     Variable(VariableDecl),
     Pattern(Pattern),
 }
 pub type Identifier = String;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function{
     pub id: Option<String>,
     pub params: Vec<FunctionArg>,
@@ -274,7 +280,7 @@ pub struct Function{
     pub generator: bool,
     pub is_async: bool,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FunctionArg{
     Expr(Expression),
     Pattern(Pattern),
@@ -293,39 +299,99 @@ impl FunctionArg {
             }
         }
     }
+
+    pub fn is_assignment(&self) -> bool {
+        match self {
+            FunctionArg::Pattern(ref p) => match p {
+                Pattern::Assignment(_) => true,
+                _ => false,
+            },
+            FunctionArg::Expr(ref e) => match e {
+                Expression::Assignment(_) => true,
+                _ => false,
+            }
+        }
+    }
+
+    pub fn is_await(&self) -> bool {
+        match self {
+            FunctionArg::Expr(ref e) => match e {
+                Expression::Ident(ref i) => i == "await",
+                _ => false,
+            },
+            FunctionArg::Pattern(ref p) => match p {
+                Pattern::Identifier(ref i) => i == "await",
+                _ => false,
+            }
+        }
+    }
 }
 
 pub type FunctionBody = Vec<ScriptPart>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Directive{
     pub expression: Literal,
     pub directive: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Literal{
     Null,
     String(String),
-    Number(f32),
+    Number(String),
     Boolean(bool),
     RegEx(RegEx),
     Template(TemplateLiteral),
 }
 
-#[derive(Debug)]
+impl Literal {
+    pub fn from_token(token: &ress::Token) -> Option<Self> {
+        match token {
+            ress::Token::Null => Some(Literal::Null),
+            ress::Token::String(ref string_lit) => Some(Literal::String(token.to_string())),
+            ress::Token::Numeric(ref num) => Some(Literal::Number(token.to_string())),
+            ress::Token::Boolean(ref b) => Some(Literal::Boolean(b.into())),
+            ress::Token::RegEx(ref r) => Some(Literal::RegEx(r.into())),
+            _ => None
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct RegEx{
     pub pattern: String,
     pub flags: String,
 }
 
-#[derive(Debug)]
+impl<'a> From<&'a ress::RegEx> for RegEx {
+    fn from(other: &'a ress::RegEx) -> Self {
+        Self::from_parts(&other.body, &other.flags)
+    }
+}
+
+impl RegEx {
+    pub fn from_parts(body: &str, flags: &Option<String>) -> Self
+    {
+        let f = if let Some(ref f) = flags {
+            f.clone()
+        } else {
+            String::new()
+        };
+        Self {
+            pattern: body.to_string(),
+            flags: f,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct SwitchCase{
     pub test: Option<Expression>,
     pub consequent: Vec<ScriptPart>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression{
     ThisExpression,
     SuperExpression,
@@ -350,6 +416,8 @@ pub enum Expression{
     Await(Box<Expression>),
     Ident(Identifier),
     ArrowParamPlaceHolder(Vec<FunctionArg>, bool),
+    Literal(Literal),
+    TaggedTemplate(TaggedTemplateExpression),
 }
 impl Expression {
     pub fn is_ident(&self) -> bool {
@@ -382,35 +450,52 @@ impl Expression {
         }
     }
 
-    pub fn as_ident(self) -> super::Res<Identifier> {
+    pub fn as_ident(self) -> Option<Identifier> {
         match self {
-            Expression::Ident(i) => Ok(i),
-            _ => Err(Error::unable_to_reinterpret("expression", "identifier")),
+            Expression::Ident(i) => Some(i),
+            _ => None,
         }
     }
 }
 
 pub type ArrayExpression = Vec<Option<Expression>>;
 pub type ObjectExpression = Vec<ObjectProperty>;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ObjectProperty{
     Property(Property),
     Spread(Box<Expression>)
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Property{
     pub key: PropertyKey,
     pub value: PropertyValue,
     pub kind: PropertyKind,
     pub method: bool,
     pub computed: bool,
+    pub short_hand: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PropertyKey{
     Literal(Literal),
     Ident(Identifier),
     Pattern(Pattern),
+}
+
+impl PropertyKey {
+    pub fn matches(&self, other: &str) -> bool {
+        match self {
+            PropertyKey::Literal(ref l) => match l {
+                Literal::String(ref s) => s == other,
+                _ => false,
+            },
+            PropertyKey::Ident(ref i) => i == other,
+            PropertyKey::Pattern(ref p) => match p {
+                Pattern::Identifier(ref i) => i == other,
+                _ => false,
+            }
+        }
+    }
 }
 
 impl PropertyKey {
@@ -440,10 +525,11 @@ impl PropertyKey {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PropertyValue{
     Expr(Expression),
     Pattern(Pattern),
+    None,
 }
 
 impl PropertyValue {
@@ -467,11 +553,12 @@ impl Property {
             kind: PropertyKind::Init,
             method: false,
             computed: false,
+            short_hand: false,
         }
     }
 
 }
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 #[derive(Debug)]
 pub enum PropertyKind{
     Init,
@@ -480,7 +567,7 @@ pub enum PropertyKind{
     Ctor,
     Method,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Pattern{
     Identifier(Identifier),
     Object(ObjectPattern),
@@ -503,22 +590,43 @@ impl Pattern {
             _ => false,
         }
     }
+
+    pub fn is_yield(&self) -> bool {
+        match self {
+            Pattern::Identifier(ref ident) => ident == "yield",
+            _ => false,
+        }
+    }
+
+    pub fn is_ident(&self) -> bool {
+        match self {
+            Pattern::Identifier(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_restricted(&self) -> bool {
+        match self {
+            Pattern::Identifier(ref ident) => ident == "eval" || ident == "arguments",
+            _ => false,
+        }
+    }
 }
 
 pub type ObjectPattern = Vec<ObjectPatternPart>;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ObjectPatternPart{
     Assignment(Property),
     Rest(Box<Pattern>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssignmentPattern{
     pub left: Box<Pattern>,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UnaryExpression{
     pub operator: UnaryOperator,
     pub prefix: bool,
@@ -535,7 +643,7 @@ impl UnaryExpression {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum UnaryOperator{
     Minus,
     Plus,
@@ -546,27 +654,48 @@ pub enum UnaryOperator{
     Delete,
 }
 
-#[derive(Debug)]
+impl UnaryOperator {
+    pub fn from_token(token: &ress::Token) -> Option<Self> {
+        match token {
+            ress::Token::Punct(ref p) =>  match p {
+                ress::Punct::Minus => Some(UnaryOperator::Minus),
+                ress::Punct::Plus => Some(UnaryOperator::Plus),
+                ress::Punct::Not => Some(UnaryOperator::Not),
+                ress::Punct::BitwiseNot => Some(UnaryOperator::Tilde),
+                _ => None,
+            }
+            ress::Token::Keyword(ref k) => match k {
+                ress::Keyword::TypeOf => Some(UnaryOperator::TypeOf),
+                ress::Keyword::Void => Some(UnaryOperator::Void),
+                ress::Keyword::Delete => Some(UnaryOperator::Delete),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct UpdateExpression{
     pub operator: UpdateOperator,
     pub argument: Box<Expression>,
     pub prefix: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UpdateOperator{
     Increment,
     Decrement,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BinaryExpression{
     pub operator: BinaryOperator,
     pub left: Box<Expression>,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinaryOperator{
     Equal,
     NotEqual,
@@ -592,20 +721,55 @@ pub enum BinaryOperator{
     PowerOf,
 }
 
-#[derive(Debug)]
+impl BinaryOperator {
+    pub fn from_token(token: &ress::Token) -> Option<Self> {
+        match token {
+            ress::Token::Keyword(ref key) => match key {
+                ress::Keyword::InstanceOf => Some(BinaryOperator::InstanceOf),
+                ress::Keyword::In => Some(BinaryOperator::In),
+                _ => None,
+            },
+            ress::Token::Punct(ref p) => match p {
+                ress::Punct::Equal => Some(BinaryOperator::Equal),
+                ress::Punct::NotEqual => Some(BinaryOperator::NotEqual),
+                ress::Punct::StrictEquals => Some(BinaryOperator::StrictEqual),
+                ress::Punct::StrictNotEquals => Some(BinaryOperator::StrictNotEqual),
+                ress::Punct::LessThan => Some(BinaryOperator::LessThan),
+                ress::Punct::LessThanEqual => Some(BinaryOperator::LessThanEqual),
+                ress::Punct::GreaterThan => Some(BinaryOperator::GreaterThan),
+                ress::Punct::GreaterThanEqual => Some(BinaryOperator::GreaterThanEqual),
+                ress::Punct::LeftShift => Some(BinaryOperator::LeftShift),
+                ress::Punct::RightShift => Some(BinaryOperator::RightShift),
+                ress::Punct::UnsignedRightShift => Some(BinaryOperator::UnsignedRightShift),
+                ress::Punct::Plus => Some(BinaryOperator::Plus),
+                ress::Punct::Minus => Some(BinaryOperator::Minus),
+                ress::Punct::Asterisk => Some(BinaryOperator::Times),
+                ress::Punct::ForwardSlash => Some(BinaryOperator::Over),
+                ress::Punct::Modulo => Some(BinaryOperator::Mod),
+                ress::Punct::And => Some(BinaryOperator::And),
+                ress::Punct::Pipe => Some(BinaryOperator::Or),
+                ress::Punct::Caret => Some(BinaryOperator::XOr),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct AssignmentExpression{
     pub operator: AssignmentOperator,
     pub left: AssignmentLeft,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AssignmentLeft{
     Pattern(Pattern),
     Expr(Box<Expression>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AssignmentOperator{
     Equal,
     PlusEqual,
@@ -625,7 +789,7 @@ pub enum AssignmentOperator{
 impl AssignmentOperator {
     pub fn from_punct(p: &ress::Punct) -> Option<Self> {
         match p {
-            ress::Punct::Equal => Some(AssignmentOperator::Equal),
+            ress::Punct::Assign => Some(AssignmentOperator::Equal),
             ress::Punct::AddAssign => Some(AssignmentOperator::PlusEqual),
             ress::Punct::SubtractAssign => Some(AssignmentOperator::MinusEqual),
             ress::Punct::MultiplyAssign => Some(AssignmentOperator::TimesEqual),
@@ -643,40 +807,53 @@ impl AssignmentOperator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LogicalExpression{
     pub operator: LogicalOperator,
     pub left: Box<Expression>,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LogicalOperator{
     Or,
     And,
 }
 
-#[derive(Debug)]
+impl LogicalOperator {
+    pub fn from_token(token: &ress::Token) -> Option<Self> {
+        match token {
+            ress::Token::Punct(ref p) => match p {
+                ress::Punct::LogicalAnd => Some(LogicalOperator::And),
+                ress::Punct::LogicalOr => Some(LogicalOperator::Or),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct MemberExpression{
     pub object: Box<Expression>,
     pub property: Box<Expression>,
     pub computed: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConditionalExpression{
     pub test: Box<Expression>,
     pub alternate: Box<Expression>,
     pub consequent: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CallExpression{
     pub callee: Box<Expression>,
     pub arguments: Vec<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NewExpression{
     pub callee: Box<Expression>,
     pub arguments: Vec<Expression>,
@@ -684,7 +861,7 @@ pub struct NewExpression{
 
 pub type SequenceExpression = Vec<Expression>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ArrowFunctionExpression{
     pub id: Option<String>,
     pub params: Vec<FunctionArg>,
@@ -694,44 +871,44 @@ pub struct ArrowFunctionExpression{
     pub is_async: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ArrowFunctionBody{
     FunctionBody(FunctionBody),
     Expr(Box<Expression>)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct YieldExpression{
     pub argument: Option<Box<Expression>>,
     pub delegate: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TemplateLiteral{
     pub quasis: Vec<TemplateElement>,
     pub expressions: Vec<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TaggedTemplateExpression{
-    pub tag: Expression,
+    pub tag: Box<Expression>,
     pub quasi: TemplateLiteral,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TemplateElement{
     pub tail: bool,
-    pub cooked: Option<String>,
+    pub cooked: String,
     pub raw: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Class{
     pub id: Option<Identifier>,
     pub super_class: Option<Box<Expression>>,
     pub body: Vec<Property>,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MethodDef{
     pub key: Expression,
     pub value: Expression,
@@ -740,7 +917,7 @@ pub struct MethodDef{
     pub is_static: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MethodKind{
     Constructor,
     Method,
@@ -748,7 +925,7 @@ pub enum MethodKind{
     Set,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MetaProperty{
     pub meta: Identifier,
     pub property: Identifier,

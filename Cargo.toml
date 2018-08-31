@@ -7,3 +7,8 @@ repository = "https://github.com/FreeMasen/RESP"
 
 [dependencies]
 ress = {path = "../ress"}
+log = "0.4.4"
+env_logger = "0.5.13"
+
+[features]
+major_libs = []
