@@ -14,12 +14,8 @@ use std::{collections::HashSet, mem::replace};
 static mut DEBUG: bool = false;
 #[allow(unused)]
 struct Config {
-    range: bool,
-    loc: bool,
-    source: Option<String>,
-    tokens: bool,
-    comment: bool,
     tolerant: bool,
+    comments: bool,
 }
 #[allow(unused)]
 struct Context {
@@ -43,12 +39,8 @@ impl Default for Config {
     fn default() -> Self {
         debug!(target: "resp:debug", "default");
         Self {
-            range: false,
-            loc: false,
-            source: None,
-            tokens: false,
-            comment: false,
             tolerant: false,
+            comments: false,
         }
     }
 }
@@ -74,13 +66,77 @@ impl Default for Context {
         }
     }
 }
+
+pub struct Builder {
+    tolerant: bool,
+    is_module: bool,
+    comments: bool,
+    js: String,
+}
+
+impl Builder {
+    pub fn new() -> Self {
+        Self {
+            tolerant: false,
+            is_module: false,
+            comments: false,
+            js: String::new(),
+        }
+    }
+
+    pub fn set_tolerant(&mut self, value: bool) {
+        self.tolerant = value;
+    }
+
+    pub fn tolerant(&mut self, value: bool) -> &mut Self {
+        self.set_tolerant(value);
+        self
+    }
+
+    pub fn set_module(&mut self, value: bool) {
+        self.is_module = false;
+    }
+
+    pub fn module(&mut self, value: bool) -> &mut Self {
+        self.set_module(value);
+        self
+    }
+
+    pub fn set_comments(&mut self, value: bool) {
+        self.comments = value;
+    }
+
+    pub fn comments(&mut self, value: bool) -> &mut Self {
+        self.set_comments(value);
+        self
+    }
+
+    pub fn set_js(&mut self, js: impl Into<String>) {
+        self.js = js.into();
+    }
+
+    pub fn js(&mut self, js: impl Into<String>) -> &mut Self {
+        self.set_js(js);
+        self
+    }
+
+    pub fn build(&self) -> Res<Parser> {
+        let is_module = self.is_module;
+        let comments = self.comments;
+        let tolerant = self.tolerant;
+        let lines = get_lines(&self.js);
+        let scanner = Scanner::new(self.js.clone());
+        Parser::build(is_module, tolerant, comments, scanner, lines)
+    }
+}
+
 #[allow(unused)]
 pub struct Parser {
     context: Context,
     config: Config,
     scanner: Scanner,
     lines: Vec<Line>,
-    pub look_ahead: Item,
+    look_ahead: Item,
     found_eof: bool,
     tokens: Vec<Item>,
     comments: Vec<Item>,
@@ -143,11 +199,30 @@ fn get_lines(text: &str) -> Vec<Line> {
 }
 
 impl Parser {
-    pub fn new(text: &str) -> Res<Parser> {
+    pub fn new(text: &str) -> Res<Self> {
         let lines = get_lines(text);
-        let mut s = Scanner::new(text);
-        let mut ret = Parser {
-            scanner: s,
+        let s = Scanner::new(text);
+        let config = Config::default();
+        let context = Context::default();
+        Self::_new(s, lines, config, context)
+    }
+
+    pub(crate) fn build(is_module: bool, tolerant: bool, comments: bool, scanner: Scanner, lines: Vec<Line>) -> Res<Self> {
+        let config = Config {
+            tolerant,
+            comments,
+            ..Default::default()
+        };
+        let context = Context {
+            is_module,
+            ..Default::default()
+        };
+        Self::_new(scanner, lines, config, context)
+    }
+
+    fn _new(scanner: Scanner, lines: Vec<Line>, config: Config, context: Context) -> Res<Self> {
+        let mut ret = Self {
+            scanner,
             look_ahead: Item {
                 token: Token::EoF,
                 span: Span {
@@ -157,8 +232,8 @@ impl Parser {
             },
             lines,
             found_eof: false,
-            config: Config::default(),
-            context: Context::default(),
+            config,
+            context,
             tokens: vec![],
             comments: vec![],
             current_position: node::Position::start(),
@@ -167,17 +242,24 @@ impl Parser {
         Ok(ret)
     }
 
-    pub fn parse_script(&mut self) -> Res<node::Program> {
+    pub fn parse(&mut self) -> Res<node::Program> {
         debug!(target: "resp:debug", "parse_script");
         let mut body = self.parse_directive_prologues()?;
         while !self.look_ahead.token.is_eof() {
-            let part = self.parse_statement_list_item_script()?;
+            let part = self.parse_statement_list_item()?;
+            if !self.context.is_module && (part.is_export() || part.is_import()) {
+                //error
+            }
             body.push(part);
         }
-        Ok(node::Program::Script(body))
+        Ok(if self.context.is_module {
+            node::Program::Module(body)
+        } else {
+            node::Program::Script(body)
+        })
     }
 
-    fn parse_directive_prologues(&mut self) -> Res<Vec<node::ScriptPart>> {
+    fn parse_directive_prologues(&mut self) -> Res<Vec<node::ProgramPart>> {
         debug!(target: "resp:debug", "parse_directive_prologues");
         let mut ret = vec![];
         loop {
@@ -191,7 +273,7 @@ impl Parser {
                     }
                     self.context.strict = true;
                 }
-                ret.push(node::ScriptPart::Directive(dir));
+                ret.push(node::ProgramPart::Directive(dir));
             } else {
                 break;
             }
@@ -239,48 +321,290 @@ impl Parser {
         Ok(ret)
     }
 
-    fn parse_statement_list_item_script(&mut self) -> Res<node::ScriptPart> {
+    fn parse_statement_list_item(&mut self) -> Res<node::ProgramPart> {
         debug!(target: "resp:debug", "parse_statement_list_item_script");
         self.context.is_assignment_target = true;
         self.context.is_binding_element = true;
         let tok = self.look_ahead.token.clone();
         let ret = match &tok {
             Token::Keyword(ref k) => match k {
-                &Keyword::Import => self.error(&self.look_ahead, &[]),
-                &Keyword::Export => self.error(&self.look_ahead, &[]),
+                &Keyword::Import => {
+                    if self.at_import_call() {
+                        let stmt = self.parse_statement()?;
+                        Ok(node::ProgramPart::Statement(stmt))
+                    } else {
+                        if !self.context.is_module {
+                            //Error
+                        }
+                        let import = self.parse_import_decl()?;
+                        let decl = node::Declaration::Import(Box::new(import));
+                        Ok(node::ProgramPart::Decl(decl))
+                    }
+                },
+                &Keyword::Export => {
+                    let export = self.parse_export_decl()?;
+                    let decl = node::Declaration::Export(Box::new(export));
+                    Ok(node::ProgramPart::Decl(decl))
+                },
                 &Keyword::Const => {
                     let decl = self.parse_lexical_decl(false)?;
-                    Ok(node::ScriptPart::Decl(decl))
+                    Ok(node::ProgramPart::Decl(decl))
                 }
                 &Keyword::Function => {
                     let func = self.parse_function_decl(true)?;
                     let decl = node::Declaration::Function(func);
-                    Ok(node::ScriptPart::Decl(decl))
+                    Ok(node::ProgramPart::Decl(decl))
                 }
                 &Keyword::Class => {
                     let class = self.parse_class_decl(false)?;
                     let decl = node::Declaration::Class(class);
-                    Ok(node::ScriptPart::Decl(decl))
+                    Ok(node::ProgramPart::Decl(decl))
                 }
                 &Keyword::Let => Ok(if self.at_lexical_decl() {
                     let decl = self.parse_lexical_decl(false)?;
-                    node::ScriptPart::Decl(decl)
+                    node::ProgramPart::Decl(decl)
                 } else {
                     let stmt = self.parse_statement()?;
-                    node::ScriptPart::Statement(stmt)
+                    node::ProgramPart::Statement(stmt)
                 }),
                 _ => {
                     let stmt = self.parse_statement()?;
-                    Ok(node::ScriptPart::Statement(stmt))
+                    Ok(node::ProgramPart::Statement(stmt))
                 }
             },
             _ => {
                 let stmt = self.parse_statement()?;
-                Ok(node::ScriptPart::Statement(stmt))
+                Ok(node::ProgramPart::Statement(stmt))
             }
         };
-        // println!("new statement list item {:#?}", ret);
         ret
+    }
+
+    fn parse_import_decl(&mut self) -> Res<node::ModuleImport> {
+        if self.context.in_function_body {
+            //error
+        }
+        self.expect_keyword(Keyword::Import)?;
+        if self.look_ahead.token.is_ident() {
+            let source = self.parse_module_specifier()?;
+            self.consume_semicolon()?;
+            Ok(node::ModuleImport {
+                specifiers: vec![],
+                source,
+            })
+        } else {
+            let specifiers = if self.at_punct(Punct::OpenBrace) {
+                self.parse_named_imports()?
+            } else if self.at_punct(Punct::Asterisk) {
+                vec![self.parse_import_namespace_specifier()?]
+            } else if self.at_possible_ident() && !self.at_keyword(Keyword::Default) {
+                let mut specifiers = vec![self.parse_import_default_specifier()?];
+                if self.at_punct(Punct::Comma) {
+                    let _ = self.next_item()?;
+                    if self.at_punct(Punct::Asterisk) {
+                        specifiers.push(self.parse_import_namespace_specifier()?);
+                    } else if self.at_punct(Punct::OpenBrace) {
+                        specifiers.append(&mut self.parse_named_imports()?);
+                    } else {
+                        return self.error(&self.look_ahead, &["{", "*"]);
+                    }
+                }
+                specifiers
+            } else {
+                return self.error(&self.look_ahead, &["{", "*", "[ident]"])
+            };
+            if !self.at_contextual_keyword("from") {
+                return self.error(&self.look_ahead, &["from"]);
+            }
+            let _ = self.next_item()?;
+            let source = self.parse_module_specifier()?;
+            self.consume_semicolon()?;
+            Ok(node::ModuleImport {
+                specifiers,
+                source,
+            })
+        }
+    }
+
+    fn at_possible_ident(&self) -> bool {
+        self.look_ahead.token.is_ident()
+        || self.look_ahead.token.is_keyword()
+        || self.look_ahead.token.is_boolean()
+        || self.look_ahead.token.is_null()
+    }
+
+    fn parse_named_imports(&mut self) -> Res<Vec<node::ImportSpecifier>> {
+        self.expect_punct(Punct::OpenBrace)?;
+        let mut ret = vec![];
+        while !self.at_punct(Punct::CloseBrace) {
+            ret.push(self.parse_import_specifier()?);
+            if !self.at_punct(Punct::CloseBrace) {
+                self.expect_punct(Punct::Comma)?;
+            }
+        }
+        Ok(ret)
+    }
+
+    fn parse_import_specifier(&mut self) -> Res<node::ImportSpecifier> {
+        let imported = if self.look_ahead.token.is_ident() {
+            self.parse_var_ident(false)?
+        } else {
+            let imported = self.parse_ident_name()?;
+            if !self.at_contextual_keyword("as") {
+                return self.error(&self.look_ahead, &["as"]);
+            }
+            imported
+        };
+        let local = self.parse_local_import_ident()?;
+        Ok(node::ImportSpecifier::Normal(imported, local))
+    }
+
+    fn parse_local_import_ident(&mut self) -> Res<Option<node::Identifier>> {
+        Ok(if self.at_contextual_keyword("as") {
+            Some(self.parse_var_ident(false)?)
+        } else {
+            None
+        })
+    }
+
+    fn parse_import_namespace_specifier(&mut self) -> Res<node::ImportSpecifier> {
+        self.expect_punct(Punct::Asterisk)?;
+        if !self.at_contextual_keyword("as") {
+            return self.error(&self.look_ahead, &["as"]);
+        }
+        let _ = self.next_item()?;
+        let ident = self.parse_ident_name()?;
+        Ok(node::ImportSpecifier::Namespace(ident))
+    }
+
+    fn parse_import_default_specifier(&mut self) -> Res<node::ImportSpecifier> {
+        let ident = self.parse_ident_name()?;
+        Ok(node::ImportSpecifier::Default(ident))
+    }
+
+    fn parse_export_decl(&mut self) -> Res<node::ModuleExport> {
+        if self.context.in_function_body {
+            //error
+        }
+        self.expect_keyword(Keyword::Export)?;
+        if self.at_keyword(Keyword::Default) {
+            let _ = self.next_item()?;
+            let decl = if self.at_keyword(Keyword::Function) {
+                let func = node::Declaration::Function(self.parse_function_decl(true)?);
+                node::DefaultExportDecl::Decl(func)
+            } else if self.at_keyword(Keyword::Class) {
+                let class = node::Declaration::Class(self.parse_class_decl(true)?);
+                node::DefaultExportDecl::Decl(class)
+            } else if self.at_contextual_keyword("async") {
+                if self.at_async_function() {
+                    let func = self.parse_function_decl(true)?;
+                    let decl = node::Declaration::Function(func);
+                    node::DefaultExportDecl::Decl(decl)
+                } else {
+                    let expr = self.parse_assignment_expr()?;
+                    node::DefaultExportDecl::Expr(expr)
+                }
+            } else {
+                if self.at_contextual_keyword("from") {
+                    //error
+                }
+                if self.at_punct(Punct::OpenBrace) {
+                    let expr = self.parse_obj_init()?;
+                    node::DefaultExportDecl::Expr(expr)
+                } else if self.at_punct(Punct::OpenBracket) {
+                    let expr = self.parse_array_init()?;
+                    node::DefaultExportDecl::Expr(expr)
+                } else {
+                    let expr = self.parse_assignment_expr()?;
+                    node::DefaultExportDecl::Expr(expr)
+                }
+            };
+            Ok(node::ModuleExport::Default(decl))
+        } else if self.at_punct(Punct::Asterisk) {
+            let _ = self.next_item()?;
+            if !self.at_contextual_keyword("from") {
+                //error
+            }
+            let _ = self.next_item()?;
+            let source = self.parse_module_specifier()?;
+            Ok(node::ModuleExport::All(source))
+        } else if self.look_ahead.token.is_keyword() {
+            if self.look_ahead.token.matches_keyword(Keyword::Let) || self.look_ahead.token.matches_keyword(Keyword::Const) {
+                let lex = self.parse_lexical_decl(false)?;
+                let decl = node::NamedExportDecl::Decl(lex);
+                Ok(node::ModuleExport::Named(decl))
+            } else if self.look_ahead.token.matches_keyword(Keyword::Var) {
+                let var = node::Declaration::Variable(node::VariableKind::Var, vec![self.parse_variable_decl(false)?]);
+                let decl = node::NamedExportDecl::Decl(var);
+                Ok(node::ModuleExport::Named(decl))
+            } else if self.look_ahead.token.matches_keyword(Keyword::Class) {
+                let class = self.parse_class_decl(true)?;
+                let decl = node::Declaration::Class(class);
+                let decl = node::NamedExportDecl::Decl(decl);
+                Ok(node::ModuleExport::Named(decl))
+            } else if  self.look_ahead.token.matches_keyword(Keyword::Function) {
+                let func = self.parse_function_decl(true)?;
+                let decl = node::Declaration::Function(func);
+                let decl = node::NamedExportDecl::Decl(decl);
+                Ok(node::ModuleExport::Named(decl))
+            } else {
+                return self.error(&self.look_ahead, &["let", "var", "const", "class", "function"]);
+            }
+        } else if self.at_async_function() {
+            let func = self.parse_function_decl(false)?;
+            let decl = node::Declaration::Function(func);
+            let decl = node::NamedExportDecl::Decl(decl);
+            Ok(node::ModuleExport::Named(decl))
+        } else {
+            self.expect_punct(Punct::OpenBrace)?;
+            let mut specifiers = vec![];
+            let mut found_default = false;
+            while !self.at_punct(Punct::CloseBrace) {
+                if self.at_keyword(Keyword::Default) {
+                    found_default = true;
+                }
+                specifiers.push(self.parse_export_specifier()?);
+                if !self.at_punct(Punct::CloseBrace) {
+                    self.expect_punct(Punct::Comma)?;
+                }
+            }
+            if self.at_contextual_keyword("from") {
+                let _ = self.next_item()?;
+                let source = self.parse_module_specifier()?;
+                self.consume_semicolon()?;
+                let decl = node::NamedExportDecl::Specifier(specifiers, Some(source));
+                Ok(node::ModuleExport::Named(decl))
+            } else if found_default {
+                self.error(&self.look_ahead, &[""])
+            } else {
+                self.consume_semicolon()?;
+                let decl = node::NamedExportDecl::Specifier(specifiers, None);
+                Ok(node::ModuleExport::Named(decl))
+            }
+        }
+    }
+
+    fn parse_export_specifier(&mut self) -> Res<node::ExportSpecifier> {
+        let local = self.parse_ident_name()?;
+        let exported = if self.at_contextual_keyword("as") {
+            Some(self.parse_ident_name()?)
+        } else {
+            None
+        };
+        Ok(node::ExportSpecifier {
+            local,
+            exported,
+        })
+    }
+
+    fn parse_module_specifier(&mut self) -> Res<node::Literal> {
+        let item = self.next_item()?;
+        match &item.token {
+            Token::String(ref s) => {
+                Ok(node::Literal::String(s.to_string()))
+            },
+            _ => self.error(&item, &["[string]"])
+        }
     }
 
     fn parse_statement(&mut self) -> Res<node::Statement> {
@@ -504,7 +828,7 @@ impl Parser {
             {
                 break;
             }
-            consequent.push(self.parse_statement_list_item_script()?)
+            consequent.push(self.parse_statement_list_item()?)
         }
         Ok(node::SwitchCase { test, consequent })
     }
@@ -578,7 +902,7 @@ impl Parser {
         debug!(target: "resp:debug", "parse_for_stmt");
 
         self.expect_keyword(Keyword::For)?;
-        let await = if self.at_keyword(Keyword::Await) {
+        let is_await = if self.at_keyword(Keyword::Await) {
             let _ = self.next_item()?;
             true
         // for await ([lookahead ≠ let] LeftHandSideExpression [?Yield, ?Await] of AssignmentExpression [+In, ?Yield, ?Await]) Statement [?Yield, ?Await, ?Return]
@@ -612,9 +936,9 @@ impl Parser {
                     let left = node::LoopLeft::Variable(decl);
                     let stmt = self.parse_for_in_loop(left)?;
                     return Ok(node::Statement::ForIn(stmt));
-                } else if self.matches_contextual_keyword("of") {
+                } else if self.at_contextual_keyword("of") {
                     let left = node::LoopLeft::Variable(decl);
-                    let stmt = self.parse_for_of_loop(left)?;
+                    let stmt = self.parse_for_of_loop(left, is_await)?;
                     return Ok(node::Statement::ForOf(stmt));
                 } else {
                     let init = node::LoopInit::Variable(vec![decl]);
@@ -668,16 +992,13 @@ impl Parser {
                             right,
                             body: Box::new(self.parse_loop_body()?),
                         }));
-                    } else if decl.init.is_none() && self.matches_contextual_keyword("of") {
+                    } else if decl.init.is_none() && self.at_contextual_keyword("of") {
                         let left = node::LoopLeft::Variable(decl);
-                        let _of = self.next_item()?;
-                        let right = self.parse_assignment_expr()?;
-                        return Ok(node::Statement::ForOf(node::ForOfStatement {
-                            left,
-                            right,
-                            body: Box::new(self.parse_loop_body()?),
-                            await,
-                        }));
+                        return Ok(
+                            node::Statement::ForOf(
+                                self.parse_for_of_loop(left, is_await)?
+                            )
+                        );
                     } else {
                         let init = node::LoopInit::Variable(vec![decl]);
                         let stmt = self.parse_for_loop_cont(Some(init))?;
@@ -705,23 +1026,16 @@ impl Parser {
                     right,
                     body: Box::new(self.parse_loop_body()?),
                 }));
-            } else if self.matches_contextual_keyword("of") {
-                let _of = self.next_item()?;
-                let p = match init {
-                    node::Expression::Assignment(a) => match a.left {
-                        node::AssignmentLeft::Pattern(p) => p,
-                        _ => return self.error(&start, &["assignment pattern"]),
-                    },
-                    _ => unimplemented!("destructuring in loop binding"),
-                };
+            } else if self.at_contextual_keyword("of") {
+                let _ = self.next_item()?;
+                let p = self.reinterpret_expr_as_pat(init)?;
                 let left = node::LoopLeft::Pattern(p);
                 let right = self.parse_assignment_expr()?;
-                return Ok(node::Statement::ForOf(node::ForOfStatement {
-                    left,
-                    right,
-                    body: Box::new(self.parse_loop_body()?),
-                    await,
-                }));
+                return Ok(
+                    node::Statement::ForOf(
+                        self.parse_for_of_loop(left, is_await)?
+                    )
+                );
             } else {
                 let init = if self.at_punct(Punct::Comma) {
                     let mut seq = vec![init];
@@ -784,9 +1098,19 @@ impl Parser {
         })
     }
 
-    fn parse_for_of_loop(&mut self, left: node::LoopLeft) -> Res<node::ForOfStatement> {
+    fn parse_for_of_loop(&mut self, left: node::LoopLeft, is_await: bool) -> Res<node::ForOfStatement> {
         debug!(target: "resp:debug", "parse_for_of_loop");
-        unimplemented!("parse_for_of_loop")
+        let _ = self.next_item()?;
+        let right = self.parse_assignment_expr()?;
+        let body = self.parse_loop_body()?;
+        Ok(
+            node::ForOfStatement {
+                left,
+                right,
+                body: Box::new(body),
+                is_await,
+            }
+        )
     }
 
     fn parse_loop_body(&mut self) -> Res<node::Statement> {
@@ -906,10 +1230,14 @@ impl Parser {
             if self.at_punct(Punct::CloseBrace) {
                 break;
             }
-            match self.parse_statement_list_item_script()? {
-                node::ScriptPart::Statement(s) => ret.push(s),
-                _ => return self.error(&self.look_ahead, &[]),
+            let part = self.parse_statement_list_item()?;
+            if part.is_export() {
+                //error
             }
+            if part.is_import() {
+                //error
+            }
+            ret.push(part);
         }
         self.expect_punct(Punct::CloseBrace)?;
         Ok(ret)
@@ -990,7 +1318,7 @@ impl Parser {
             return self.error(&self.look_ahead, &["not eval", "not arguments"]);
         }
         let init = if kind == &node::VariableKind::Const {
-            if !self.at_keyword(Keyword::In) && !self.matches_contextual_keyword("of") {
+            if !self.at_keyword(Keyword::In) && !self.at_contextual_keyword("of") {
                 if self.at_punct(Punct::Assign) {
                     let _ = self.next_item()?;
                     Some(self.isolate_cover_grammar(&Self::parse_assignment_expr)?)
@@ -1014,7 +1342,7 @@ impl Parser {
 
     fn parse_function_decl(&mut self, opt_ident: bool) -> Res<node::Function> {
         debug!(target: "resp:debug", "parse_function_decl");
-        let is_async = if self.matches_contextual_keyword("async") {
+        let is_async = if self.at_contextual_keyword("async") {
             let _ = self.next_item()?;
             true
         } else {
@@ -1100,7 +1428,7 @@ impl Parser {
             if self.at_punct(Punct::CloseBrace) {
                 break;
             }
-            body.push(self.parse_statement_list_item_script()?)
+            body.push(self.parse_statement_list_item()?)
         }
         self.expect_punct(Punct::CloseBrace)?;
         self.context.label_set = prev_label;
@@ -1120,7 +1448,7 @@ impl Parser {
         } else {
             Some(self.parse_var_ident(false)?)
         };
-        let super_class = if self.matches_contextual_keyword("extends") {
+        let super_class = if self.at_contextual_keyword("extends") {
             let _ = self.next_item()?;
             Some(Box::new(self.isolate_cover_grammar(
                 &Self::parse_left_hand_side_expr_allow_call,
@@ -1162,7 +1490,6 @@ impl Parser {
         let mut key: Option<node::PropertyKey> = None;
         let mut value: Option<node::PropertyValue> = None;
         let mut computed = false;
-        let method = false;
         let mut is_static = false;
         let is_async = false;
         if self.at_punct(Punct::Asterisk) {
@@ -1187,7 +1514,7 @@ impl Parser {
             }
             if self.look_ahead.token.is_ident()
                 && !self.context.has_line_term
-                && self.matches_contextual_keyword("async")
+                && self.at_contextual_keyword("async")
             {
                 if !self.look_ahead.token.matches_punct(Punct::Colon)
                     && !self.look_ahead.token.matches_punct(Punct::OpenParen)
@@ -1201,19 +1528,25 @@ impl Parser {
         let mut kind: Option<node::PropertyKind> = None;
         let mut method = false;
 
-        let look_ahead_prop_key = Self::qualified_prop_name(&self.look_ahead.token);
+        let look_ahead_prop_key = self.at_possible_ident();
         if self.look_ahead.token.is_ident() {
-            if self.matches_contextual_keyword("get") && look_ahead_prop_key {
-                kind = Some(node::PropertyKind::Get);
-                computed = self.at_punct(Punct::OpenBracket);
-                key = Some(self.parse_object_property_key()?);
-                self.context.allow_yield = false;
-                value = Some(self.parse_getter_method()?);
-            } else if self.matches_contextual_keyword("set") && look_ahead_prop_key {
-                kind = Some(node::PropertyKind::Set);
-                computed = self.at_punct(Punct::OpenBracket);
-                key = Some(self.parse_object_property_key()?);
-                value = Some(self.parse_setter_method()?);
+            let (at_get, at_set) = if let Some(ref k) = key {
+                (k.matches("get") && look_ahead_prop_key, k.matches("set") && look_ahead_prop_key)
+            } else {
+                (false, false)
+            };
+
+            if at_get {
+                    kind = Some(node::PropertyKind::Get);
+                    computed = self.at_punct(Punct::OpenBracket);
+                    self.context.allow_yield = false;
+                    key = Some(self.parse_object_property_key()?);
+                    value = Some(self.parse_getter_method()?);
+            } else if at_set {
+                    kind = Some(node::PropertyKind::Set);
+                    computed = self.at_punct(Punct::OpenBracket);
+                    key = Some(self.parse_object_property_key()?);
+                    value = Some(self.parse_setter_method()?);
             }
         } else if self.look_ahead.token.matches_punct(Punct::Asterisk) && look_ahead_prop_key {
             kind = Some(node::PropertyKind::Init);
@@ -1225,10 +1558,11 @@ impl Parser {
 
         if kind.is_none() && key.is_some() && self.at_punct(Punct::OpenParen) {
             kind = Some(node::PropertyKind::Init);
+            method = true;
             value = Some(if is_async {
-                self.parse_property_method_async_fn()?
+                self.parse_async_property_method()?
             } else {
-                self.parse_property_method_fn()?
+                self.parse_property_method()?
             });
         }
 
@@ -1252,12 +1586,13 @@ impl Parser {
                 return self.error(&self.look_ahead, &[]);
             }
             if !is_static && key.matches_value("constructor") {
-                if kind == node::PropertyKind::Method || !method {
-                    return self.error(&self.look_ahead, &[]);
+                println!("kind: {:?}, method: {}", kind, method);
+                if kind != node::PropertyKind::Method || !method {
+                    return self.error(&self.look_ahead, &["[constructor declaration]"]);
                 }
                 if let Some(ref v) = value {
                     if v.is_generator() {
-                        return self.error(&self.look_ahead, &[]);
+                        return self.error(&self.look_ahead, &["[non-generator function declaration]"]);
                     }
                 }
                 if has_ctor {
@@ -1288,19 +1623,61 @@ impl Parser {
         ))
     }
 
-    fn parse_property_method_async_fn(&mut self) -> Res<node::PropertyValue> {
+    fn parse_async_property_method(&mut self) -> Res<node::PropertyValue> {
         debug!(target: "resp:debug", "parse_property_method_async_fn");
-        unimplemented!("parse_property_method_async_fn")
+        let prev_yield = self.context.allow_yield;
+        let prev_await = self.context.await;
+        self.context.allow_yield = false;
+        self.context.await = true;
+        let params = self.parse_formal_params()?;
+        let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
+        self.context.allow_yield = prev_yield;
+        self.context.await = prev_await;
+        let func = node::Function {
+            id: None,
+            params: params.params,
+            is_async: true,
+            generator: false,
+            body,
+        };
+        Ok(node::PropertyValue::Expr(node::Expression::Function(func)))
     }
 
-    fn parse_property_method_fn(&mut self) -> Res<node::PropertyValue> {
-        debug!(target: "resp:debug", "parse_property_method_fn");
-        unimplemented!("parse_property_method_fn")
+
+
+    fn parse_property_method(&mut self) -> Res<node::PropertyValue> {
+        debug!(target: "resp:debug", "parse_property_method");
+        let prev_yield = self.context.allow_yield;
+        self.context.allow_yield = false;
+        let params = self.parse_formal_params()?;
+        let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
+        self.context.allow_yield = prev_yield;
+        let func = node::Function {
+            id: None,
+            params: params.params,
+            is_async: false,
+            generator: false,
+            body,
+        };
+        Ok(node::PropertyValue::Expr(node::Expression::Function(func)))
     }
 
     fn parse_generator_method(&mut self) -> Res<node::PropertyValue> {
         debug!(target: "resp:debug", "pares_generator_method");
-        unimplemented!("pares_generator_method")
+        let prev_yield = self.context.allow_yield;
+        self.context.allow_yield = true;
+        let params = self.parse_formal_params()?;
+        self.context.allow_yield = false;
+        let body = self.parse_method_body(params.simple, params.found_restricted)?;
+        self.context.allow_yield = prev_yield;
+        let func = node::Function {
+            id: None,
+            params: params.params,
+            is_async: false,
+            generator: true,
+            body,
+        };
+        Ok(node::PropertyValue::Expr(node::Expression::Function(func)))
     }
 
     fn parse_getter_method(&mut self) -> Res<node::PropertyValue> {
@@ -1328,7 +1705,7 @@ impl Parser {
         )
     }
 
-    fn parse_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<Vec<node::ScriptPart>> {
+    fn parse_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<Vec<node::ProgramPart>> {
         debug!(target: "resp:debug", "parse_method_body");
         self.context.is_assignment_target = false;
         self.context.is_binding_element = false;
@@ -1346,7 +1723,41 @@ impl Parser {
 
     fn parse_setter_method(&mut self) -> Res<node::PropertyValue> {
         debug!(target: "resp:debug", "parse_setter_method");
-        unimplemented!("parse_setter_method")
+        let prev_allow = self.context.allow_yield;
+        self.context.allow_yield = true;
+        let params = self.parse_formal_params()?;
+        if params.params.len() != 1 {
+            //tolerate error
+        } else if let Some(ref param) = params.params.get(0) {
+            if param.is_rest() {
+                //tolerate error
+            }
+        }
+        let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
+        let func = node::Function {
+            id: None,
+            params: params.params,
+            body,
+            generator: false,
+            is_async: false,
+        };
+        Ok(node::PropertyValue::Expr(node::Expression::Function(func)))
+    }
+
+    fn parse_property_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<node::FunctionBody> {
+        debug!(target: "resp:debug", "parse_property_method_fn");
+        self.context.is_assignment_target = false;
+        self.context.is_binding_element = false;
+        let prev_strict = self.context.strict;
+        let prev_allow = self.context.allow_strict_directive;
+        self.context.allow_strict_directive = simple;
+        let ret = self.inherit_cover_grammar(&Self::parse_function_source_el)?;
+        if self.context.strict && found_restricted {
+            //tolerate error
+        }
+        self.context.strict = prev_strict;
+        self.context.allow_strict_directive = prev_allow;
+        Ok(ret)
     }
 
     fn qualified_prop_name(tok: &Token) -> bool {
@@ -1717,9 +2128,9 @@ impl Parser {
                         computed,
                         key,
                         value: if is_async {
-                            self.parse_property_method_async_fn()?
+                            self.parse_async_property_method()?
                         } else {
-                            self.parse_property_method_fn()?
+                            self.parse_property_method()?
                         },
                         kind,
                         method: true,
@@ -1812,7 +2223,7 @@ impl Parser {
 
     fn parse_function_expr(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_function_expr");
-        let is_async = self.matches_contextual_keyword("async");
+        let is_async = self.at_contextual_keyword("async");
         if is_async {
             let _ = self.next_item()?;
         }
@@ -1997,8 +2408,10 @@ impl Parser {
     ) -> Res<(bool, node::Pattern)> {
         debug!(target: "resp:debug", "parse_pattern");
         if self.at_punct(Punct::OpenBracket) {
-            self.parse_array_pattern()
+            let kind = kind.unwrap_or(node::VariableKind::Var);
+            self.parse_array_pattern(params, kind)
         } else if self.at_punct(Punct::OpenBracket) {
+            let kind = kind.unwrap_or(node::VariableKind::Var);
             self.parse_object_pattern()
         } else {
             let is_var = if let Some(kind) = kind {
@@ -2021,14 +2434,102 @@ impl Parser {
         }
     }
 
-    fn parse_array_pattern(&mut self) -> Res<(bool, node::Pattern)> {
+    fn parse_array_pattern(&mut self, params: &mut Vec<Item>, kind: node::VariableKind) -> Res<(bool, node::Pattern)> {
         debug!(target: "resp:debug", "parse_array_pattern");
-        unimplemented!("parse_array_pattern")
+        self.expect_punct(Punct::OpenBracket)?;
+        let mut elements = vec![];
+        while !self.at_punct(Punct::CloseBracket) {
+            if self.at_punct(Punct::Comma) {
+                let _ = self.next_item()?;
+                elements.push(None);
+            } else {
+                if self.at_punct(Punct::Spread) {
+                    let (_, el) = self.parse_rest_element(params)?;
+                    elements.push(Some(el));
+                    break;
+                } else {
+                    let (_, el) = self.parse_pattern_with_default(params)?;
+                    elements.push(Some(el));
+                }
+                if !self.at_punct(Punct::CloseBracket) {
+                    self.expect_punct(Punct::Comma)?;
+                }
+            }
+        }
+        self.expect_punct(Punct::CloseBracket)?;
+        Ok((false, node::Pattern::Array(elements)))
     }
 
     fn parse_object_pattern(&mut self) -> Res<(bool, node::Pattern)> {
         debug!(target: "resp:debug", "parse_object_pattern");
-        unimplemented!("parse_object_pattern")
+        self.expect_punct(Punct::OpenBrace)?;
+        let mut body = vec![];
+        while !self.at_punct(Punct::CloseBrace) {
+            let el = if self.at_punct(Punct::Spread) {
+                self.parse_rest_prop()?
+            } else {
+                self.parse_property_pattern()?
+            };
+            body.push(el);
+            if !self.at_punct(Punct::CloseBrace) {
+                self.expect_punct(Punct::Comma)?;
+            }
+        }
+        self.expect_punct(Punct::CloseBrace)?;
+        Ok((false, node::Pattern::Object(body)))
+    }
+
+    fn parse_rest_prop(&mut self) -> Res<node::ObjectPatternPart> {
+        debug!(target: "resp:debug", "parse_rest_prop");
+        self.expect_punct(Punct::Spread)?;
+        let (_, arg) = self.parse_pattern(None, &mut vec![])?;
+        if self.at_punct(Punct::Assign) {
+            //unexpected token
+        }
+        if !self.at_punct(Punct::CloseBrace) {
+            //unable to parse props after rest
+        }
+        let rest = node::Pattern::RestElement(Box::new(arg));
+        let part = node::ObjectPatternPart::Rest(Box::new(rest));
+        Ok(part)
+    }
+
+    fn parse_property_pattern(&mut self) -> Res<node::ObjectPatternPart> {
+        debug!(target: "resp:debug", "parse_property_pattern");
+        let mut computed = false;
+        let mut short_hand = false;
+        let mut method = false;
+        let (key, value) = if self.look_ahead.token.is_ident() {
+            let key = node::PropertyKey::Ident(self.parse_var_ident(false)?);
+            let value = if self.at_punct(Punct::Assign) {
+                short_hand = true;
+                let e = self.parse_assignment_expr()?;
+                node::PropertyValue::Expr(e)
+            } else if !self.at_punct(Punct::Colon) {
+                short_hand = true;
+                node::PropertyValue::None
+            } else {
+                self.expect_punct(Punct::Colon)?;
+                let (_, p) = self.parse_pattern_with_default(&mut vec![])?;
+                node::PropertyValue::Pattern(p)
+            };
+            (key, value)
+        } else {
+            computed = self.at_punct(Punct::OpenBracket);
+            let key = self.parse_object_property_key()?;
+            self.expect_punct(Punct::Colon)?;
+            let (_, v) = self.parse_pattern_with_default(&mut vec![])?;
+            let value = node::PropertyValue::Pattern(v);
+            (key, value)
+        };
+        Ok(node::ObjectPatternPart::Assignment(node::Property {
+            key,
+            value,
+            computed,
+            short_hand,
+            method,
+            kind: node::PropertyKind::Init,
+        }))
     }
 
     fn parse_assignment_expr(&mut self) -> Res<node::Expression> {
@@ -2455,7 +2956,7 @@ impl Parser {
                 operator,
                 argument: Box::new(arg),
             }))
-        } else if self.context.await && self.matches_contextual_keyword("await") {
+        } else if self.context.await && self.at_contextual_keyword("await") {
             self.parse_await_expr()
         } else {
             self.parse_update_expr()
@@ -2599,7 +3100,7 @@ impl Parser {
     fn parse_left_hand_side_expr_allow_call(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_left_hand_side_expr_allow_call");
         let start_pos = self.get_item_position(&self.look_ahead);
-        let is_async = self.matches_contextual_keyword("async");
+        let is_async = self.at_contextual_keyword("async");
         let prev_in = self.context.allow_in;
         self.context.allow_in = true;
 
@@ -2642,13 +3143,15 @@ impl Parser {
                 };
                 //TODO: check for bad import call
                 if async_arrow && self.at_punct(Punct::FatArrow) {
-                    unimplemented!("arrow function def")
+                    let args = args.into_iter().map(|a| node::FunctionArg::Expr(a)).collect();
+                    expr = node::Expression::ArrowParamPlaceHolder(args, true);
+                } else {
+                    let inner = node::CallExpression {
+                        callee: Box::new(expr),
+                        arguments: args,
+                    };
+                    expr = node::Expression::Call(inner);
                 }
-                let inner = node::CallExpression {
-                    callee: Box::new(expr),
-                    arguments: args,
-                };
-                expr = node::Expression::Call(inner);
             } else if self.at_punct(Punct::OpenBracket) {
                 self.context.is_assignment_target = true;
                 self.context.is_binding_element = false;
@@ -2700,6 +3203,7 @@ impl Parser {
         self.expect_punct(Punct::CloseParen)?;
         Ok(ret)
     }
+
     fn expect_comma_sep(&mut self) -> Res<()> {
         debug!(target: "resp:debug", "expect_comma_sep");
         if self.config.tolerant {
@@ -2717,15 +3221,21 @@ impl Parser {
             self.expect_punct(Punct::Comma)
         }
     }
+
     fn parse_async_arg(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_async_arg");
         let expr = self.parse_assignment_expr()?;
         self.context.first_covert_initialized_name_error = None;
         Ok(expr)
     }
+
     fn parse_spread_element(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_spread_element");
-        unimplemented!("parse_spread_element");
+        self.expect_punct(Punct::Spread)?;
+        let arg = self.inherit_cover_grammar(&Self::parse_assignment_expr)?;
+        Ok(
+            node::Expression::Spread(Box::new(arg))
+        )
     }
 
     fn parse_args(&mut self) -> Res<Vec<node::Expression>> {
@@ -2876,19 +3386,19 @@ impl Parser {
     /// and return the last token
     fn next_item(&mut self) -> Res<Item> {
         unsafe {
-            if self.scanner.cursor > 52710 {
-                DEBUG = true
+            if self.scanner.cursor > 0 {
+                DEBUG = false
             }
         }
         loop {
             if let Some(look_ahead) = self.scanner.next() {
                 unsafe {
                     if DEBUG {
-                        // println!("{:?}", look_ahead);
+                        println!("{:?}", look_ahead);
                     }
                 }
                 if look_ahead.token.is_comment() {
-                    if self.config.comment {
+                    if self.config.comments {
                         self.comments.push(look_ahead);
                     }
                     continue;
@@ -2897,9 +3407,6 @@ impl Parser {
                 let new_pos = self.get_item_position(&look_ahead);
                 self.context.has_line_term = old_pos.line != new_pos.line;
                 self.current_position = old_pos;
-                if self.config.tokens {
-                    self.tokens.push(look_ahead.clone())
-                }
                 let ret = replace(&mut self.look_ahead, look_ahead);
                 return Ok(ret);
             } else {
@@ -3016,7 +3523,7 @@ impl Parser {
     }
 
     fn at_async_function(&mut self) -> bool {
-        if self.matches_contextual_keyword("async") {
+        if self.at_contextual_keyword("async") {
             if let Some(peek) = self.scanner.look_ahead() {
                 let pos = self.get_item_position(&self.look_ahead);
                 let next_pos = self.get_item_position(&peek);
@@ -3040,7 +3547,7 @@ impl Parser {
         Ok(())
     }
 
-    fn matches_contextual_keyword(&self, s: &str) -> bool {
+    fn at_contextual_keyword(&self, s: &str) -> bool {
         self.look_ahead.token.matches_ident_str(s)
     }
 
@@ -3246,7 +3753,7 @@ message: options.message
     }
     fn parse_script(js: &str, name: &str) {
         let mut p = Parser::new(js).unwrap();
-        let script = p.parse_script().unwrap();
+        let script = p.parse().unwrap();
         // ::std::fs::write(format!("{}.rus", name), format!("{:#?}", script)).unwrap();
     }
     #[test]

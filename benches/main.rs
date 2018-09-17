@@ -12,79 +12,100 @@ use test::{Bencher};
 #[bench]
 fn angular1(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::Angular) {
-        let mut p = Parser::new(&js).expect("Unable to crate new parser for angular.js");
-        b.iter(|| p.parse_script().expect("unable to parse angular1"));
+        b.iter(|| {
+            let mut p = Parser::new(&js).expect("Unable to crate new parser for angular.js");
+            p.parse().expect("unable to parse angular1")
+        });
     }
 }
 #[bench]
 fn angular1_min(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::Angular) {
-        let mut p = Parser::new(&js).expect("Unable to crate new parser for angular.js (min)");
-        b.iter(|| p.parse_script().expect("unable to parse angular1_min"));
+        b.iter(|| {
+            let mut p = Parser::new(&js).expect("Unable to crate new parser for angular.js (min)");
+            p.parse().expect("unable to parse angular1_min")
+        });
     }
 }
 
 #[bench]
 fn jquery(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::Jquery) {
-        let mut p = Parser::new(&js).expect("Unable to create new parser for jquery");
-        b.iter(|| p.parse_script().expect("unable to parse jquery"));
+        b.iter(|| {
+            let mut p = Parser::new(&js).expect("Unable to create new parser for jquery");
+            p.parse().expect("unable to parse jquery")
+        });
     }
 }
 #[bench]
 fn jquery_min(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::Jquery) {
-        let mut p = Parser::new(&js).expect("Unable to create new parser for jquery (min)");
-        b.iter(|| p.parse_script().expect("unable to parse jquery_min"));
+        b.iter(|| {
+            let mut p = Parser::new(&js).expect("Unable to create new parser for jquery (min)");
+            p.parse().expect("unable to parse jquery_min")
+        });
     }
 }
 
 #[bench]
 fn react(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::React) {
-        let mut p = Parser::new(&js).expect("Unable to create new parser for react");
-        b.iter(|| p.parse_script().expect("unable to parse react"));
+        b.iter(|| {
+            let mut p = Parser::new(&js).expect("Unable to create new parser for react");
+            p.parse().expect("unable to parse react")
+        });
     }
 }
 #[bench]
 fn react_min(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::React) {
-        let mut p = Parser::new(&js).expect("Unable to create new parser for react (min)");
-        b.iter(|| p.parse_script().expect("unable to parse react_min"));
+        b.iter(|| {
+            let mut p = Parser::new(&js).expect("Unable to create new parser for react (min)");
+            p.parse().expect("unable to parse react_min")
+        });
     }
 }
 
 #[bench]
 fn react_dom(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::ReactDom) {
-        let mut p = Parser::new(&js).expect("Unable to create new parser for react-dom");
-        b.iter(|| p.parse_script().expect("unable to parse react_dom"));
+        b.iter(|| {
+            let mut p = Parser::new(&js).expect("Unable to create new parser for react-dom");
+            p.parse().expect("unable to parse react_dom")
+        });
     }
 }
 #[bench]
 fn react_dom_min(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::ReactDom) {
-        let mut p = Parser::new(&js).expect("Unable to create new parser for react-dom (min)");
-        b.iter(|| p.parse_script().expect("unable to parse react_dom_min"));
+        b.iter(|| {
+            let mut p = Parser::new(&js).expect("Unable to create new parser for react-dom (min)");
+            p.parse().expect("unable to parse react_dom_min")
+        });
     }
 }
 
 #[bench]
 fn vue(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::Vue) {
-        let mut p = Parser::new(&js).expect("Unable to create new parser for vue");
-        b.iter(|| p.parse_script().expect("unable to parse vue"));
+        b.iter(|| {
+            let mut p = Parser::new(&js).expect("Unable to create new parser for vue");
+            p.parse().expect("unable to parse vue")
+        });
     }
 }
 #[bench]
 fn vue_min(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::Vue) {
-        let mut p = Parser::new(&js).expect("Unable to create new parser for vue (min)");
-        b.iter(|| p.parse_script().expect("unable to parse vue_min"));
+        b.iter(|| {
+            let mut p = Parser::new(&js).expect("Unable to create new parser for vue (min)");
+            p.parse().expect("unable to parse vue_min")
+        });
     }
 }
 
 fn npm_install() -> Result<(), ::std::io::Error> {
+    eprintln!("Downloading required js dependencies");
     let mut c = ::std::process::Command::new("npm");
     c.arg("i");
     c.output()?;

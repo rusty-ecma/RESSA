@@ -1,23 +1,29 @@
 
 
-function Thing() {
-    try {
-        Stuff()
-    } catch (message) {
-        console.log(message)
-    }
-}
+// function Thing() {
+//     try {
+//         Stuff()
+//     } catch (message) {
+//         console.log(message)
+//     }
+// }
 
-function Stuff() {
-    throw new Error('jahahahhahahaha')
-}
+// function Stuff() {
+//     throw new Error('jahahahhahahaha')
+// }
 
-function Third(one, two) {
-    return one + two + 3 + 4 + 10;
-}
+// function Third(one, two) {
+//     return one + two + 3 + 4 + 10;
+// }
 
-Thing();
+// Thing();
 
-let other = (one, two) => {
-    return 3;
-}
+// let other = (one, two) => {
+//     return 3;
+// }
+
+const { readFile } = require('fs');
+
+readFile('package.json', (err, val) => {
+    console.log(val.toString());
+})
