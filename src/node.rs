@@ -48,6 +48,16 @@ pub enum Program{
     Script(Vec<ProgramPart>),
 }
 
+impl Program {
+    pub fn module(parts: Vec<ProgramPart>) -> Self {
+        Program::Module(parts)
+    }
+
+    pub fn script(parts: Vec<ProgramPart>) -> Self {
+        Program::Script(parts)
+    }
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum ProgramPart {
     Directive(Directive),
@@ -56,6 +66,26 @@ pub enum ProgramPart {
 }
 
 impl ProgramPart {
+    pub fn directive(dir: &str) -> Self {
+        ProgramPart::Directive(Directive::new(dir))
+    }
+
+    pub fn use_strict(double_quotes: bool) -> Self {
+        let dir = if double_quotes {
+            r#""use strict""#
+        } else {
+            "'use strict'"
+        };
+        ProgramPart::directive(dir)
+    }
+
+    pub fn decl(decl: Declaration) -> Self {
+        ProgramPart::Decl(decl)
+    }
+
+    pub fn statement(stmt: Statement) -> Self {
+        ProgramPart::Statement(stmt)
+    }
     pub fn is_import(&self) -> bool {
         match self {
             ProgramPart::Decl(ref decl) => match decl {
@@ -82,10 +112,129 @@ pub enum ModuleDecl{
     Import(ModuleImport),
     Export(ModuleExport),
 }
+
+impl ModuleDecl {
+    pub fn import(import: ModuleImport) -> Self {
+        ModuleDecl::Import(import)
+    }
+
+    pub fn import_parts(specifiers: Vec<ImportSpecifier>, source: &str) -> Self {
+        ModuleDecl::Import(ModuleImport {
+            specifiers,
+            source: Literal::string(source),
+        })
+    }
+
+    pub fn single_import(name: &str, from: &str) -> Self {
+        Self::simple_imports(&[name], from)
+    }
+
+    pub fn single_default_import(name: &str, from: &str) -> Self {
+        let specifiers = vec![ImportSpecifier::default(name)];
+        let source = Literal::string(from);
+        ModuleDecl::Import(ModuleImport {
+            specifiers,
+            source,
+        })
+    }
+
+    pub fn imports_with_default(default: &str, normal: &[&str], from: &str) -> Self {
+        let mut specifiers = Vec::with_capacity(normal.len() + 1);
+        specifiers.push(ImportSpecifier::default(default));
+        for name in normal {
+            specifiers.push(ImportSpecifier::normal_no_local(name))
+        }
+        let source = Literal::string(from);
+        ModuleDecl::Import(ModuleImport {
+            specifiers,
+            source
+        })
+    }
+
+    pub fn simple_imports(names: &[&str], from: &str) -> Self {
+        let specifiers = names.iter().map(|n| ImportSpecifier::normal_no_local(n)).collect();
+        let source = Literal::string(from);
+        ModuleDecl::Import(ModuleImport {
+            specifiers,
+            source
+        })
+    }
+
+    pub fn namespace_import(local: &str, from: &str) -> Self {
+        ModuleDecl::Import(ModuleImport {
+            specifiers: vec![ImportSpecifier::namespace(local)],
+            source: Literal::string(from)
+        })
+    }
+
+    pub fn export(export: ModuleExport) -> Self {
+        ModuleDecl::Export(export)
+    }
+
+    pub fn export_all(name: &str) -> Self {
+        ModuleDecl::Export(ModuleExport::All(Literal::string(name)))
+    }
+
+    pub fn export_default_expr(expr: Expression) -> Self {
+        ModuleDecl::Export(
+            ModuleExport::Default(
+                DefaultExportDecl::Expr(expr)
+            )
+        )
+    }
+
+    pub fn export_default_decl(decl: Declaration) -> Self {
+        ModuleDecl::Export(
+            ModuleExport::Default(
+                DefaultExportDecl::Decl(decl)
+            )
+        )
+    }
+
+    pub fn export_named_decl(decl: Declaration) -> Self {
+        ModuleDecl::Export(
+            ModuleExport::Named(
+                NamedExportDecl::Decl(decl)
+            )
+        )
+    }
+
+    pub fn export_single_named_spec(name: &str) -> Self {
+        ModuleDecl::Export(
+            ModuleExport::Named(
+                NamedExportDecl::Specifier(
+                    vec![ExportSpecifier::no_alias(name)],
+                    None
+                )
+            )
+        )
+    }
+
+    pub fn export_single_named_spec_with_alias(name: &str, alias: &str) -> Self {
+        ModuleDecl::Export(
+            ModuleExport::Named(
+                NamedExportDecl::Specifier(
+                    vec![ExportSpecifier::with_alias(name, alias)],
+                    None
+                )
+            )
+        )
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub struct ModuleImport{
     pub specifiers: Vec<ImportSpecifier>,
     pub source: Literal,
+}
+
+impl ModuleImport {
+    pub fn new(specifiers: Vec<ImportSpecifier>, source: Literal) -> Self {
+        Self {
+            specifiers,
+            source,
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -93,6 +242,28 @@ pub enum ImportSpecifier{
     Normal(Identifier, Option<Identifier>),
     Default(Identifier),
     Namespace(Identifier),
+}
+
+impl ImportSpecifier {
+    pub fn normal(ident: Identifier, local: Option<Identifier>) -> Self {
+        ImportSpecifier::Normal(ident, local)
+    }
+
+    pub fn normal_no_local(ident: &str) -> Self {
+        ImportSpecifier::Normal(ident.to_string(), None)
+    }
+
+    pub fn normal_local(ident: &str, local: &str) -> Self {
+        ImportSpecifier::Normal(ident.to_string(), Some(local.to_string()))
+    }
+
+    pub fn default(ident: &str) -> Self {
+        ImportSpecifier::Default(ident.to_string())
+    }
+
+    pub fn namespace(ident: &str) -> Self {
+        ImportSpecifier::Namespace(ident.to_string())
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -125,6 +296,7 @@ pub enum NamedExportDecl {
     Decl(Declaration),
     Specifier(Vec<ExportSpecifier>, Option<Literal>),
 }
+
 #[derive(PartialEq,Debug, Clone)]
 pub enum DefaultExportDecl{
     Decl(Declaration),
@@ -134,6 +306,22 @@ pub enum DefaultExportDecl{
 pub struct ExportSpecifier{
     pub local: Identifier,
     pub exported: Option<Identifier>,
+}
+
+impl ExportSpecifier {
+    pub fn no_alias(local: &str) -> Self {
+        Self {
+            local: local.to_string(),
+            exported: None
+        }
+    }
+
+    pub fn with_alias(local: &str, alias: &str) -> Self {
+        Self {
+            local: local.to_string(),
+            exported: Some(alias.to_string()),
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -159,7 +347,67 @@ impl VariableDecl {
     pub fn is_obj(&self) -> bool {
         self.id.is_obj()
     }
+
+    pub fn uninitialized(name: &str) -> Self {
+        Self {
+            id: Pattern::ident(name),
+            init: None
+        }
+    }
+
+    pub fn with_value(name: &str, value: Expression) -> Self {
+        Self {
+            id: Pattern::ident(name),
+            init: Some(value),
+        }
+    }
+
+    pub fn destructed(names: &[&str], value: ObjectExpression) -> Self {
+        let id = Pattern::Object(names.iter().map(|name|
+            ObjectPatternPart::Assignment(Property {
+                key: PropertyKey::Ident(name.to_string()),
+                value: PropertyValue::None,
+                kind: PropertyKind::Init,
+                method: false,
+                short_hand: true,
+                computed: false,
+            })).collect()
+        );
+        Self {
+            id,
+            init: Some(Expression::Object(value)),
+        }
+    }
+
+    pub fn destructed_with_rest(names: &[&str], rest: &str, value: ObjectExpression) -> Self {
+        let mut props: Vec<ObjectPatternPart> = names.iter().map(|name|
+            ObjectPatternPart::Assignment(
+                Property {
+                    key: PropertyKey::Ident(name.to_string()),
+                    value: PropertyValue::None,
+                    kind: PropertyKind::Init,
+                    computed: false,
+                    method: false,
+                    short_hand: true,
+                }
+            )
+        ).collect();
+        props.push(
+            ObjectPatternPart::Rest(
+                Box::new(Pattern::RestElement(
+                    Box::new(Pattern::ident(rest))
+                ))
+            )
+        );
+        let id = Pattern::Object(props);
+        let init = Some(Expression::Object(value));
+        Self {
+            id,
+            init,
+        }
+    }
 }
+
 #[derive(PartialEq, Clone, Debug)]
 pub enum VariableKind{
     Var,
@@ -200,10 +448,37 @@ pub enum Statement{
     Var(Vec<VariableDecl>),
 }
 
+impl Statement {
+    pub fn with(object: Expression, body: Statement) -> Self {
+        Statement::With(
+            WithStatement::new(object, body)
+        )
+    }
+    pub fn while_stmt(test: Expression, body: Statement) -> Self {
+        Statement::While (
+            WhileStatement::new(test, body)
+        )
+    }
+    pub fn if_stmt(test: Expression, consequent: Statement, alt: Option<Statement>) -> Self {
+        Statement::If(
+            IfStatement::new(test, consequent, alt)
+        )
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub struct WithStatement{
     pub object: Expression,
     pub body: Box<Statement>,
+}
+
+impl WithStatement {
+    pub fn new(object: Expression, body: Statement) -> Self {
+        WithStatement {
+            object,
+            body: Box::new(body),
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -212,11 +487,33 @@ pub struct LabeledStatement{
     pub body: Box<Statement>,
 }
 
+impl LabeledStatement {
+    pub fn new(label: &str, body: Statement) -> Self {
+        Self {
+            label: label.to_string(),
+            body: Box::new(body),
+        }
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub struct IfStatement{
     pub test: Expression,
     pub consequent: Box<Statement>,
     pub alternate: Option<Box<Statement>>,
+}
+
+impl IfStatement {
+    pub fn new(test: Expression, consequent: Statement, alternate: Option<Statement>) -> Self {
+        Self {
+            test,
+            consequent: Box::new(consequent),
+            alternate: match alternate {
+                Some(stmt) => Some(Box::new(stmt)),
+                None => None
+            }
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -245,10 +542,28 @@ pub struct WhileStatement{
     pub body: Box<Statement>,
 }
 
+impl WhileStatement {
+    pub fn new(test: Expression, body: Statement) -> Self {
+        Self {
+            test,
+            body: Box::new(body),
+        }
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub struct DoWhileStatement{
     pub test: Expression,
     pub body: Box<Statement>,
+}
+
+impl DoWhileStatement {
+    pub fn new(test: Expression, body: Statement) -> Self {
+        Self {
+            test,
+            body: Box::new(body),
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -257,6 +572,26 @@ pub struct ForStatement{
     pub test: Option<Expression>,
     pub update: Option<Expression>,
     pub body: Box<Statement>,
+}
+
+impl ForStatement {
+    pub fn new(init: Option<LoopInit>, test: Option<Expression>, update: Option<Expression>, body: Statement) -> Self {
+        Self {
+            init: init,
+            test: test,
+            update: update,
+            body: Box::new(body)
+        }
+    }
+
+    pub fn normal(init: LoopInit, test: Expression, update: Expression, body: Statement) -> Self {
+        Self::new(Some(init), Some(test), Some(update), body)
+    }
+
+    pub fn infinite(body: Statement) -> Self {
+        Self::new(None, None, None, body)
+    }
+
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -272,12 +607,33 @@ pub struct ForInStatement{
     pub body: Box<Statement>,
 }
 
+impl ForInStatement {
+    pub fn new(left: LoopLeft, right: Expression, body: Statement) -> Self {
+        Self {
+            left,
+            right,
+            body: Box::new(body)
+        }
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub struct ForOfStatement{
     pub left: LoopLeft,
     pub right: Expression,
     pub body: Box<Statement>,
     pub is_await: bool,
+}
+
+impl ForOfStatement {
+    pub fn new(left: LoopLeft, right: Expression, body: Statement, is_await: bool) -> Self {
+        Self {
+            left,
+            right,
+            body: Box::new(body),
+            is_await,
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -353,6 +709,18 @@ impl FunctionArg {
             }
         }
     }
+
+    pub fn new_expr(expr: Expression) -> Self {
+        FunctionArg::Expr(expr)
+    }
+
+    pub fn new_patt(patt: Pattern) -> Self {
+        FunctionArg::Pattern(patt)
+    }
+
+    pub fn ident(name: &str) -> Self {
+        FunctionArg::Pattern(Pattern::ident(name))
+    }
 }
 
 pub type FunctionBody = Vec<ProgramPart>;
@@ -361,6 +729,20 @@ pub type FunctionBody = Vec<ProgramPart>;
 pub struct Directive{
     pub expression: Literal,
     pub directive: String,
+}
+
+impl Directive {
+    pub fn new(value: &str) -> Self {
+        let expression = Literal::string(value);
+        let directive = value
+                        .trim_matches(|c| c == '\''
+                                        || c == '"')
+                        .to_string();
+        Self {
+            expression,
+            directive,
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -384,6 +766,19 @@ impl Literal {
             _ => None
         }
     }
+
+    pub fn string(string: &str) -> Self {
+        Literal::String(string.to_string())
+    }
+
+    pub fn number(num: &str) -> Self {
+        Literal::Number(num.to_string())
+    }
+
+    pub fn regex(pattern: &str, flags: &str) -> Self {
+        let inner = RegEx::new(pattern, flags);
+        Literal::RegEx(inner)
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -394,12 +789,18 @@ pub struct RegEx{
 
 impl<'a> From<&'a ress::RegEx> for RegEx {
     fn from(other: &'a ress::RegEx) -> Self {
-        Self::from_parts(&other.body, &other.flags)
+        Self::from_ress_parts(&other.body, &other.flags)
     }
 }
 
 impl RegEx {
-    pub fn from_parts(body: &str, flags: &Option<String>) -> Self
+    pub fn new(body: &str, flags: &str) -> Self {
+        RegEx {
+            pattern: body.to_string(),
+            flags: body.to_string(),
+        }
+    }
+    pub fn from_ress_parts(body: &str, flags: &Option<String>) -> Self
     {
         let f = if let Some(ref f) = flags {
             f.clone()
@@ -447,6 +848,7 @@ pub enum Expression{
     Literal(Literal),
     TaggedTemplate(TaggedTemplateExpression),
 }
+
 impl Expression {
     pub fn is_ident(&self) -> bool {
         match self {
@@ -484,6 +886,69 @@ impl Expression {
             _ => None,
         }
     }
+
+    pub fn ident(name: &str) -> Self {
+        Expression::Ident(name.to_string())
+    }
+
+    pub fn string(val: &str) -> Self {
+        Expression::Literal(Literal::string(val))
+    }
+
+    pub fn number(val: &str) -> Self {
+        Expression::Literal(Literal::number(val))
+    }
+
+    pub fn boolean(val: bool) -> Self {
+        Expression::Literal(Literal::Boolean(val))
+    }
+
+    pub fn regex(pattern: &str, flags: &str) -> Self {
+        Expression::Literal(Literal::regex(pattern, flags))
+    }
+
+    pub fn binary(left: Expression, operator: BinaryOperator, right: Expression) -> Self {
+        Expression::Binary(BinaryExpression::new(left, operator, right))
+    }
+
+    pub fn call(callee: Expression, arguments: Vec<Expression>) -> Self {
+        Expression::Call(CallExpression::new(callee, arguments))
+    }
+
+    pub fn member(object: Expression, property: Expression, computed: bool) -> Self {
+        Expression::Member(MemberExpression::new(object, property, computed))
+    }
+
+    pub fn logical(left: Expression, operator: LogicalOperator, right: Expression) -> Self {
+        Expression::Logical(
+            LogicalExpression::new(operator, left, right)
+        )
+    }
+
+    pub fn function(id: Option<String>, params: Vec<FunctionArg>, body: FunctionBody,
+                    generator: bool, is_async: bool) -> Self {
+        Expression::Function(Function {
+            id,
+            params,
+            body,
+            generator,
+            is_async,
+        })
+    }
+
+    pub fn yield_expr(arg: Option<Expression>, delegate: bool) -> Self {
+        Expression::Yield(YieldExpression::new(
+            arg, delegate
+        ))
+    }
+
+    pub fn yield_with_arg(arg: Expression, delegate: bool) -> Self {
+        Expression::Yield(YieldExpression::new(Some(arg), delegate))
+    }
+
+    pub fn empty_yield(delegate: bool) -> Self {
+        Expression::Yield(YieldExpression::new(None, delegate))
+    }
 }
 
 pub type ArrayExpression = Vec<Option<Expression>>;
@@ -493,14 +958,52 @@ pub enum ObjectProperty{
     Property(Property),
     Spread(Box<Expression>)
 }
+
+impl ObjectProperty {
+    pub fn spread(arg: Expression) -> Self {
+        ObjectProperty::Spread(Box::new(arg))
+    }
+
+    pub fn string(key: &str, value: &str) -> Self {
+        ObjectProperty::Property(Property::string(key, value))
+    }
+
+    pub fn number(key: &str, value: &str) -> Self {
+        ObjectProperty::Property(Property::number(key, value))
+    }
+}
 #[derive(PartialEq,Debug, Clone)]
-pub struct Property{
+pub struct Property {
     pub key: PropertyKey,
     pub value: PropertyValue,
     pub kind: PropertyKind,
     pub method: bool,
     pub computed: bool,
     pub short_hand: bool,
+}
+
+impl Property {
+    pub fn string(key: &str, value: &str) -> Self {
+        Self {
+            key: PropertyKey::Ident(key.to_string()),
+            value: PropertyValue::Expr(Expression::string(value)),
+            kind: PropertyKind::Init,
+            method: false,
+            computed: false,
+            short_hand: false,
+        }
+    }
+
+    pub fn number(key: &str, value: &str) -> Self {
+        Self {
+            key: PropertyKey::Ident(key.to_string()),
+            value: PropertyValue::Expr(Expression::number(value)),
+            kind: PropertyKind::Init,
+            method: false,
+            computed: false,
+            short_hand: false,
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -524,9 +1027,7 @@ impl PropertyKey {
             }
         }
     }
-}
 
-impl PropertyKey {
     pub fn is_static(&self) -> bool {
         match self {
             PropertyKey::Literal(ref l) => match l {
@@ -538,17 +1039,6 @@ impl PropertyKey {
                 Pattern::Identifier(ref s) => s == "static",
                 _ => false
             }
-        }
-    }
-
-    pub fn matches_value(&self, value: &str) -> bool {
-        match self {
-            PropertyKey::Ident(ref s) => s == value,
-            PropertyKey::Literal(ref s) => match s {
-                Literal::String(ref s) => s == value,
-                _ => false,
-            },
-            _ => false,
         }
     }
 }
@@ -638,6 +1128,14 @@ impl Pattern {
             _ => false,
         }
     }
+
+    pub fn ident(name: &str) -> Self {
+        Pattern::Identifier(name.to_string())
+    }
+
+    pub fn rest_element(arg: Pattern) -> Self {
+        Pattern::RestElement(Box::new(arg))
+    }
 }
 
 pub type ObjectPattern = Vec<ObjectPatternPart>;
@@ -647,10 +1145,37 @@ pub enum ObjectPatternPart{
     Rest(Box<Pattern>),
 }
 
+impl ObjectPatternPart {
+    pub fn rest(arg: Pattern) -> Self {
+        ObjectPatternPart::Rest(Box::new(arg))
+    }
+
+    pub fn string(key: &str, value: &str) -> Self {
+        ObjectPatternPart::Assignment(
+            Property::string(key, value)
+        )
+    }
+
+    pub fn number(key: &str, value: &str) -> Self {
+        ObjectPatternPart::Assignment(
+            Property::number(key, value)
+        )
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub struct AssignmentPattern{
     pub left: Box<Pattern>,
     pub right: Box<Expression>,
+}
+
+impl AssignmentPattern {
+    pub fn new(left: Pattern, right: Expression) -> Self {
+        Self {
+            left: Box::new(left),
+            right: Box::new(right),
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -661,6 +1186,14 @@ pub struct UnaryExpression{
 }
 
 impl UnaryExpression {
+    pub fn new(operator: UnaryOperator, prefix: bool, arg: Expression) -> Self {
+        Self {
+            operator,
+            prefix,
+            argument: Box::new(arg)
+        }
+    }
+
     pub fn has_operator(&self, op: &UnaryOperator) -> bool {
         &self.operator == op
     }
@@ -709,6 +1242,16 @@ pub struct UpdateExpression{
     pub prefix: bool,
 }
 
+impl UpdateExpression {
+    pub fn new(operator: UpdateOperator, arg: Expression, prefix: bool) -> Self {
+        Self {
+            operator,
+            prefix,
+            argument: Box::new(arg),
+        }
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub enum UpdateOperator{
     Increment,
@@ -720,6 +1263,16 @@ pub struct BinaryExpression{
     pub operator: BinaryOperator,
     pub left: Box<Expression>,
     pub right: Box<Expression>,
+}
+
+impl BinaryExpression {
+    pub fn new(left: Expression, operator: BinaryOperator, right: Expression) -> Self {
+        Self {
+            operator,
+            left: Box::new(left),
+            right: Box::new(right)
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -790,10 +1343,26 @@ pub struct AssignmentExpression{
     pub right: Box<Expression>,
 }
 
+impl AssignmentExpression {
+    pub fn new(operator: AssignmentOperator, left: AssignmentLeft, right: Expression) -> Self {
+        Self {
+            operator,
+            left,
+            right: Box::new(right),
+        }
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub enum AssignmentLeft{
     Pattern(Pattern),
     Expr(Box<Expression>),
+}
+
+impl AssignmentLeft {
+    pub fn expr(value: Expression) -> Self {
+        AssignmentLeft::Expr(Box::new(value))
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -841,6 +1410,16 @@ pub struct LogicalExpression{
     pub right: Box<Expression>,
 }
 
+impl LogicalExpression {
+    pub fn new(operator: LogicalOperator, left: Expression, right: Expression) -> Self {
+        Self {
+            operator,
+            left: Box::new(left),
+            right: Box::new(right),
+        }
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub enum LogicalOperator{
     Or,
@@ -867,11 +1446,31 @@ pub struct MemberExpression{
     pub computed: bool,
 }
 
+impl MemberExpression {
+    pub fn new(object: Expression, property: Expression, computed: bool) -> Self {
+        Self {
+            object: Box::new(object),
+            property: Box::new(property),
+            computed,
+        }
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub struct ConditionalExpression{
     pub test: Box<Expression>,
     pub alternate: Box<Expression>,
     pub consequent: Box<Expression>,
+}
+
+impl ConditionalExpression {
+    pub fn new(test: Expression, alt: Expression, consequent: Expression) -> Self {
+        Self {
+            test: Box::new(test),
+            alternate: Box::new(alt),
+            consequent: Box::new(consequent),
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -880,10 +1479,28 @@ pub struct CallExpression{
     pub arguments: Vec<Expression>,
 }
 
+impl CallExpression {
+    pub fn new(callee: Expression, arguments: Vec<Expression>) -> Self {
+        Self {
+            callee: Box::new(callee),
+            arguments,
+        }
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub struct NewExpression{
     pub callee: Box<Expression>,
     pub arguments: Vec<Expression>,
+}
+
+impl NewExpression {
+    pub fn new(callee: Expression, arguments: Vec<Expression>) -> Self {
+        Self {
+            callee: Box::new(callee),
+            arguments,
+        }
+    }
 }
 
 pub type SequenceExpression = Vec<Expression>;
@@ -904,22 +1521,49 @@ pub enum ArrowFunctionBody{
     Expr(Box<Expression>)
 }
 
+impl ArrowFunctionBody {
+    pub fn expr(value: Expression) -> Self {
+        ArrowFunctionBody::Expr(Box::new(value))
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub struct YieldExpression{
     pub argument: Option<Box<Expression>>,
     pub delegate: bool,
 }
 
-#[derive(PartialEq,Debug, Clone)]
-pub struct TemplateLiteral{
-    pub quasis: Vec<TemplateElement>,
-    pub expressions: Vec<Expression>,
+impl YieldExpression {
+    pub fn new(arg: Option<Expression>, delegate: bool) -> Self {
+        Self {
+            argument: match arg {
+                Some(arg) => Some(Box::new(arg)),
+                None => None,
+            },
+            delegate,
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
 pub struct TaggedTemplateExpression{
     pub tag: Box<Expression>,
     pub quasi: TemplateLiteral,
+}
+
+impl TaggedTemplateExpression {
+    pub fn new(tag: Expression, quasi: TemplateLiteral) -> Self {
+        Self {
+            tag: Box::new(tag),
+            quasi,
+        }
+    }
+}
+
+#[derive(PartialEq,Debug, Clone)]
+pub struct TemplateLiteral{
+    pub quasis: Vec<TemplateElement>,
+    pub expressions: Vec<Expression>,
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -935,6 +1579,39 @@ pub struct Class{
     pub super_class: Option<Box<Expression>>,
     pub body: Vec<Property>,
 }
+
+impl Class {
+    pub fn new(id: Option<&str>, super_class: Option<Expression>, body: Vec<Property>) -> Self {
+        Self {
+            id: match id {
+                Some(s) => Some(s.to_string()),
+                None => None,
+            },
+            super_class: match super_class {
+                Some(e) => Some(Box::new(e)),
+                None => None
+            },
+            body,
+        }
+    }
+
+    pub fn no_super(id: &str, body: Vec<Property>) -> Self {
+        Self {
+            id: Some(id.to_string()),
+            super_class: None,
+            body,
+        }
+    }
+
+    pub fn no_id_no_super(body: Vec<Property>) -> Self {
+        Self {
+            id: None,
+            super_class: None,
+            body,
+        }
+    }
+}
+
 #[derive(PartialEq,Debug, Clone)]
 pub struct MethodDef{
     pub key: Expression,
@@ -942,6 +1619,58 @@ pub struct MethodDef{
     pub kind: MethodKind,
     pub computed: bool,
     pub is_static: bool,
+}
+
+impl MethodDef {
+    pub fn constructor(value: Expression) -> Self {
+        Self {
+            key: Expression::Ident("constructor".to_string()),
+            value,
+            kind: MethodKind::Constructor,
+            computed: false,
+            is_static: false,
+        }
+    }
+
+    pub fn normal(key: &str, value: Expression) -> Self {
+        Self {
+            key: Expression::Ident(key.to_string()),
+            value,
+            kind: MethodKind::Method,
+            computed: false,
+            is_static: false,
+        }
+    }
+
+    pub fn static_method(key: &str, value: Expression) -> Self {
+        Self {
+            key: Expression::Ident(key.to_string()),
+            value,
+            kind: MethodKind::Method,
+            computed: false,
+            is_static: true,
+        }
+    }
+
+    pub fn getter(key: &str, value: Expression) -> Self {
+        Self {
+            key: Expression::Ident(key.to_string()),
+            value,
+            kind: MethodKind::Get,
+            computed: false,
+            is_static: false,
+        }
+    }
+
+    pub fn setter(key: &str, value: Expression) -> Self {
+        Self {
+            key: Expression::Ident(key.to_string()),
+            value,
+            kind: MethodKind::Set,
+            computed: false,
+            is_static: false,
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -956,4 +1685,13 @@ pub enum MethodKind{
 pub struct MetaProperty{
     pub meta: Identifier,
     pub property: Identifier,
+}
+
+impl MetaProperty {
+    pub fn new(meta: &str, property: &str) -> Self {
+        Self {
+            meta: meta.to_string(),
+            property: property.to_string()
+        }
+    }
 }
