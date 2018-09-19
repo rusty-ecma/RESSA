@@ -33,6 +33,7 @@ struct Context {
     label_set: HashSet<String>,
     strict: bool,
     has_line_term: bool,
+    past_prolog: bool,
 }
 
 impl Default for Config {
@@ -63,6 +64,7 @@ impl Default for Context {
             label_set: HashSet::new(),
             strict: false,
             has_line_term: false,
+            past_prolog: false,
         }
     }
 }
@@ -244,13 +246,12 @@ impl Parser {
 
     pub fn parse(&mut self) -> Res<node::Program> {
         debug!(target: "resp:debug", "parse_script");
-        let mut body = self.parse_directive_prologues()?;
-        while !self.look_ahead.token.is_eof() {
-            let part = self.parse_statement_list_item()?;
-            if !self.context.is_module && (part.is_export() || part.is_import()) {
-                //error
+        let mut body = vec![];
+        while let Some(part) = self.next() {
+            match part {
+                Ok(part) => body.push(part),
+                Err(e) => return Err(e)
             }
-            body.push(part);
         }
         Ok(if self.context.is_module {
             node::Program::Module(body)
@@ -3670,6 +3671,29 @@ impl Parser {
     }
     fn reinterpret_error(&self, from: &str, to: &str) -> Error {
         Error::UnableToReinterpret(self.current_position, from.to_owned(), to.to_owned())
+    }
+
+    fn next_part(&mut self) -> Res<node::ProgramPart> {
+        if !self.context.past_prolog {
+            if let Some(dir) = self.parse_directive()? {
+                return Ok(node::ProgramPart::Directive(dir))
+            } else {
+                self.context.past_prolog = true;
+            }
+        }
+        self.parse_statement_list_item()
+    }
+}
+
+impl Iterator for Parser {
+    type Item = Res<node::ProgramPart>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.look_ahead.token.is_eof() {
+            None
+        } else {
+            Some(self.next_part())
+        }
+
     }
 }
 
