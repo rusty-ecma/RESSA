@@ -716,12 +716,39 @@ impl Parser {
     fn parse_var_stmt(&mut self) -> Res<node::Statement> {
         debug!(target: "resp:debug", "parse_var_stmt");
         self.expect_keyword(Keyword::Var)?;
-        let decls = self.parse_binding_list(&node::VariableKind::Var, false)?;
+        let decls = self.parse_var_decl_list(false)?;
         let stmt = node::Statement::Var(decls);
         self.consume_semicolon()?;
         Ok(stmt)
     }
 
+    fn parse_var_decl_list(&mut self, in_for: bool) -> Res<Vec<node::VariableDecl>> {
+        let mut ret = vec![self.parse_var_decl(in_for)?];
+        while self.at_punct(Punct::Comma) {
+            let _ = self.next_item()?;
+            ret.push(self.parse_var_decl(in_for)?)
+        }
+        Ok(ret)
+    }
+
+    fn parse_var_decl(&mut self, in_for: bool) -> Res<node::VariableDecl> {
+        let (_, patt) = self.parse_pattern(Some(node::VariableKind::Var), &mut vec![])?;
+        if self.context.strict && patt.is_restricted() {
+            //error
+        }
+        let init = if self.at_punct(Punct::Assign) {
+            let _ = self.next_item()?;
+            Some(self.isolate_cover_grammar(&Self::parse_assignment_expr)?)
+        } else if !patt.is_ident() && !in_for {
+            return self.error(&self.look_ahead, &["="]);
+        } else {
+            None
+        };
+        Ok(node::VariableDecl {
+            id: patt,
+            init,
+        })
+    }
     fn parse_try_stmt(&mut self) -> Res<node::TryStatement> {
         debug!(target: "resp:debug", "parse_try_stmt");
         self.expect_keyword(Keyword::Try)?;
@@ -1582,10 +1609,10 @@ impl Parser {
             return self.error(&self.look_ahead, &[]);
         };
         if !computed {
-            if is_static && key.matches_value("prototype") {
+            if is_static && key.matches("prototype") {
                 return self.error(&self.look_ahead, &[]);
             }
-            if !is_static && key.matches_value("constructor") {
+            if !is_static && key.matches("constructor") {
                 println!("kind: {:?}, method: {}", kind, method);
                 if kind != node::PropertyKind::Method || !method {
                     return self.error(&self.look_ahead, &["[constructor declaration]"]);
@@ -2410,7 +2437,7 @@ impl Parser {
         if self.at_punct(Punct::OpenBracket) {
             let kind = kind.unwrap_or(node::VariableKind::Var);
             self.parse_array_pattern(params, kind)
-        } else if self.at_punct(Punct::OpenBracket) {
+        } else if self.at_punct(Punct::OpenBrace) {
             let kind = kind.unwrap_or(node::VariableKind::Var);
             self.parse_object_pattern()
         } else {
@@ -2534,7 +2561,7 @@ impl Parser {
 
     fn parse_assignment_expr(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_assignment_expr");
-        if !self.context.allow_yield && self.at_keyword(Keyword::Yield) {
+        if self.context.allow_yield && self.at_keyword(Keyword::Yield) {
             return self.parse_yield_expr();
         } else {
             let start = self.look_ahead.clone();
@@ -3386,8 +3413,8 @@ impl Parser {
     /// and return the last token
     fn next_item(&mut self) -> Res<Item> {
         unsafe {
-            if self.scanner.cursor > 0 {
-                DEBUG = false
+            if self.scanner.cursor > 2541 {
+                    DEBUG = true
             }
         }
         loop {
@@ -3653,131 +3680,13 @@ struct FormalParams {
     strict: bool,
     found_restricted: bool,
 }
+
 #[allow(unused)]
 struct CoverFormalListOptions {
     simple: bool,
     params: Vec<node::FunctionArg>,
     stricted: bool,
     first_restricted: Option<node::Expression>,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::{read_to_string};
-    use std::path::Path;
-    #[test]
-    fn directive() {
-        init_logging();
-        debug!(target: "resp:debug", "directive");
-        let js = "'use strict'";
-        parse_script(js, "directive");
-    }
-    #[test]
-    fn script() {
-        init_logging();
-        debug!(target: "resp:debug", "script");
-        let js = include_str!("../test.js");
-        parse_script(js, "script");
-    }
-    #[test]
-    fn arrow_func() {
-        init_logging();
-        debug!(target: "resp:debug", "arrow_func");
-        let js = "let other = (one, two) => {
-    return one + two;
-}";
-        parse_script(js, "arrow_func");
-    }
-    #[test]
-    fn reg_func() {
-        init_logging();
-        debug!(target: "resp:debug", "reg_func");
-        let js = "function singFn(one, two) {
-    return one + two + 3 + 10 / 20
-}";
-        parse_script(js, "reg_func");
-    }
-    #[test]
-    fn if_statement() {
-        init_logging();
-        let js = "if(typeof exports === 'object' && typeof module === 'object')
-    return 0;";
-        parse_script(js, "if_statement");
-    }
-    #[test]
-    fn index_assignment() {
-        init_logging();
-        debug!(target: "resp:test", "index_assignment");
-        let js = "obj['prop'] = thing()";
-        parse_script(js, "index_assignment");
-    }
-    #[test]
-    fn for_in() {
-        init_logging();
-        debug!(target: "resp:test", "for_in");
-        let js = "for (var x in y) { }";
-        parse_script(js, "for_in");
-    }
-    #[test]
-    fn index_update() {
-        init_logging();
-        debug!(target: "resp:test", "index_update");
-        let js = "var value = this.scanner.source[this.scanner.index++];";
-        parse_script(js, "index_update");
-    }
-    #[test]
-    fn arguments_loop() {
-        init_logging();
-        debug!(target: "resp:test", "index_update");
-        let js = "for (var _i = 1; _i < arguments.length; _i++) { }";
-        parse_script(js, "arguments_loop")
-    }
-    #[test]
-    fn return_obj_lit() {
-        init_logging();
-        let js = "return {
-simple: options.simple,
-params: params,
-stricted: options.stricted,
-firstRestricted: options.firstRestricted,
-message: options.message
-};";
-        parse_script(js, "return_obj_lit");
-    }
-    #[test]
-    fn parse_and_assign_bitwise_not() {
-        init_test_logging();
-        let js = "x &= ~1";
-        parse_script(js, "parse_and_assign_bitwise_not");
-    }
-    fn parse_script(js: &str, name: &str) {
-        let mut p = Parser::new(js).unwrap();
-        let script = p.parse().unwrap();
-        // ::std::fs::write(format!("{}.rus", name), format!("{:#?}", script)).unwrap();
-    }
-    #[test]
-    fn test_lines() {
-        let js = "'use strict';
-(function() {
-    let x = 'things and stuff ⊆ people and places';
-    let y = 'people and places ∉ things and stuff';
-    let x = 'omg this is crazy 🙈🙈🙈🙈🙈🙈🙈🙈🙈🙈';
-)()";
-        for (i, (lhs, rhs)) in get_lines(js).iter().zip(js.lines()).enumerate() {
-            assert_eq!((i, &js[lhs.start..lhs.end]), (i, rhs));
-        }
-    }
-    fn init_test_logging() {
-        unsafe {
-            if LOGGING {
-               return;
-            }
-        }
-        init_logging();
-        unsafe {LOGGING = true};
-    }
-    static mut LOGGING: bool = false;
 }
 
 pub(crate) fn init_logging() {
