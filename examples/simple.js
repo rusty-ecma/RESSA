@@ -84,4 +84,19 @@ if (process.argv[4]) {
     bs = process.argv[4]
 }
 
-dd(ifile, ofile, bs)
+dd(ifile, ofile, bs);
+
+
+var gen = function*() {
+    yield 'one';
+    yield 'two';
+    yield 'three';
+}
+let generator = gen();
+let current = generator.next();
+while (!current.done) {
+    console.log('current value:', current.value);
+    current = generator.next();
+}
+
+var {a, b, c} = {a: 1, b: 2, c: 3};
