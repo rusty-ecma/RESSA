@@ -6,8 +6,8 @@ repository = "https://github.com/FreeMasen/RESP"
 
 
 [dependencies]
-ress = "0.4"
-log = "0.4.4"
+ress = "0.5.1"
+log = "0.4.5"
 env_logger = "0.5.13"
 
 [features]

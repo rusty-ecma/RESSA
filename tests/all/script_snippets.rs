@@ -2,7 +2,7 @@
 
 use resp::node::*;
 use resp::Parser;
-
+use env_logger;
 
 #[test]
 fn parse_directive_prologues() {
@@ -223,6 +223,14 @@ fn parse_labeled_stmt_lf() {
             Statement::Expr(Expression::number("0"))
         )
     ]);
+    execute(js, program);
+}
+
+#[test]
+fn parse_var_ident_fn() {
+    let _ = env_logger::try_init();
+    let js = "({var(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){}})";
+    let program = Program::Script(vec![]);
     execute(js, program);
 }
 

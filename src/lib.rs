@@ -179,7 +179,7 @@ fn get_lines(text: &str) -> Vec<Line> {
                         None
                     }
                 }
-                '\n' | '\u{2028}' | '\u{2029}' => {
+                '\n' | '\u{2028}' | '\u{2029}' | '\u{000A}' => {
                     let ret = Line {
                         start: line_start,
                         end: byte_position,
@@ -616,7 +616,8 @@ impl Parser {
             | Token::Null
             | Token::Numeric(_)
             | Token::String(_)
-            | Token::RegEx(_) => {
+            | Token::RegEx(_)
+            | Token::Template(_) => {
                 let expr = self.parse_expression_statement()?;
                 node::Statement::Expr(expr)
             }
@@ -750,6 +751,7 @@ impl Parser {
             init,
         })
     }
+
     fn parse_try_stmt(&mut self) -> Res<node::TryStatement> {
         debug!(target: "resp:debug", "parse_try_stmt");
         self.expect_keyword(Keyword::Try)?;
@@ -1004,7 +1006,7 @@ impl Parser {
             } else {
                 let prev_in = self.context.allow_in;
                 self.context.allow_in = false;
-                let mut decls = self.parse_binding_list(&kind, true)?;
+                let mut decls = self.parse_binding_list(kind, true)?;
                 if decls.len() == 1 {
                     let decl = if let Some(d) = decls.pop() {
                         d
@@ -1205,7 +1207,7 @@ impl Parser {
     }
 
     fn parse_labelled_statement(&mut self) -> Res<node::Statement> {
-        debug!(target: "resp:debug", "parse_labelled_statement");
+        debug!(target: "resp:debug", "parse_labelled_statement, {:?}", self.look_ahead.token);
         let ret = self.parse_expression()?;
         if ret.is_ident() && self.at_punct(Punct::Colon) {
             let _colon = self.next_item()?;
@@ -1214,6 +1216,7 @@ impl Parser {
             } else {
                 return Err(self.reinterpret_error("expression", "ident"))
             };
+
             if !self.context.label_set.insert(format!("${}", id)) {
                 //error, multiple ids in this scope.
             }
@@ -1283,14 +1286,14 @@ impl Parser {
             },
             _ => return self.error(&next, &["let", "const"]),
         };
-        let decl = self.parse_binding_list(&kind, in_for)?;
+        let decl = self.parse_binding_list(kind, in_for)?;
         self.consume_semicolon()?;
         Ok(node::Declaration::Variable(kind, decl))
     }
 
     fn parse_binding_list(
         &mut self,
-        kind: &node::VariableKind,
+        kind: node::VariableKind,
         in_for: bool,
     ) -> Res<Vec<node::VariableDecl>> {
         debug!(target: "resp:debug", "parse_binding_list");
@@ -1333,7 +1336,7 @@ impl Parser {
 
     fn parse_lexical_binding(
         &mut self,
-        kind: &node::VariableKind,
+        kind: node::VariableKind,
         in_for: bool,
     ) -> Res<node::VariableDecl> {
         debug!(target: "resp:debug", "parse_lexical_binding");
@@ -1341,11 +1344,11 @@ impl Parser {
             node::VariableKind::Const | node::VariableKind::Let => false,
             _ => true,
         };
-        let id = self.parse_var_ident(is_var)?;
-        if self.context.strict && Self::is_restricted_word(&id) {
+        let (_, id) = self.parse_pattern(Some(kind), &mut vec![])?;
+        if self.context.strict && id.is_restricted() {
             return self.error(&self.look_ahead, &["not eval", "not arguments"]);
         }
-        let init = if kind == &node::VariableKind::Const {
+        let init = if kind == node::VariableKind::Const {
             if !self.at_keyword(Keyword::In) && !self.at_contextual_keyword("of") {
                 if self.at_punct(Punct::Assign) {
                     let _ = self.next_item()?;
@@ -1363,7 +1366,7 @@ impl Parser {
             None
         };
         Ok(node::VariableDecl {
-            id: node::Pattern::Identifier(id),
+            id,
             init,
         })
     }
@@ -1614,7 +1617,6 @@ impl Parser {
                 return self.error(&self.look_ahead, &[]);
             }
             if !is_static && key.matches("constructor") {
-                println!("kind: {:?}, method: {}", kind, method);
                 if kind != node::PropertyKind::Method || !method {
                     return self.error(&self.look_ahead, &["[constructor declaration]"]);
                 }
@@ -1814,9 +1816,17 @@ impl Parser {
             Ok(node::PropertyKey::Ident(id))
         } else if item.token.matches_punct(Punct::OpenBracket) {
             let key = self.isolate_cover_grammar(&Self::parse_assignment_expr)?;
-            let id = self.reinterpret_expr_as_pat(key)?;
+            let id = if key.is_valid_property_key_literal() {
+                match key {
+                    node::Expression::Literal(lit) => node::PropertyKey::Literal(lit),
+                    _ => return self.error(&self.look_ahead, &["property key literal"]),
+                }
+            } else {
+                let id = self.reinterpret_expr_as_pat(key)?;
+                node::PropertyKey::Pattern(id)
+            };
             self.expect_punct(Punct::CloseBracket)?;
-            Ok(node::PropertyKey::Pattern(id))
+            Ok(id)
         } else {
             self.error(&item, &["[string]", "[number]", "[ident]", "[boolean]", "null", "[keyword]", "["])
         }
@@ -2067,6 +2077,10 @@ impl Parser {
                 has_proto = has_proto || found_proto;
                 prop
             };
+            println!("pushing prop: {}", match prop {
+                node::ObjectProperty::Property(ref prop) => format!("{:?}", prop),
+                node::ObjectProperty::Spread(ref s) => format!("{:?}", s),
+            });
             props.push(prop);
             if !self.at_punct(Punct::CloseBrace) {
                 self.expect_comma_sep()?;
@@ -2081,7 +2095,7 @@ impl Parser {
         let start = self.look_ahead.clone();
         let mut has_proto = has_proto;
         let (key, is_async, computed) = if let Token::Ident(ref id) = start.token {
-            let id = id.clone();
+            let mut id = id.clone();
             let _ = self.next_item()?;
             let computed = self.at_punct(Punct::OpenBracket);
             let is_async = self.context.has_line_term
@@ -2107,7 +2121,7 @@ impl Parser {
         let prop = if start.token.matches_ident_str("get") && at_qualified && !is_async {
             node::ObjectProperty::Property(node::Property {
                 computed: self.at_punct(Punct::OpenBracket),
-                key: key.unwrap_or(self.parse_object_property_key()?),
+                key: self.parse_object_property_key()?,
                 value: self.parse_getter_method()?,
                 kind: node::PropertyKind::Get,
                 method: false,
@@ -2213,20 +2227,19 @@ impl Parser {
 
     fn parse_template_literal(&mut self) -> Res<node::TemplateLiteral> {
         debug!(target: "resp:debug", "parse_template_literal");
-        if !self.look_ahead.token.is_template_head() {
-            return self.error(&self.look_ahead, &["template head"]);
+        if !self.look_ahead.is_template_head() {
+            return self.error(&self.look_ahead, &["template head", "template no sub"]);
         }
         let mut expressions = vec![];
         let mut quasis = vec![];
-        loop {
-            quasis.push(self.parse_template_element()?);
-            while !self.look_ahead.token.is_template() {
-                expressions.push(self.parse_expression()?)
-            }
-            if self.look_ahead.token.is_template_tail() {
-                quasis.push(self.parse_template_element()?);
-                break;
-            }
+        let quasi = self.parse_template_element()?;
+        let mut breaking = quasi.tail;
+        quasis.push(quasi);
+        while !breaking {
+            expressions.push(self.parse_expression()?);
+            let quasi = self.parse_template_element()?;
+            breaking = quasi.tail;
+            quasis.push(quasi);
         }
         Ok(node::TemplateLiteral {
             expressions,
@@ -2238,7 +2251,7 @@ impl Parser {
         debug!(target: "resp:debug", "parse_template_element");
         if let Token::Template(t) = self.next_item()?.token {
             let (raw, cooked, tail) = match t {
-                Template::Head(cooked) => (format!("`{}{{", cooked), cooked, false),
+                Template::Head(cooked) => (format!("`{}${{", cooked), cooked, false),
                 Template::Middle(cooked) => (format!("}}{}{{", cooked), cooked, false),
                 Template::Tail(cooked) => (format!("}}{}`", cooked), cooked, true),
                 Template::NoSub(cooked) => (format!("`{}`", cooked), cooked, true),
@@ -2347,6 +2360,7 @@ impl Parser {
         }
         match &ident.token {
             &Token::Ident(ref i) => Ok(i.to_string()),
+            &Token::Keyword(ref k) => Ok(k.to_string()),
             _ => self.error(&ident, &["variable identifier"]),
         }
     }
@@ -2407,6 +2421,12 @@ impl Parser {
             return self.error(&self.look_ahead, &[")"]);
         }
         Ok((restricted, arg))
+    }
+
+    fn parse_binding_rest_el(&mut self, params: &mut Vec<Item>) -> Res<(bool, node::Pattern)> {
+        debug!(target: "resp:debug", "parse_binding_rest_el");
+        self.expect_punct(Punct::Spread)?;
+        self.parse_pattern(None, params)
     }
 
     fn parse_pattern_with_default(&mut self, params: &mut Vec<Item>) -> Res<(bool, node::Pattern)> {
@@ -2472,7 +2492,7 @@ impl Parser {
                 elements.push(None);
             } else {
                 if self.at_punct(Punct::Spread) {
-                    let (_, el) = self.parse_rest_element(params)?;
+                    let (_, el) = self.parse_binding_rest_el(params)?;
                     elements.push(Some(el));
                     break;
                 } else {
@@ -3362,25 +3382,43 @@ impl Parser {
         }
     }
 
+    fn set_isolate_cover_grammar_state(&mut self, prev_bind: bool, prev_assign: bool, prev_first: Option<Item>) -> Res<()> {
+        if let Some(ref e) = prev_first {
+            //FIXME this needs some more information
+            return self.error(e, &[])
+        }
+        self.context.is_binding_element = prev_bind;
+        self.context.is_assignment_target = prev_assign;
+        self.context.first_covert_initialized_name_error = prev_first;
+        Ok(())
+    }
+
     fn isolate_cover_grammar<T, F>(&mut self, parse_fn: &F) -> Res<T>
     where
         F: Fn(&mut Self) -> Res<T>,
     {
         debug!(target: "resp:debug", "isolate_cover_grammar");
-        let prev_bind = self.context.is_binding_element;
-        let prev_ass = self.context.is_assignment_target;
-        let prev_first = self.context.first_covert_initialized_name_error.clone();
-        self.context.is_binding_element = true;
-        self.context.is_assignment_target = true;
-        self.context.first_covert_initialized_name_error = None;
+        let (prev_bind, prev_assign, prev_first)  = self.get_cover_grammar_state();
+        self.set_isolate_cover_grammar_state(true, true, None);
         let res = parse_fn(self)?;
-        if let Some(ref e) = self.context.first_covert_initialized_name_error {
-            return self.error(e, &[]);
-        }
-        self.context.is_binding_element = prev_bind;
-        self.context.is_assignment_target = prev_ass;
-        self.context.first_covert_initialized_name_error = prev_first;
+        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
         Ok(res)
+    }
+
+    fn get_cover_grammar_state(&self) -> (bool, bool, Option<Item>) {
+        (
+            self.context.is_binding_element,
+            self.context.is_assignment_target,
+            self.context.first_covert_initialized_name_error.clone()
+        )
+    }
+
+    fn set_inherit_cover_grammar_state(&mut self, is_binding_element: bool, is_assignment: bool, first_covert_initialized_name_error: Option<Item>) {
+        self.context.is_binding_element = self.context.is_binding_element && is_binding_element;
+        self.context.is_assignment_target = self.context.is_assignment_target && is_assignment;
+        if first_covert_initialized_name_error.is_some() {
+            self.context.first_covert_initialized_name_error = first_covert_initialized_name_error;
+        }
     }
 
     fn inherit_cover_grammar<T, F>(&mut self, parse_fn: &F) -> Res<T>
@@ -3388,22 +3426,10 @@ impl Parser {
         F: Fn(&mut Self) -> Res<T>,
     {
         debug!(target: "resp:debug", "inherit_cover_grammar");
-        let prev_bind = self.context.is_binding_element;
-        let prev_ass = self.context.is_assignment_target;
-        let prev_first = self.context.first_covert_initialized_name_error.clone();
-
-        self.context.is_binding_element = true;
-        self.context.is_assignment_target = true;
-        self.context.first_covert_initialized_name_error = None;
-
+        let (prev_bind, prev_ass, prev_first) = self.get_cover_grammar_state();
+        self.set_inherit_cover_grammar_state(true, true, None);
         let res = parse_fn(self)?;
-
-        self.context.is_binding_element = self.context.is_binding_element && prev_bind;
-        self.context.is_assignment_target = self.context.is_assignment_target && prev_ass;
-        if prev_first.is_some() {
-            self.context.first_covert_initialized_name_error = prev_first
-        }
-
+        self.set_inherit_cover_grammar_state(prev_bind, prev_ass, prev_first);
         Ok(res)
     }
 
@@ -3414,11 +3440,12 @@ impl Parser {
     /// and return the last token
     fn next_item(&mut self) -> Res<Item> {
         unsafe {
-            if self.scanner.cursor > 2541 {
+            if self.scanner.cursor > usize::max_value() {
                     DEBUG = true
             }
         }
         loop {
+            self.context.has_line_term = self.scanner.pending_new_line; //old_pos.line != new_pos.line;
             if let Some(look_ahead) = self.scanner.next() {
                 unsafe {
                     if DEBUG {
@@ -3433,7 +3460,6 @@ impl Parser {
                 }
                 let old_pos = self.get_item_position(&self.look_ahead);
                 let new_pos = self.get_item_position(&look_ahead);
-                self.context.has_line_term = old_pos.line != new_pos.line;
                 self.current_position = old_pos;
                 let ret = replace(&mut self.look_ahead, look_ahead);
                 return Ok(ret);
@@ -3681,7 +3707,9 @@ impl Parser {
                 self.context.past_prolog = true;
             }
         }
-        self.parse_statement_list_item()
+        let ret = self.parse_statement_list_item()?;
+        trace!(target: "resp:trace", "{:?}", ret);
+        Ok(ret)
     }
 }
 
@@ -3721,4 +3749,25 @@ pub(crate) fn init_logging() {
         b.parse(&args);
     }
     let _ = b.try_init();
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn split_lines() {
+        let js = "lineFeed:0\n0;";
+        let lines = get_lines(js);
+        let expectation = vec![
+            Line {
+                start: 0,
+                end: 10,
+            },
+            Line {
+                start: 11,
+                end: 13
+            }
+        ];
+        assert_eq!(lines, expectation);
+    }
 }

@@ -408,7 +408,7 @@ impl VariableDecl {
     }
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Copy)]
 pub enum VariableKind{
     Var,
     Let,
@@ -779,6 +779,31 @@ impl Literal {
         let inner = RegEx::new(pattern, flags);
         Literal::RegEx(inner)
     }
+
+    pub fn is_valid_property_key(&self) -> bool {
+        self.is_string() || self.is_number() || self.is_boolean()
+    }
+
+    pub fn is_string(&self) -> bool {
+        match self {
+            Literal::String(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_number(&self) -> bool {
+        match self {
+            Literal::Number(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_boolean(&self) -> bool {
+        match self {
+            Literal::Boolean(_) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(PartialEq,Debug, Clone)]
@@ -876,6 +901,13 @@ impl Expression {
             &Expression::Function(ref f) => f.is_async,
             &Expression::ArrowFunction(ref f) => f.is_async,
             &Expression::ArrowParamPlaceHolder(_, b) => b,
+            _ => false
+        }
+    }
+
+    pub fn is_valid_property_key_literal(&self) -> bool {
+        match self {
+            Expression::Literal(ref l) => l.is_valid_property_key(),
             _ => false
         }
     }
