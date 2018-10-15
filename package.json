@@ -1,31 +1,13 @@
 {
-  "name": "resp",
-  "version": "0.1.0",
-  "description": "rusty ECMAScript Parser",
-  "main": "app.js",
-  "directories": {
-    "example": "examples"
-  },
-  "dependencies": {
+  "devDependencies": {
     "angular": "^1.5.6",
+    "dexie": "^2.0.4",
     "esprima": "^4.0.1",
     "jquery": "^3.3.1",
+    "moment": "^2.22.2",
     "react": "^16.4.2",
     "react-dom": "^16.4.2",
-    "vue": "^2.5.17"
-  },
-  "devDependencies": {},
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/FreeMasen/RESP.git"
-  },
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/FreeMasen/RESP/issues"
-  },
-  "homepage": "https://github.com/FreeMasen/RESP#readme"
+    "vue": "^2.5.17",
+    "everything.js": "^1.0.3"
+  }
 }

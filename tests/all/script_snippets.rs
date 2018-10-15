@@ -1,7 +1,7 @@
 #![cfg(test)]
-extern crate resp;
-use resp::Parser;
+
 use resp::node::*;
+use resp::Parser;
 
 
 #[test]
@@ -182,6 +182,50 @@ fn parse_var_stmt_destructure_rest() {
     let program = Program::Script(vec![ProgramPart::Statement(stmt)]);
     execute(js, program);
 }
+
+#[test]
+fn parse_try_stmt() {
+    let js = "try {
+            console.log('trying');
+        } finally {
+            console.log('done trying');
+        }";
+
+    let program = Program::Script(vec![]);
+    execute(js, program);
+}
+
+#[test]
+fn parse_try_stmt_2() {
+    let js = "try {
+        console.log('trying');
+    } catch (e) {
+        console.log('caught', e);
+    }";
+    let program = Program::Script(vec![]);
+    execute(js, program);
+}
+#[test]
+fn parse_labeled_stmt_lf() {
+    let js = "linefeed:0\n0;";
+    let program = Program::Script(vec![
+        ProgramPart::Statement(
+            Statement::Labeled(
+                LabeledStatement {
+                    label: "linefeed".to_string(),
+                    body: Box::new(
+                        Statement::Expr(Expression::number("0"))
+                    )
+                }
+            )
+        ),
+        ProgramPart::Statement(
+            Statement::Expr(Expression::number("0"))
+        )
+    ]);
+    execute(js, program);
+}
+
 
 fn execute(js: &str, expectation: Program) {
     let mut p = Parser::new(js).unwrap();
