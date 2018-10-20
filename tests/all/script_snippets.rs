@@ -234,6 +234,42 @@ fn parse_var_ident_fn() {
     execute(js, program);
 }
 
+#[test]
+fn parse_arg_ident_assign() {
+    let _ = env_logger::try_init();
+    let js = "({
+        var({i = 0, i: j = 0}) {
+
+        }
+    })";
+    let program = Program::Script(vec![]);
+    execute(js, program);
+}
+
+#[test]
+fn parse_nested_delegated_yield() {
+    let _ = env_logger::try_init();
+    let js = "function*g(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){
+  return a = yield* b = yield c = yield yield;
+}";
+    let program = Program::Script(vec![]);
+    execute(js, program);
+}
+#[test]
+fn parse_obj_patter_fn_fat_arrow() {
+    let _ = env_logger::try_init();
+    let js = "(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k) => {;};";
+    let program = Program::Script(vec![]);
+    execute(js, program);
+}
+#[test]
+fn parse_obj_pattern_fn_fat_arrow2() {
+    let _ = env_logger::try_init();
+    let js = "({x}) => ({x});";
+    let program = Program::Script(vec![]);
+    execute(js, program);
+}
+
 
 fn execute(js: &str, expectation: Program) {
     let mut p = Parser::new(js).unwrap();

@@ -249,7 +249,10 @@ impl Parser {
         let mut body = vec![];
         while let Some(part) = self.next() {
             match part {
-                Ok(part) => body.push(part),
+                Ok(part) => {
+                    println!("program part\n{:?}", part);
+                    body.push(part)
+                },
                 Err(e) => return Err(e)
             }
         }
@@ -307,7 +310,9 @@ impl Parser {
 
     fn parse_expression(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_expression");
-        let ret = self.isolate_cover_grammar(&Self::parse_assignment_expr)?;
+        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+        let ret = self.parse_assignment_expr()?;
+        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
         if self.at_punct(Punct::Comma) {
             let mut list = vec![ret];
             while !self.look_ahead.token.is_eof() {
@@ -315,7 +320,10 @@ impl Parser {
                     break;
                 }
                 let _comma = self.next_item()?;
-                list.push(self.isolate_cover_grammar(&Self::parse_assignment_expr)?);
+                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let expr = self.parse_assignment_expr()?;
+                self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+                list.push(expr);
             }
             return Ok(node::Expression::Sequence(list));
         }
@@ -740,7 +748,10 @@ impl Parser {
         }
         let init = if self.at_punct(Punct::Assign) {
             let _ = self.next_item()?;
-            Some(self.isolate_cover_grammar(&Self::parse_assignment_expr)?)
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let init = self.parse_assignment_expr()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+            Some(init)
         } else if !patt.is_ident() && !in_for {
             return self.error(&self.look_ahead, &["="]);
         } else {
@@ -1044,7 +1055,9 @@ impl Parser {
             let start = self.look_ahead.clone();
             let prev_in = self.context.allow_in;
             self.context.allow_in = false;
-            let init = self.inherit_cover_grammar(&Self::parse_assignment_expr)?;
+            let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+            let init = self.parse_assignment_expr()?;
+            self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             self.context.allow_in = prev_in;
             if self.at_keyword(Keyword::In) {
                 let _ = self.next_item()?;
@@ -1061,9 +1074,10 @@ impl Parser {
                 let p = self.reinterpret_expr_as_pat(init)?;
                 let left = node::LoopLeft::Pattern(p);
                 let right = self.parse_assignment_expr()?;
+                let body = self.parse_loop_body()?;
                 return Ok(
                     node::Statement::ForOf(
-                        self.parse_for_of_loop(left, is_await)?
+                        node::ForOfStatement::new(left, right, body, is_await)
                     )
                 );
             } else {
@@ -1071,7 +1085,9 @@ impl Parser {
                     let mut seq = vec![init];
                     while self.at_punct(Punct::Comma) {
                         let _comma = self.next_item()?;
-                        seq.push(self.inherit_cover_grammar(&Self::parse_assignment_expr)?)
+                        let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+                        seq.push(self.parse_assignment_expr()?);
+                        self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
                     }
                     node::LoopInit::Expr(node::Expression::Sequence(seq))
                 } else {
@@ -1148,7 +1164,9 @@ impl Parser {
         self.expect_punct(Punct::CloseParen)?;
         let prev_iter = self.context.in_iteration;
         self.context.in_iteration = true;
-        let ret = self.isolate_cover_grammar(&Self::parse_statement)?;
+        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+        let ret = self.parse_statement()?;
+        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
         self.context.in_iteration = prev_iter;
         Ok(ret)
     }
@@ -1321,7 +1339,10 @@ impl Parser {
         }
         let init = if self.at_punct(Punct::Assign) {
             let _ = self.next_item()?;
-            Some(self.isolate_cover_grammar(&Self::parse_assignment_expr)?)
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let init = self.parse_assignment_expr()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+            Some(init)
         } else if id.is_ident() && !in_for {
             self.expect_punct(Punct::Assign)?;
             None
@@ -1352,7 +1373,10 @@ impl Parser {
             if !self.at_keyword(Keyword::In) && !self.at_contextual_keyword("of") {
                 if self.at_punct(Punct::Assign) {
                     let _ = self.next_item()?;
-                    Some(self.isolate_cover_grammar(&Self::parse_assignment_expr)?)
+                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let init = self.parse_assignment_expr()?;
+                    self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+                    Some(init)
                 } else {
                     return self.error(&self.look_ahead, &["="]);
                 }
@@ -1361,7 +1385,10 @@ impl Parser {
             }
         } else if in_for || self.at_punct(Punct::Assign) {
             self.expect_punct(Punct::Assign)?;
-            Some(self.isolate_cover_grammar(&Self::parse_assignment_expr)?)
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let init = self.parse_assignment_expr()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+            Some(init)
         } else {
             None
         };
@@ -1413,7 +1440,7 @@ impl Parser {
         let prev_await = self.context.await;
         let prev_yield = self.context.allow_yield;
         self.context.await = is_async;
-        self.context.allow_yield = !is_gen;
+        self.context.allow_yield = is_gen;
 
         let formal_params = self.parse_formal_params()?;
         let strict = formal_params.strict;
@@ -1481,9 +1508,10 @@ impl Parser {
         };
         let super_class = if self.at_contextual_keyword("extends") {
             let _ = self.next_item()?;
-            Some(Box::new(self.isolate_cover_grammar(
-                &Self::parse_left_hand_side_expr_allow_call,
-            )?))
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let super_class = self.parse_left_hand_side_expr()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+            Some(Box::new(super_class))
         } else {
             None
         };
@@ -1742,7 +1770,9 @@ impl Parser {
         let prev_strict = self.context.strict;
         let prev_allow_strict = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
-        let body = self.isolate_cover_grammar(&Self::parse_function_source_el)?;
+        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+        let body = self.parse_function_source_el()?;
+        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
         if self.context.strict && found_restricted {
             //tolerate error
         }
@@ -1781,7 +1811,9 @@ impl Parser {
         let prev_strict = self.context.strict;
         let prev_allow = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
-        let ret = self.inherit_cover_grammar(&Self::parse_function_source_el)?;
+        let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+        let ret = self.parse_function_source_el()?;
+        self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
         if self.context.strict && found_restricted {
             //tolerate error
         }
@@ -1815,7 +1847,9 @@ impl Parser {
             let id = item.token.to_string();
             Ok(node::PropertyKey::Ident(id))
         } else if item.token.matches_punct(Punct::OpenBracket) {
-            let key = self.isolate_cover_grammar(&Self::parse_assignment_expr)?;
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let key = self.parse_assignment_expr()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             let id = if key.is_valid_property_key_literal() {
                 match key {
                     node::Expression::Literal(lit) => node::PropertyKey::Literal(lit),
@@ -1870,15 +1904,18 @@ impl Parser {
             let lit = self.parse_template_literal()?;
             Ok(node::Expression::Literal(node::Literal::Template(lit)))
         } else if self.look_ahead.token.is_punct() {
-            if self.at_punct(Punct::OpenParen) {
-                Ok(self.inherit_cover_grammar(&Self::parse_group_expr)?)
+            let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+            let expr = if self.at_punct(Punct::OpenParen) {
+                self.parse_group_expr()?
             } else if self.at_punct(Punct::OpenBracket) {
-                Ok(self.inherit_cover_grammar(&Self::parse_array_init)?)
+                self.parse_array_init()?
             } else if self.at_punct(Punct::OpenBrace) {
-                Ok(self.inherit_cover_grammar(&Self::parse_obj_init)?)
+                self.parse_obj_init()?
             } else {
-                self.error(&self.look_ahead, &["{", "[", "("])
-            }
+                return self.error(&self.look_ahead, &["{", "[", "("])
+            };
+            self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
+            Ok(expr)
         } else if self.look_ahead.token.is_regex() {
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
@@ -1892,6 +1929,7 @@ impl Parser {
             };
             Ok(node::Expression::Literal(node::Literal::RegEx(lit)))
         } else if self.look_ahead.token.is_keyword() {
+            println!("{:?}", self.look_ahead.token.to_string());
             if !self.context.strict
                 && ((self.context.allow_yield && self.at_keyword(Keyword::Yield))
                     || self.at_keyword(Keyword::Let))
@@ -1975,7 +2013,9 @@ impl Parser {
                 Ok(node::Expression::ArrowParamPlaceHolder(vec![arg], false))
             } else {
                 self.context.is_binding_element = true;
-                let mut ex = self.inherit_cover_grammar(&Self::parse_assignment_expr)?;
+                let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+                let mut ex = self.parse_assignment_expr()?;
+                self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
                 if self.at_punct(Punct::Comma) {
                     let mut exprs = vec![ex];
                     while !self.look_ahead.token.is_eof() {
@@ -2005,7 +2045,9 @@ impl Parser {
                             self.expect_punct(Punct::CloseParen)?;
                             return Ok(node::Expression::ArrowParamPlaceHolder(args, false));
                         } else {
-                            exprs.push(self.inherit_cover_grammar(&Self::parse_assignment_expr)?);
+                            let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+                            exprs.push(self.parse_assignment_expr()?);
+                            self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
                         }
                     }
                     ex = node::Expression::Sequence(exprs);
@@ -2028,6 +2070,11 @@ impl Parser {
                             .map(|e| node::FunctionArg::Expr(e))
                             .collect();
                         return Ok(node::Expression::ArrowParamPlaceHolder(args, false));
+                    } else {
+                        return Ok(node::Expression::ArrowParamPlaceHolder(
+                            vec![node::FunctionArg::Expr(ex)],
+                            false,
+                        ));
                     }
                 }
                 Ok(ex)
@@ -2052,9 +2099,11 @@ impl Parser {
                 }
                 elements.push(Some(el))
             } else {
+                let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
                 elements.push(Some(
-                    self.inherit_cover_grammar(&Self::parse_assignment_expr)?,
+                    self.parse_assignment_expr()?,
                 ));
+                self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
                 if !self.at_punct(Punct::CloseBracket) {
                     self.expect_punct(Punct::Comma)?;
                 }
@@ -2156,7 +2205,9 @@ impl Parser {
                         has_proto = true;
                     }
                     let _ = self.next_item()?;
-                    let value = self.inherit_cover_grammar(&Self::parse_assignment_expr)?;
+                    let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+                    let value = self.parse_assignment_expr()?;
+                    self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
                     node::ObjectProperty::Property(node::Property {
                         computed,
                         key,
@@ -2183,7 +2234,9 @@ impl Parser {
                         self.context.first_covert_initialized_name_error =
                             Some(self.look_ahead.clone());
                         let _ = self.next_item()?;
-                        let inner = self.inherit_cover_grammar(&Self::parse_assignment_expr)?;
+                        let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+                        let inner = self.parse_assignment_expr()?;
+                        self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
                         node::ObjectProperty::Property(node::Property {
                             computed,
                             key,
@@ -2436,7 +2489,9 @@ impl Parser {
             let _assign = self.next_item()?;
             let prev_yield = self.context.allow_yield;
             self.context.allow_yield = true;
-            let right = self.isolate_cover_grammar(&Self::parse_assignment_expr)?;
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let right = self.parse_assignment_expr()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             self.context.allow_yield = prev_yield;
             return Ok((
                 is_restricted,
@@ -2550,6 +2605,7 @@ impl Parser {
         let (key, value) = if self.look_ahead.token.is_ident() {
             let key = node::PropertyKey::Ident(self.parse_var_ident(false)?);
             let value = if self.at_punct(Punct::Assign) {
+                self.expect_punct(Punct::Assign)?;
                 short_hand = true;
                 let e = self.parse_assignment_expr()?;
                 node::PropertyValue::Expr(e)
@@ -2619,7 +2675,9 @@ impl Parser {
                             body: node::ArrowFunctionBody::FunctionBody(body),
                         });
                     } else {
-                        let a = self.isolate_cover_grammar(&Self::parse_assignment_expr)?;
+                        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                        let a = self.parse_assignment_expr()?;
+                        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                         current = node::Expression::ArrowFunction(node::ArrowFunctionExpression {
                             id: None,
                             expression: true,
@@ -2677,7 +2735,9 @@ impl Parser {
                             )
                         }
                     };
-                    let right = self.isolate_cover_grammar(&Self::parse_assignment_expr)?;
+                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let right = self.parse_assignment_expr()?;
+                    self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     self.context.first_covert_initialized_name_error = None;
                     return Ok(node::Expression::Assignment(node::AssignmentExpression {
                         operator: op,
@@ -2844,16 +2904,22 @@ impl Parser {
     fn parse_conditional_expr(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_conditional_expr");
         let start = self.look_ahead.clone();
-        let expr = self.inherit_cover_grammar(&Self::parse_binary_expression)?;
+        let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+        let expr = self.parse_binary_expression()?;
+        self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
         if self.at_punct(Punct::QuestionMark) {
             let _question_mark = self.next_item()?;
             let prev_in = self.context.allow_in;
             self.context.allow_in = true;
-            let if_true = self.isolate_cover_grammar(&Self::parse_assignment_expr)?;
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let if_true = self.parse_assignment_expr()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             self.context.allow_in = prev_in;
 
             self.expect_punct(Punct::Colon)?;
-            let if_false = self.isolate_cover_grammar(&Self::parse_assignment_expr)?;
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let if_false = self.parse_assignment_expr()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
 
             let c = node::ConditionalExpression {
                 test: Box::new(expr),
@@ -2870,7 +2936,9 @@ impl Parser {
     fn parse_binary_expression(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_binary_expression");
         let start = self.look_ahead.clone();
-        let mut current = self.inherit_cover_grammar(&Self::parse_exponentiation_expression)?;
+        let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+        let mut current = self.parse_exponentiation_expression()?;
+        self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
         let mut token = self.look_ahead.clone();
         let mut prec = self.bin_precedence(&token.token);
         if prec > 0 {
@@ -2880,7 +2948,11 @@ impl Parser {
             self.context.is_binding_element = false;
             let mut left = current.clone();
             debug!(target: "resp:debug", "left: {:#?}", left);
-            let mut right = self.isolate_cover_grammar(&Self::parse_exponentiation_expression)?;
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let mut right = self.parse_exponentiation_expression()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             debug!(target: "resp:debug", "right: {:#?}", right);
             let mut stack = vec![left.clone(), right.clone()];
             let mut ops = vec![token.token.clone()];
@@ -2924,7 +2996,10 @@ impl Parser {
                 }
                 ops.push(self.next_item()?.token);
                 precs.push(prec);
-                stack.push(self.isolate_cover_grammar(&Self::parse_exponentiation_expression)?);
+                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let exp = self.parse_exponentiation_expression()?;
+                self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+                stack.push(exp);
             }
             current = stack
                 .pop()
@@ -2963,13 +3038,17 @@ impl Parser {
     fn parse_exponentiation_expression(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_exponentiation_expression");
         let start = self.look_ahead.clone();
-        let expr = self.inherit_cover_grammar(&Self::parse_unary_expression)?;
+        let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+        let expr = self.parse_unary_expression()?;
+        self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
         if expr.is_unary() && self.at_punct(Punct::Exponent) {
             let _stars = self.next_item()?;
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let left = expr;
-            let right = self.isolate_cover_grammar(&Self::parse_exponentiation_expression)?;
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let right = self.parse_exponentiation_expression()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             return Ok(node::Expression::Binary(node::BinaryExpression {
                 operator: node::BinaryOperator::PowerOf,
                 left: Box::new(left),
@@ -2991,7 +3070,9 @@ impl Parser {
             || self.at_keyword(Keyword::TypeOf)
         {
             let op = self.next_item()?;
-            let arg = self.inherit_cover_grammar(&Self::parse_unary_expression)?;
+            let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+            let arg = self.parse_unary_expression()?;
+            self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             if op.token.matches_keyword(Keyword::Delete) && self.context.strict && arg.is_ident() {
                 //tolerate error
             }
@@ -3023,7 +3104,9 @@ impl Parser {
         let start = self.look_ahead.clone();
         if self.at_punct(Punct::Increment) || self.at_punct(Punct::Decrement) {
             let next = self.next_item()?;
-            let ex = self.inherit_cover_grammar(&Self::parse_unary_expression)?;
+            let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+            let ex = self.parse_unary_expression()?;
+            self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             if self.context.strict && ex.is_ident() {
                 match &ex {
                     &node::Expression::Ident(ref i) => if Self::is_restricted_word(i) {
@@ -3051,7 +3134,9 @@ impl Parser {
             self.context.is_binding_element = false;
             Ok(node::Expression::Update(ret))
         } else {
-            let expr = self.inherit_cover_grammar(&Self::parse_left_hand_side_expr_allow_call)?;
+            let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+            let expr = self.parse_left_hand_side_expr_allow_call()?;
+            self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             if !self.context.has_line_term && self.look_ahead.token.is_punct() {
                 if self.at_punct(Punct::Increment) || self.at_punct(Punct::Decrement) {
                     if self.context.strict {
@@ -3094,18 +3179,23 @@ impl Parser {
         let mut expr = if self.at_keyword(Keyword::Super) && self.context.in_function_body {
             self.parse_super()?
         } else {
-            if self.at_keyword(Keyword::New) {
-                self.inherit_cover_grammar(&Self::parse_new_expr)?
+            let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+            let ret = if self.at_keyword(Keyword::New) {
+                self.parse_new_expr()?
             } else {
-                self.inherit_cover_grammar(&Self::parse_primary_expression)?
-            }
+                self.parse_primary_expression()?
+            };
+            self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
+            ret
         };
         loop {
             if self.at_punct(Punct::OpenBracket) {
                 self.context.is_binding_element = false;
                 self.context.is_assignment_target = true;
                 self.expect_punct(Punct::OpenBracket)?;
-                let prop = self.isolate_cover_grammar(&Self::parse_expression)?;
+                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let prop = self.parse_expression()?;
+                self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                 self.expect_punct(Punct::CloseBracket)?;
                 let member = node::MemberExpression {
                     computed: true,
@@ -3162,11 +3252,14 @@ impl Parser {
             }
             node::Expression::SuperExpression
         } else {
-            if self.at_keyword(Keyword::New) {
-                self.inherit_cover_grammar(&Self::parse_new_expr)?
+            let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+            let ret = if self.at_keyword(Keyword::New) {
+                self.parse_new_expr()?
             } else {
-                self.inherit_cover_grammar(&Self::parse_primary_expression)?
-            }
+                self.parse_primary_expression()?
+            };
+            self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
+            ret
         };
         loop {
             if self.at_punct(Punct::Period) {
@@ -3204,7 +3297,9 @@ impl Parser {
                 self.context.is_assignment_target = true;
                 self.context.is_binding_element = false;
                 self.expect_punct(Punct::OpenBracket)?;
-                let prop = self.isolate_cover_grammar(&Self::parse_expression)?;
+                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let prop = self.parse_expression()?;
+                self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                 self.expect_punct(Punct::CloseBracket)?;
                 let inner = node::MemberExpression {
                     object: Box::new(expr),
@@ -3236,7 +3331,10 @@ impl Parser {
                 let arg = if self.at_punct(Punct::Spread) {
                     self.parse_spread_element()?
                 } else {
-                    self.isolate_cover_grammar(&Self::parse_async_arg)?
+                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let arg = self.parse_async_arg()?;
+                    self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+                    arg
                 };
                 ret.push(arg);
                 if self.at_punct(Punct::CloseParen) {
@@ -3280,7 +3378,9 @@ impl Parser {
     fn parse_spread_element(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_spread_element");
         self.expect_punct(Punct::Spread)?;
-        let arg = self.inherit_cover_grammar(&Self::parse_assignment_expr)?;
+        let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+        let arg = self.parse_assignment_expr()?;
+        self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
         Ok(
             node::Expression::Spread(Box::new(arg))
         )
@@ -3295,7 +3395,10 @@ impl Parser {
                 let expr = if self.at_punct(Punct::Spread) {
                     self.parse_spread_element()?
                 } else {
-                    self.isolate_cover_grammar(&Self::parse_assignment_expr)?
+                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let expr = self.parse_assignment_expr()?;
+                    self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+                    expr
                 };
                 args.push(expr);
                 if self.at_punct(Punct::CloseParen) {
@@ -3327,7 +3430,9 @@ impl Parser {
         } else if self.at_keyword(Keyword::Import) {
             self.error(&self.look_ahead, &["not import"])
         } else {
-            let callee = self.isolate_cover_grammar(&Self::parse_left_hand_side_expr)?;
+            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let callee = self.parse_left_hand_side_expr()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             let args = if self.at_punct(Punct::OpenParen) {
                 self.parse_args()?
             } else {
@@ -3393,16 +3498,11 @@ impl Parser {
         Ok(())
     }
 
-    fn isolate_cover_grammar<T, F>(&mut self, parse_fn: &F) -> Res<T>
-    where
-        F: Fn(&mut Self) -> Res<T>,
-    {
+    fn isolate_cover_grammar(&mut self) -> (bool, bool, Option<Item>) {
         debug!(target: "resp:debug", "isolate_cover_grammar");
-        let (prev_bind, prev_assign, prev_first)  = self.get_cover_grammar_state();
+        let ret  = self.get_cover_grammar_state();
         self.set_isolate_cover_grammar_state(true, true, None);
-        let res = parse_fn(self)?;
-        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-        Ok(res)
+        ret
     }
 
     fn get_cover_grammar_state(&self) -> (bool, bool, Option<Item>) {
@@ -3421,26 +3521,19 @@ impl Parser {
         }
     }
 
-    fn inherit_cover_grammar<T, F>(&mut self, parse_fn: &F) -> Res<T>
-    where
-        F: Fn(&mut Self) -> Res<T>,
-    {
-        debug!(target: "resp:debug", "inherit_cover_grammar");
-        let (prev_bind, prev_ass, prev_first) = self.get_cover_grammar_state();
+    fn inherit_cover_grammar(&mut self) -> (bool, bool, Option<Item>) {
+        trace!(target: "resp:debug", "inherit_cover_grammar");
+        let ret = self.get_cover_grammar_state();
         self.set_inherit_cover_grammar_state(true, true, None);
-        let res = parse_fn(self)?;
-        self.set_inherit_cover_grammar_state(prev_bind, prev_ass, prev_first);
-        Ok(res)
+        ret
     }
-
-
 
     /// Request the next token from the scanner
     /// swap the last look ahead with this new token
     /// and return the last token
     fn next_item(&mut self) -> Res<Item> {
         unsafe {
-            if self.scanner.cursor > usize::max_value() {
+            if self.scanner.cursor > 8 {
                     DEBUG = true
             }
         }
