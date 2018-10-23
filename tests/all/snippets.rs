@@ -293,6 +293,32 @@ fn parse_delete_comma_op() {
     parse(js);
 }
 
+#[test]
+fn doc_snippet() {
+    let js = "function helloWorld() { alert('Hello world'); }";
+    let p = Parser::new(&js).unwrap();
+    let f = ProgramPart::decl(
+        Declaration::Function(
+            Function {
+                id: Some("helloWorld".to_string()),
+                params: vec![],
+                body: vec![
+                    ProgramPart::Statement(
+                        Statement::Expr(
+                            Expression::call(Expression::ident("alert"), vec![Expression::string("'Hello world'")])
+                        )
+                    )
+                ],
+                generator: false,
+                is_async: false,
+            }
+        )
+    );
+    for part in p {
+        assert_eq!(part.unwrap(), f);
+    }
+}
+
 
 fn execute(js: &str, expectation: Program) {
     let s = parse(js);

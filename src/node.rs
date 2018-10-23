@@ -1,5 +1,5 @@
 use ress;
-use error::Error;
+
 #[derive(PartialEq,Debug)]
 pub struct Node{
     pub position: Position,
@@ -759,8 +759,8 @@ impl Literal {
     pub fn from_token(token: &ress::Token) -> Option<Self> {
         match token {
             ress::Token::Null => Some(Literal::Null),
-            ress::Token::String(ref string_lit) => Some(Literal::String(token.to_string())),
-            ress::Token::Numeric(ref num) => Some(Literal::Number(token.to_string())),
+            ress::Token::String(ref _string_lit) => Some(Literal::String(token.to_string())),
+            ress::Token::Numeric(ref _num) => Some(Literal::Number(token.to_string())),
             ress::Token::Boolean(ref b) => Some(Literal::Boolean(b.into())),
             ress::Token::RegEx(ref r) => Some(Literal::RegEx(r.into())),
             _ => None
@@ -822,7 +822,7 @@ impl RegEx {
     pub fn new(body: &str, flags: &str) -> Self {
         RegEx {
             pattern: body.to_string(),
-            flags: body.to_string(),
+            flags: flags.to_string(),
         }
     }
     pub fn from_ress_parts(body: &str, flags: &Option<String>) -> Self
