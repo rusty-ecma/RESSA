@@ -7,7 +7,7 @@ use std::{
     path::PathBuf,
 };
 
-use resp::Parser;
+use ressa::Parser;
 use test::{Bencher};
 #[bench]
 fn angular1(b: &mut Bencher) {
