@@ -137,7 +137,7 @@ impl Lib {
             &Lib::Angular => "node_modules/angular/angular.min.js".into(),
             &Lib::React => "node_modules/react/umd/react.production.min.js".into(),
             &Lib::ReactDom => "node_modules/react-dom/umd/react-dom.production.min.js".into(),
-            &Lib::Vue => "node_modules/vue/dist/vue.js".into(),
+            &Lib::Vue => "node_modules/vue/dist/vue.min.js".into(),
         }
     }
 }
