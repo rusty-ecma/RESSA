@@ -1,5 +1,5 @@
 #![cfg(test)]
-use resp::{Parser, Builder, node::ProgramPart,};
+use ressa::{Parser, Builder, node::ProgramPart,};
 use super::{Lib, EverythingVersion, get_js_file};
 use env_logger;
 

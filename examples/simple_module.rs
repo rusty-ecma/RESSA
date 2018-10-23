@@ -1,5 +1,5 @@
-extern crate resp;
-use resp::*;
+extern crate ressa;
+use ressa::*;
 fn main() {
     let js = include_str!("simple.mjs");
     let mut builder = Builder::new();

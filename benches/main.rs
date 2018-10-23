@@ -1,6 +1,6 @@
 #![feature(test)]
 extern crate test;
-extern crate resp;
+extern crate ressa;
 
 use std::{
     fs::read_to_string,

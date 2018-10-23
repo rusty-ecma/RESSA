@@ -1,7 +1,7 @@
 #![cfg(test)]
 
-use resp::node::*;
-use resp::Parser;
+use ressa::node::*;
+use ressa::Parser;
 use env_logger;
 
 #[test]

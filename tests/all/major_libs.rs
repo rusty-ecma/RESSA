@@ -1,6 +1,6 @@
 
 #![cfg(test)]
-use resp::Parser;
+use ressa::Parser;
 use env_logger;
 
 use super::{Lib, get_js_file};
