@@ -4,7 +4,7 @@ extern crate env_logger;
 
 mod major_libs;
 mod ecma262;
-mod script_snippets;
+mod snippets;
 
 use std::{
     io::Error,
@@ -47,7 +47,7 @@ impl Lib {
             Lib::React => "node_modules/react/umd/react.development.js".into(),
             Lib::ReactDom => "node_modules/react-dom/umd/react-dom.development.js".into(),
             Lib::Vue => "node_modules/vue/dist/vue.js".into(),
-            Lib::Moment => "node_modules/moment/src/moment.js".into(),
+            Lib::Moment => "node_modules/moment/moment.js".into(),
             Lib::Dexie => "node_modules/dexie/dist/dexie.js".into(),
             Lib::Everything(kind) => format!("node_modules/everything.js/{}", kind.file_name()),
         }

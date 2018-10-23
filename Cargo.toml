@@ -9,6 +9,7 @@ repository = "https://github.com/FreeMasen/RESP"
 ress = "0.5.1"
 log = "0.4.5"
 env_logger = "0.5.13"
+backtrace = "0"
 
 [features]
 major_libs = []

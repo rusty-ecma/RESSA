@@ -191,8 +191,8 @@ fn parse_try_stmt() {
             console.log('done trying');
         }";
 
-    let program = Program::Script(vec![]);
-    execute(js, program);
+
+    parse(js);
 }
 
 #[test]
@@ -202,8 +202,7 @@ fn parse_try_stmt_2() {
     } catch (e) {
         console.log('caught', e);
     }";
-    let program = Program::Script(vec![]);
-    execute(js, program);
+    parse(js);
 }
 #[test]
 fn parse_labeled_stmt_lf() {
@@ -230,8 +229,7 @@ fn parse_labeled_stmt_lf() {
 fn parse_var_ident_fn() {
     let _ = env_logger::try_init();
     let js = "({var(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){}})";
-    let program = Program::Script(vec![]);
-    execute(js, program);
+    parse(js);
 }
 
 #[test]
@@ -242,8 +240,7 @@ fn parse_arg_ident_assign() {
 
         }
     })";
-    let program = Program::Script(vec![]);
-    execute(js, program);
+    parse(js);
 }
 
 #[test]
@@ -252,28 +249,58 @@ fn parse_nested_delegated_yield() {
     let js = "function*g(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){
   return a = yield* b = yield c = yield yield;
 }";
-    let program = Program::Script(vec![]);
-    execute(js, program);
+    parse(js);
 }
 #[test]
 fn parse_obj_patter_fn_fat_arrow() {
     let _ = env_logger::try_init();
-    let js = "(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k) => {;};";
-    let program = Program::Script(vec![]);
-    execute(js, program);
+    let js = "({i = 0, i: j = 0}) => {;};";
+    parse(js);
 }
 #[test]
 fn parse_obj_pattern_fn_fat_arrow2() {
     let _ = env_logger::try_init();
     let js = "({x}) => ({x});";
-    let program = Program::Script(vec![]);
-    execute(js, program);
+
+    parse(js);
+}
+
+#[test]
+fn parse_super_call() {
+    let _ = env_logger::try_init();
+    let js = "class A extends B {
+        constructor() {
+            super(new.target);
+        }
+    }";
+    parse(js);
+}
+
+#[test]
+fn parse_delete_comma_op() {
+    let _ = env_logger::try_init();
+    let js = "remove: function(a){
+        if(l<Number.MAX_VALUE){
+            var b=m[a];
+            if(!b)return;
+            b==n && (n=b.p);
+            b==p && (p=b.n);
+            f(b.n,b.p);
+            delete m[a]
+        }
+        a in k&&(delete k[a],g--)
+    }";
+    parse(js);
 }
 
 
 fn execute(js: &str, expectation: Program) {
+    let s = parse(js);
+    assert_eq!(s, expectation);
+}
+
+fn parse(js: &str) -> Program {
     let mut p = Parser::new(js).unwrap();
     let s = p.parse().unwrap();
-    println!("{:#?}", s);
-    assert_eq!(s, expectation);
+    s
 }
