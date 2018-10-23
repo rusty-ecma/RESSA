@@ -3,7 +3,11 @@ name = "resp"
 version = "0.1.0"
 authors = ["Robert Masen <r@robertmasen.pizza>"]
 repository = "https://github.com/FreeMasen/RESP"
-
+description = "An ECMAscript parser"
+license = "MIT"
+readme = "./README.md"
+keywords = ["JavaScript", "parsing", "JS", "ES", "ECMA"]
+categories = ["parsing", "text-processing", "web-programming"]
 
 [dependencies]
 ress = "0.5.1"
