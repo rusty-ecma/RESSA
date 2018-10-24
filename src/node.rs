@@ -27,7 +27,7 @@ impl Position {
 }
 
 #[derive(PartialEq,Debug)]
-pub enum Item{
+pub enum Item {
     Program(Program),
     Function(Function),
     Statement(Statement),
