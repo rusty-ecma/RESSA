@@ -12,8 +12,8 @@
 //!
 //! A very simple example might look like this
 //! ```
-//! extern crate resp;
-//! use resp::{
+//! extern crate ressa;
+//! use ressa::{
 //!  Parser,
 //!  node::*,
 //! };
@@ -41,7 +41,7 @@
 //!        assert_eq!(part.unwrap(), f);
 //!    }
 //! }
-//!
+//!```
 //! checkout the `examples` folders for slightly larger
 //! examples.
 //!
@@ -58,32 +58,64 @@ use error::Error;
 use node::Position;
 use std::{collections::HashSet, mem::replace};
 
+/// The current configuration options.
+/// This will most likely increase over time
 struct Config {
+    /// whether or not to tolerate a subset of errors
     tolerant: bool,
+    /// whether or not to collect comments or ignore them
     comments: bool,
 }
 
+/// The current parsing context.
+/// This structure holds the relivant
+/// information to know when some
+/// text might behave differently
+/// depending on what has come before it
 struct Context {
+    /// If the current JS should be treated
+    /// as a JS module
     is_module: bool,
+    /// If `in` is allowed as an identifier
     allow_in: bool,
+    /// If a strict directive is allowed
     allow_strict_directive: bool,
+    /// If `yield` is allowed as an identifier
     allow_yield: bool,
+    /// If await is allowed as an identifier
     await: bool,
+    /// If we have found any possible naming errors
+    /// which are not yet resolved
     first_covert_initialized_name_error: Option<Item>,
+    /// If the current expressions is an assignment target
     is_assignment_target: bool,
+    /// If the current expression is a binding element
     is_binding_element: bool,
+    /// If we have entered a function body
     in_function_body: bool,
+    /// If we have entered a loop block
     in_iteration: bool,
+    /// If we have entered a switch block
     in_switch: bool,
+    /// The currently known labels, this applies
+    /// to labels only, not all identifiers. Errors
+    /// at that level would need to be handled by
+    /// the calling scope
     label_set: HashSet<String>,
+    /// If the current scope has a `'use strict';` directive
+    /// in the prelude
     strict: bool,
+    /// If the scanner has a pending line terminator
+    /// before the next token
     has_line_term: bool,
+    /// If we have passed the initial prelude where a valid
+    /// `'use strict'` directive would exist
     past_prolog: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        trace!(target: "resp:debug", "default");
+        trace!(target: "resp:debug", "default config");
         Self {
             tolerant: false,
             comments: false,
@@ -93,7 +125,7 @@ impl Default for Config {
 
 impl Default for Context {
     fn default() -> Self {
-        trace!(target: "resp:debug", "default ",);
+        trace!(target: "resp:debug", "default context",);
         Self {
             is_module: false,
             await: false,
@@ -113,7 +145,62 @@ impl Default for Context {
         }
     }
 }
-
+/// This is used to create a `Parser` using
+/// the builder method
+/// ```
+/// use ressa::Builder;
+/// use ressa::node::*;
+/// fn main() {
+///     let js = "for (var i = 0; i < 100; i++) {
+///         console.log('loop', i);
+///         }";
+///     let p = Builder::new()
+///                     .comments(false)
+///                     .module(false)
+///                     .js(js)
+///                     .build()
+///                     .unwrap();
+///     for part in p {
+///         let expecation = ProgramPart::Statement(
+///             Statement::For(
+///                 ForStatement {
+///                     init: Some(
+///                         LoopInit::Variable(
+///                             vec![VariableDecl::with_value("i", Expression::number("0"))]
+///                         )
+///                     ),
+///                     test: Some(
+///                         Expression::binary(Expression::ident("i"), BinaryOperator::LessThan, Expression::number("100"))
+///                     ),
+///                     update: Some(
+///                         Expression::Update(
+///                             UpdateExpression {
+///                                 operator: UpdateOperator::Increment,
+///                                 argument: Box::new(Expression::ident("i")),
+///                                 prefix: false,
+///                             }
+///                         )
+///                     ),
+///                     body:
+///                         Box::new(Statement::Block(
+///                             vec![ProgramPart::Statement(
+///                                 Statement::Expr(
+///                                     Expression::call(Expression::member(Expression::ident("console"), Expression::ident("log"), false),
+///                                     vec![
+///                                         Expression::string("'loop'"),
+///                                         Expression::ident("i"),
+///                                     ])
+///                                 )
+///                             )]
+///                         )
+///                     )
+///                 }
+///             )
+///         );
+///         assert_eq!(part.unwrap(), expecation);
+///     }
+/// }
+/// ```
 pub struct Builder {
     tolerant: bool,
     is_module: bool,
@@ -177,34 +264,63 @@ impl Builder {
     }
 }
 
-#[allow(unused)]
+/// This is the primary interface that you would interact with.
+/// There are two main ways to use it, the first is to utilize
+/// the `Iterator` implementation. Each iteration will return
+/// a `Result<ProgramPart, Error>`.
+/// The other option is to use the `parse` method, which is just
+/// a wrapper around the `collect` method on `Iterator`, however
+/// the final result will be a `Result<Program, Error>` and the
+/// `ProgramPart` collection will be the inner data. Since modern
+/// js allows for both `Module`s as well as `Script`s, these will be
+/// the two `enum` variants.
 pub struct Parser {
+    /// The current parsing context
     context: Context,
+    /// The configuration provided by the user
     config: Config,
+    /// The interal scanner (see the
+    /// ress` crate for more details)
     scanner: Scanner,
+    /// The indexes that each line starts/ends at
     lines: Vec<Line>,
+    /// The next item,
     look_ahead: Item,
+    /// Since we are looking ahead, we need
+    /// to make sure we don't miss the eof
+    /// by using this flag
     found_eof: bool,
-    tokens: Vec<Item>,
-    comments: Vec<Item>,
+    /// a possible container for tokens, currently
+    /// it is unused
+    _tokens: Vec<Item>,
+    /// a possible container for comments, currently
+    /// it is unused
+    _comments: Vec<Item>,
+    /// The current position we are parsing
     current_position: node::Position,
+    /// To ease debugging this will be a String representation
+    /// of the look_ahead token
     _look_ahead: String,
 }
+/// The start/end index of a line
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Line {
     start: usize,
     end: usize,
 }
-
+/// The result type for the Parser operations
 type Res<T> = Result<T, Error>;
-
+/// Capture the lines from the raw js text
 fn get_lines(text: &str) -> Vec<Line> {
+    // Obviously we will start at 0
     let mut line_start = 0;
+    // This is the byte position, not the character
+    // position to account for multi byte chars
     let mut byte_position = 0;
+    // loop over the characters
     let mut ret: Vec<Line> = text
         .chars()
         .filter_map(|c| {
-
             let ret = match c {
                 '\r' => {
                     // look ahead 1 char to see if it is a newline pair
@@ -225,23 +341,37 @@ fn get_lines(text: &str) -> Vec<Line> {
                         None
                     }
                 }
-                '\n' | '\u{2028}' | '\u{2029}' => {
+                '\n' => {
                     let ret = Line {
                         start: line_start,
                         end: byte_position,
                     };
                     line_start = byte_position + 1;
                     Some(ret)
+                },
+                '\u{2028}' | '\u{2029}' => {
+                    //These new line characters are both 3 bytes in length
+                    //that means we need to include this calculation in both
+                    // the end field and the next line start
+                    let ret = Line {
+                        start: line_start,
+                        end: byte_position + 2,
+                    };
+                    line_start = byte_position + 3;
+                    Some(ret)
                 }
                 _ => None,
             };
+            // Since chars can be up to 4 bytes wide, we
+            // want to move the full width of the current byte
             byte_position += c.len_utf8();
             ret
         }).collect();
-
+    // Since we shouldn't have only a new line char at EOF,
+    // This will capture the last line of the text
     ret.push(Line {
         start: line_start,
-        end: text.len(),
+        end: text.len() - 1,
     });
     ret
 }
@@ -283,8 +413,8 @@ impl Parser {
             found_eof: false,
             config,
             context,
-            tokens: vec![],
-            comments: vec![],
+            _tokens: vec![],
+            _comments: vec![],
             current_position: node::Position::start(),
             _look_ahead: String::new(),
         };
@@ -1298,6 +1428,7 @@ impl Parser {
                 return Err(self.redecl_error(&id));
             }
             let body = if self.at_keyword(Keyword::Class) {
+                //tolerate error, unexpected token
                 let body = self.parse_class_body()?;
                 let cls = node::Class {
                     id: None,
@@ -1313,6 +1444,7 @@ impl Parser {
             } else {
                 self.parse_statement()?
             };
+            self.context.label_set.remove(&format!("${}", &id));
             Ok(node::Statement::Labeled(node::LabeledStatement {
                 label: id,
                 body: Box::new(body),
@@ -3591,7 +3723,7 @@ impl Parser {
                 self._look_ahead = format!("{:?}", look_ahead.token);
                 if look_ahead.token.is_comment() {
                     if self.config.comments {
-                        self.comments.push(look_ahead);
+                        self._comments.push(look_ahead);
                     }
                     continue;
                 }
@@ -3850,16 +3982,74 @@ mod test {
     use super::*;
     #[test]
     fn split_lines() {
-        let js = "lineFeed:0\n0;";
-        let lines = get_lines(js);
+        println!("line feed");
+        let lf = "lf:0
+0;";
+        let lines = get_lines(lf);
         let expectation = vec![
             Line {
                 start: 0,
-                end: 10,
+                end: 4,
             },
             Line {
-                start: 11,
-                end: 13
+                start: 5,
+                end: 6
+            }
+        ];
+        assert_eq!(lines, expectation);
+        println!("carriage return");
+        let cr = format!("cr:0{}0;", '\r');
+        let lines = get_lines(&cr);
+        let expectation = vec![
+            Line {
+                start: 0,
+                end: 4
+            },
+            Line {
+                start: 5,
+                end: 6
+            }
+        ];
+        assert_eq!(lines, expectation);
+        println!("carriage return line feed");
+        let crlf = format!("crlf:0{}{}0;", '\r', '\n');
+        let lines = get_lines(&crlf);
+        let expectation = vec![
+            Line {
+                start: 0,
+                end: 7
+            },
+            Line {
+                start: 8,
+                end: 9
+            }
+        ];
+        assert_eq!(lines, expectation);
+        println!("line seperator");
+        let ls = "ls:0 0;";
+        let lines = get_lines(ls);
+        let expectation = vec![
+            Line {
+                start: 0,
+                end: 6
+            },
+            Line {
+                start: 7,
+                end: 8,
+            }
+        ];
+        assert_eq!(lines, expectation);
+        println!("paragraph seperator");
+        let ps = "ps:0 0;";
+        let lines = get_lines(ps);
+        let expectation = vec![
+            Line {
+                start: 0,
+                end: 6
+            },
+            Line {
+                start: 7,
+                end: 8,
             }
         ];
         assert_eq!(lines, expectation);
