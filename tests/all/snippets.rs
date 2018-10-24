@@ -319,6 +319,59 @@ fn doc_snippet() {
     }
 }
 
+#[test]
+fn builder_doc_snippet() {
+    use ressa::Builder;
+    let js = "for (var i = 0; i < 100; i++) {
+        console.log('loop', i);
+        }";
+    let p = Builder::new()
+                    .comments(false)
+                    .module(false)
+                    .js(js)
+                    .build()
+                    .unwrap();
+    for part in p {
+        let expecation = ProgramPart::Statement(
+            Statement::For(
+                ForStatement {
+                    init: Some(
+                        LoopInit::Variable(
+                            vec![VariableDecl::with_value("i", Expression::number("0"))]
+                        )
+                    ),
+                    test: Some(
+                        Expression::binary(Expression::ident("i"), BinaryOperator::LessThan, Expression::number("100"))
+                    ),
+                    update: Some(
+                        Expression::Update(
+                            UpdateExpression {
+                                operator: UpdateOperator::Increment,
+                                argument: Box::new(Expression::ident("i")),
+                                prefix: false,
+                            }
+                        )
+                    ),
+                    body:
+                        Box::new(Statement::Block(
+                            vec![ProgramPart::Statement(
+                                Statement::Expr(
+                                    Expression::call(Expression::member(Expression::ident("console"), Expression::ident("log"), false),
+                                    vec![
+                                        Expression::string("'loop'"),
+                                        Expression::ident("i"),
+                                    ])
+                                )
+                            )]
+                        )
+                    )
+                }
+            )
+        );
+        assert_eq!(part.unwrap(), expecation);
+    }
+}
+
 
 fn execute(js: &str, expectation: Program) {
     let s = parse(js);
