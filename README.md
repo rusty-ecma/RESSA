@@ -21,3 +21,4 @@ In its current state it is minimally functional, there are a few big features th
 | reactDom.min.js | 157.81 ms | 66.25 ms | 94.27 kb |
 | vue.js | 633.09 ms | 285.20 ms | 282.52 kb |
 | vue.min.js | 154.84 ms | 16.89 ms | 84.43 kb |
+

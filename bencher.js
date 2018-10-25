@@ -1,78 +1,35 @@
 const path = require('path');
 const fs = require('fs');
-const benches = {
-    angular1: {
-        normal: {
-            ns: 2303806063,
-            dev: 629241313,
-            path: 'angular/angular.js',
-        },
-        min: {
-            ns: 298483805,
-            dev: 133099887,
-            path: 'angular/angular.min.js',
-        },
-
-    },
-    jquery: {
-        normal: {
-            ns: 512966585,
-            dev: 193621991,
-            path: 'jquery/dist/jquery.js',
-        },
-        min: {
-            ns: 151366969,
-            dev: 38781238,
-            path: 'jquery/dist/jquery.min.js',
-        },
-    },
-    react: {
-        normal: {
-            ns: 38489490,
-            dev: 2915616,
-            path: 'react/umd/react.development.js',
-        },
-        min:{
-            ns: 10627439,
-            dev: 497958,
-            path: 'react/umd/react.production.min.js',
-        },
-    },
-    reactDom: {
-        normal: {
-            ns: 1490179396,
-            dev: 672391389,
-            path: 'react-dom/umd/react-dom.development.js',
-        },
-        min:  {
-            ns: 157814413,
-            dev: 66248993,
-            path: 'react-dom/umd/react-dom.production.min.js',
-        },
-    },
-    vue: {
-        normal: {
-            ns: 633085083,
-            dev: 285204631,
-            path: 'vue/dist/vue.js'
-        },
-        min: {
-            ns: 154839352,
-            dev: 16893259,
-            path: 'vue/dist/vue.min.js'
-        },
-    },
-};
-
+async function main() {
+    let benchOut = await runBench();
+    let b = parseOutput(benchOut);
+    await addSizes(b);
+    report(b);
+}
+const paths = {
+    'angular1': path.join(__dirname, 'node_modules', 'angular', 'angular.js'),
+    'angular1.min': path.join(__dirname, 'node_modules', 'angular', 'angular.min.js'),
+    'jquery': path.join(__dirname, 'node_modules', 'jquery', 'dist', 'jquery.js'),
+    'jquery.min': path.join(__dirname, 'node_modules', 'jquery', 'dist', 'jquery.min.js'),
+    'react': path.join(__dirname, 'node_modules', 'react', 'umd', 'react.development.js'),
+    'react.min': path.join(__dirname, 'node_modules', 'react', 'umd', 'react.production.min.js'),
+    'react.dom': path.join(__dirname, 'node_modules', 'react-dom', 'umd', 'react-dom.development.js'),
+    'react.dom.min': path.join(__dirname, 'node_modules', 'react-dom', 'umd', 'react-dom.production.min.js'),
+    'vue': path.join(__dirname, 'node_modules', 'vue', 'dist', 'vue.js'),
+    'vue.min': path.join(__dirname, 'node_modules', 'vue', 'dist', 'vue.min.js'),
+}
 function runBench() {
     return new Promise((res, rej) => {
         let bencher = require('child_process').spawn('cargo', ['+nightly', 'bench']);
         let totalOut = '';
         let returned = false;
         bencher.stdout.on('data', (data) => {
+            process.stdout.write(data);
             if (typeof data != 'string') data = data.toString();
             totalOut += data;
-            console.log('data: ', data);
+        });
+        bencher.stderr.on('data', data => {
+            process.stderr.write(data);
         });
         bencher.on('close', (code, sig) => {
             if (!returned) {
@@ -91,24 +48,54 @@ function runBench() {
     });
 }
 
-async function main() {
-    let benchOut = await runBench();
-    console.log('benchOut', benchOut);
+function parseOutput(output) {
+    let lines = output.split('\n');
+    let relevant = lines.filter(l => l.indexOf('... bench:') > -1);
+    return relevant.map(l => {
+        let parts = l.split(' ').filter(p => p != '');
+        let name = parts[1].split('_').join('.');
+        let ns = parts[4].replace(/,/g, '');
+        ns = parseInt(ns);
+        let dev = parts[7];
+        dev = parseInt(dev.substring(0, dev.length));
+        return {
+            name,
+            ns,
+            dev,
+            size: 0,
+        }
+    })
 }
 
-function report() {
-    console.log('| test name | bench time | +/- | size |')
-    console.log('|---|---|---|---|');
-    for (let k in benches) {
-        let test = benches[k];
-        let normal = test.normal;
-        let normalSize = fs.statSync(path.join(__dirname, 'node_modules', normal.path)).size;
-        let normalOut = formatEntry(`${k}.js`, normal.ns, normal.dev, normalSize);
-        console.log(normalOut);
-        let min = test.min;
-        let minSize = fs.statSync(path.join(__dirname, 'node_modules', min.path)).size;
-        let minOut = formatEntry(`${k}.min.js`, min.ns, min.dev, minSize);
-        console.log(minOut);
+async function addSizes(results) {
+    for (let result of results) {
+        await addSize(result);
+    }
+}
+
+function addSize(result) {
+    return new Promise((r, j) => {
+        let p = paths[result.name];
+        fs.stat(p, (err, stats) => {
+            if (err) return j(err);
+            result.size = stats.size;
+            r();
+        });
+    });
+}
+
+
+
+function report(benches) {
+    const header = '| test name | bench time | +/- | size |\n';
+    const divider = '|---|---|---|---|\n';
+    for (let bench of benches) {
+        let out = formatEntry(bench.name, bench.ns, bench.dev, bench.size)
+        let fullOut = header + divider + out;
+        fs.writeFile('benchmark.md', fullOut, err => {
+            if (err) throw err;
+            console.log(fullOut);
+        });
     }
 }
 
@@ -116,7 +103,7 @@ function formatEntry(name, time, dev, size) {
     let [t, u] = reduceTime(time);
     let [dt, du] = reduceTime(dev);
     let [s, su] = reduceSize(size);
-    return `| ${name} | ${t.toFixed(2)} ${u} | ${dt.toFixed(2)} ${du} | ${s.toFixed(2)} ${su} |`;
+    return `| ${name}.js | ${t.toFixed(2)} ${u} | ${dt.toFixed(2)} ${du} | ${s.toFixed(2)} ${su} |`;
 }
 
 
