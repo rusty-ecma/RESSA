@@ -3888,19 +3888,24 @@ impl Parser {
     }
 
     fn get_item_position(&self, item: &Item) -> Position {
-        fn search(lines: &[Line], item: &Item, index: usize) -> Option<(usize, Line)> {
+        fn search(lines: &[Line], item: &Item, index: usize) -> (usize, Line) {
             let current_len = lines.len();
-            if current_len <= 100 {
-                if let Some((idx, line)) = lines
-                    .iter()
-                    .enumerate()
-                    .find(|(_, l)| l.end + 1 >= item.span.start) {
-                        Some((index + idx, *line))
-                    } else {
-                        None
-                    }
+            if current_len <= 2 {
+                if lines[0].start >= item.span.start {
+                    (index, lines[0])
+                } else {
+                    (index + 1, lines[1])
+                }
+                // if let Some((idx, line)) = lines
+                //     .iter()
+                //     .enumerate()
+                //     .find(|(_, l)| l.end + 1 >= item.span.start) {
+                //         Some((index + idx, *line))
+                //     } else {
+                //         None
+                //     }
             } else {
-                let half = current_len / 2;
+                let half = current_len >> 1;
                 if lines[half].start + 1 >= item.span.start {
                     search(&lines[..=half], item, index + half)
                 } else {
@@ -3908,11 +3913,7 @@ impl Parser {
                 }
             }
         }
-        let (idx, line) = if let Some((idx, line)) = search(&self.lines, item, 0) {
-            (idx, line)
-        } else {
-            panic!("Unable to determine item's line number {:?}", item);
-        };
+        let (idx, line) = search(&self.lines, item, 0);
         // let (idx, line) = if let Some((idx, line)) = self
         //     .lines
         //     .iter()
