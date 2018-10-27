@@ -1,6 +1,21 @@
 #![feature(test)]
+//! This benchmarking suite is extremely naive
+//! I use it internally to determine if I have
+//! been able to make large impact performance
+//! improvements in both this crate
+//! and `ress`
+//! If you want to full output please run
+//! `node ./bencher.js` in the crate root
+//! this will collect the results and
+//! build a table that will be written to
+//! benchmark.md
+//! This will include information about
+//! the parser overhead above the scanner
+//! and a naive comparison against
+//! [esprima](https://github.com/jquery/esprima)
 extern crate test;
 extern crate ressa;
+extern crate ress;
 
 use std::{
     fs::read_to_string,
@@ -8,13 +23,24 @@ use std::{
 };
 
 use ressa::Parser;
-use test::{Bencher};
+use ress::Scanner;
+use test::{Bencher, black_box};
 #[bench]
 fn angular1(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::Angular) {
         b.iter(|| {
             let mut p = Parser::new(&js).expect("Unable to crate new parser for angular.js");
             p.parse().expect("unable to parse angular1")
+        });
+    }
+}
+#[bench]
+fn angular1_scanner_only(b: &mut Bencher) {
+    if let Ok(js) = get_js(Lib::Angular) {
+        b.iter(|| {
+            let s = Scanner::new((&js).to_string());
+            let res: Vec<ress::Item> = s.collect();
+            black_box(res);
         });
     }
 }
@@ -27,13 +53,32 @@ fn angular1_min(b: &mut Bencher) {
         });
     }
 }
-
+#[bench]
+fn angular1_min_scanner_only(b: &mut Bencher) {
+    if let Ok(js) = get_min_js(Lib::Angular) {
+        b.iter(|| {
+            let s = Scanner::new((&js).to_string());
+            let res: Vec<ress::Item> = s.collect();
+            black_box(res);
+        });
+    }
+}
 #[bench]
 fn jquery(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::Jquery) {
         b.iter(|| {
             let mut p = Parser::new(&js).expect("Unable to create new parser for jquery");
             p.parse().expect("unable to parse jquery")
+        });
+    }
+}
+#[bench]
+fn jquery_scanner_only(b: &mut Bencher) {
+    if let Ok(js) = get_js(Lib::Jquery) {
+        b.iter(|| {
+            let s = Scanner::new((&js).to_string());
+            let res: Vec<ress::Item> = s.collect();
+            black_box(res);
         });
     }
 }
@@ -46,13 +91,32 @@ fn jquery_min(b: &mut Bencher) {
         });
     }
 }
-
+#[bench]
+fn jquery_min_scanner_only(b: &mut Bencher) {
+    if let Ok(js) = get_min_js(Lib::Jquery) {
+        b.iter(|| {
+            let s = Scanner::new((&js).to_string());
+            let res: Vec<ress::Item> = s.collect();
+            black_box(res);
+        });
+    }
+}
 #[bench]
 fn react(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::React) {
         b.iter(|| {
             let mut p = Parser::new(&js).expect("Unable to create new parser for react");
             p.parse().expect("unable to parse react")
+        });
+    }
+}
+#[bench]
+fn react_scanner_only(b: &mut Bencher) {
+    if let Ok(js) = get_js(Lib::React) {
+        b.iter(|| {
+            let s = Scanner::new((&js).to_string());
+            let res: Vec<ress::Item> = s.collect();
+            black_box(res);
         });
     }
 }
@@ -67,6 +131,17 @@ fn react_min(b: &mut Bencher) {
 }
 
 #[bench]
+fn react_min_scanner_only(b: &mut Bencher) {
+    if let Ok(js) = get_min_js(Lib::React) {
+        b.iter(|| {
+            let s = Scanner::new((&js).to_string());
+            let res: Vec<ress::Item> = s.collect();
+            black_box(res);
+        });
+    }
+}
+
+#[bench]
 fn react_dom(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::ReactDom) {
         b.iter(|| {
@@ -75,12 +150,35 @@ fn react_dom(b: &mut Bencher) {
         });
     }
 }
+
+#[bench]
+fn react_dom_scanner_only(b: &mut Bencher) {
+    if let Ok(js) = get_js(Lib::ReactDom) {
+        b.iter(|| {
+            let s = Scanner::new((&js).to_string());
+            let res: Vec<ress::Item> = s.collect();
+            black_box(res);
+        });
+    }
+}
+
 #[bench]
 fn react_dom_min(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::ReactDom) {
         b.iter(|| {
             let mut p = Parser::new(&js).expect("Unable to create new parser for react-dom (min)");
             p.parse().expect("unable to parse react_dom_min")
+        });
+    }
+}
+
+#[bench]
+fn react_dom_min_scanner_only(b: &mut Bencher) {
+    if let Ok(js) = get_min_js(Lib::ReactDom) {
+        b.iter(|| {
+            let s = Scanner::new((&js).to_string());
+            let res: Vec<ress::Item> = s.collect();
+            black_box(res);
         });
     }
 }
@@ -94,12 +192,35 @@ fn vue(b: &mut Bencher) {
         });
     }
 }
+
+#[bench]
+fn vue_scanner_only(b: &mut Bencher) {
+    if let Ok(js) = get_js(Lib::Vue) {
+        b.iter(|| {
+            let s = Scanner::new((&js).to_string());
+            let res: Vec<ress::Item> = s.collect();
+            black_box(res);
+        });
+    }
+}
+
 #[bench]
 fn vue_min(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::Vue) {
         b.iter(|| {
             let mut p = Parser::new(&js).expect("Unable to create new parser for vue (min)");
             p.parse().expect("unable to parse vue_min")
+        });
+    }
+}
+
+#[bench]
+fn vue_min_scanner_only(b: &mut Bencher) {
+    if let Ok(js) = get_min_js(Lib::Vue) {
+        b.iter(|| {
+            let s = Scanner::new((&js).to_string());
+            let res: Vec<ress::Item> = s.collect();
+            black_box(res);
         });
     }
 }
