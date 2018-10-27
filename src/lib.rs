@@ -197,7 +197,7 @@ impl Default for Context {
 ///                 }
 ///             )
 ///         );
-///         assert_eq!(part.unwrap(), expecation);
+///         assert_eq!(part.unwrap(), expectation);
 ///     }
 /// }
 /// ```
@@ -217,44 +217,53 @@ impl Builder {
             js: String::new(),
         }
     }
-
+    /// Enable or disable error tolerance
+    /// default: `false`
     pub fn set_tolerant(&mut self, value: bool) {
         self.tolerant = value;
     }
-
+    /// Enable or disable error tolerance with a builder
+    /// pattern
+    /// default: `false`
     pub fn tolerant(&mut self, value: bool) -> &mut Self {
         self.set_tolerant(value);
         self
     }
-
+    /// Set the parsing context to module or script
+    /// default: `false` (script)
     pub fn set_module(&mut self, value: bool) {
         self.is_module = value;
     }
-
+    /// Set the parsing context to module or script
+    /// with a builder pattern
+    /// default: `false` (script)
     pub fn module(&mut self, value: bool) -> &mut Self {
         self.set_module(value);
         self
     }
-
-    pub fn set_comments(&mut self, value: bool) {
-        self.comments = value;
+    /// Set the behavior of the parser when
+    /// handling comments
+    /// default: `false` (discard comments)
     }
-
-    pub fn comments(&mut self, value: bool) -> &mut Self {
+    /// Set the behavior of the parser when
+    /// handling comments with a builder pattern
+    /// default: `false` (discard comments)
         self.set_comments(value);
         self
     }
-
+    /// Set the js text that this parser would operate
+    /// on
     pub fn set_js(&mut self, js: impl Into<String>) {
         self.js = js.into();
     }
-
+    /// Set the js text that this parser would operate
+    /// on with a builder pattern
     pub fn js(&mut self, js: impl Into<String>) -> &mut Self {
         self.set_js(js);
         self
     }
-
-    pub fn build(&self) -> Res<Parser> {
+    /// Complete the builder pattern returning
+    /// `Result<Parser, Error>`
         let is_module = self.is_module;
         let comments = self.comments;
         let tolerant = self.tolerant;
@@ -278,9 +287,8 @@ pub struct Parser {
     /// The current parsing context
     context: Context,
     /// The configuration provided by the user
-    config: Config,
-    /// The interal scanner (see the
-    /// ress` crate for more details)
+    /// The internal scanner (see the
+    /// `ress` crate for more details)
     scanner: Scanner,
     /// The indexes that each line starts/ends at
     lines: Vec<Line>,
@@ -402,6 +410,7 @@ fn get_lines(text: &str) -> Vec<Line> {
         };
         Self::_new(scanner, lines, config, context)
     }
+    /// Internal constructor to allow for both builder pattern
     /// and `new` construction
         let look_ahead = Item {
                 token: Token::EoF,
