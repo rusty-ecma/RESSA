@@ -1117,17 +1117,6 @@ fn get_lines(text: &str) -> Vec<Line> {
         Ok(ret)
     }
 
-    fn at_return_arg(&self) -> bool {
-        if self.context.has_line_term {
-            return self.look_ahead.is_string()
-                    || self.look_ahead.is_template()
-        }
-        !self.at_punct(Punct::SemiColon)
-        && !self.at_punct(Punct::CloseBrace)
-        && !self.look_ahead.is_eof()
-
-    }
-
     fn parse_if_stmt(&mut self) -> Res<node::IfStatement> {
         debug!(target: "resp:debug", "parse_if_stmt {}", self.context.allow_yield);
         self.expect_keyword(Keyword::If)?;
@@ -1500,6 +1489,29 @@ fn get_lines(text: &str) -> Vec<Line> {
         self.consume_semicolon()?;
         Ok(ret)
     }
+
+    fn parse_expression(&mut self) -> Res<node::Expression> {
+        debug!(target: "resp:debug", "parse_expression {}", self.context.allow_yield);
+        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+        let ret = self.parse_assignment_expr()?;
+        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+        if self.at_punct(Punct::Comma) {
+            let mut list = vec![ret];
+            while !self.look_ahead.token.is_eof() {
+                if !self.at_punct(Punct::Comma) {
+                    break;
+                }
+                let _comma = self.next_item()?;
+                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let expr = self.parse_assignment_expr()?;
+                self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+                list.push(expr);
+            }
+            return Ok(node::Expression::Sequence(list));
+        }
+        Ok(ret)
+    }
+
 
     fn parse_block(&mut self) -> Res<node::BlockStatement> {
         debug!(target: "resp:debug", "parse_block {}", self.context.allow_yield);
@@ -2201,23 +2213,6 @@ fn get_lines(text: &str) -> Vec<Line> {
         }
     }
 
-    fn at_import_call(&mut self) -> bool {
-        debug!(target: "resp:debug", "at_import_call {}", self.context.allow_yield);
-        if self.at_keyword(Keyword::Import) {
-            let state = self.scanner.get_state();
-            self.scanner.skip_comments();
-            let ret = if let Some(next) = self.scanner.next() {
-                next.token.matches_punct(Punct::OpenParen)
-            } else {
-                false
-            };
-            self.scanner.set_state(state);
-            ret
-        } else {
-            false
-        }
-    }
-
     fn parse_group_expr(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_group_expr {}", self.context.allow_yield);
         self.expect_punct(Punct::OpenParen)?;
@@ -2491,17 +2486,11 @@ fn get_lines(text: &str) -> Vec<Line> {
         Ok((has_proto, prop))
     }
 
-    fn at_qualified_prop_key(&self) -> bool {
-        match &self.look_ahead.token {
-            Token::Ident(_)
-            | Token::String(_)
-            | Token::Boolean(_)
-            | Token::Numeric(_)
-            | Token::Null
-            | Token::Keyword(_) => true,
-            Token::Punct(ref p) => p == &Punct::OpenBracket,
-            _ => false,
-        }
+    fn at_possible_ident(&self) -> bool {
+        self.look_ahead.token.is_ident()
+        || self.look_ahead.token.is_keyword()
+        || self.look_ahead.token.is_boolean()
+        || self.look_ahead.token.is_null()
     }
 
     fn parse_template_literal(&mut self) -> Res<node::TemplateLiteral> {
@@ -3573,6 +3562,12 @@ fn get_lines(text: &str) -> Vec<Line> {
     }
     /// Parse an argument of an async function
     /// note: not sure this is needed
+    fn parse_async_arg(&mut self) -> Res<node::Expression> {
+        debug!(target: "resp:debug", "parse_async_arg {}", self.context.allow_yield);
+        let expr = self.parse_assignment_expr()?;
+        self.context.first_covert_initialized_name_error = None;
+        Ok(expr)
+    }
     /// Expect a comma separator,
     /// if parsing with tolerance we can tolerate
     /// a non-existent comma
@@ -3816,6 +3811,51 @@ fn get_lines(text: &str) -> Vec<Line> {
         Ok(())
     }
 
+    fn at_return_arg(&self) -> bool {
+        if self.context.has_line_term {
+            return self.look_ahead.is_string()
+                    || self.look_ahead.is_template()
+        }
+        !self.at_punct(Punct::SemiColon)
+        && !self.at_punct(Punct::CloseBrace)
+        && !self.look_ahead.is_eof()
+
+    }
+
+    fn at_import_call(&mut self) -> bool {
+        debug!(target: "resp:debug", "at_import_call {}", self.context.allow_yield);
+        if self.at_keyword(Keyword::Import) {
+            let state = self.scanner.get_state();
+            self.scanner.skip_comments();
+            let ret = if let Some(next) = self.scanner.next() {
+                next.token.matches_punct(Punct::OpenParen)
+            } else {
+                false
+            };
+            self.scanner.set_state(state);
+            ret
+        } else {
+            false
+        }
+    }
+
+    fn at_qualified_prop_key(&self) -> bool {
+        match &self.look_ahead.token {
+            Token::Ident(_)
+            | Token::String(_)
+            | Token::Boolean(_)
+            | Token::Numeric(_)
+            | Token::Null
+            | Token::Keyword(_) => true,
+            Token::Punct(ref p) => p == &Punct::OpenBracket,
+            _ => false,
+        }
+    }
+
+    /// Lexical declarations require the next token
+    /// (not including any comments)
+    /// must be an identifier, `let`, `yield`
+    /// `{`, or `[`
     fn at_lexical_decl(&mut self) -> bool {
         let state = self.scanner.get_state();
         self.scanner.skip_comments();
