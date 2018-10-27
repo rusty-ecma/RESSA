@@ -645,7 +645,7 @@ fn get_lines(text: &str) -> Vec<Line> {
                 specifiers
             // import must be followed by an `{`, `*`, `identifier`, or `string`
             } else {
-                return self.error(&self.look_ahead, &["{", "*", "[ident]"])
+                return self.error(&self.look_ahead, &["{", "*", "[ident]", "[string]"])
             };
             // Import declarations require the contextual keyword
             // `from`
