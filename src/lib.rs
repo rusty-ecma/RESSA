@@ -3955,19 +3955,11 @@ fn get_lines(text: &str) -> Vec<Line> {
         fn search(lines: &[Line], item: &Item, index: usize) -> (usize, Line) {
             let current_len = lines.len();
             if current_len <= 2 {
-                if lines[0].start >= item.span.start {
+                if lines[0].end + 1 >= item.span.start {
                     (index, lines[0])
                 } else {
                     (index + 1, lines[1])
                 }
-                // if let Some((idx, line)) = lines
-                //     .iter()
-                //     .enumerate()
-                //     .find(|(_, l)| l.end + 1 >= item.span.start) {
-                //         Some((index + idx, *line))
-                //     } else {
-                //         None
-                //     }
             } else {
                 let half = current_len >> 1;
                 if lines[half].start + 1 >= item.span.start {
@@ -3978,16 +3970,6 @@ fn get_lines(text: &str) -> Vec<Line> {
             }
         }
         let (idx, line) = search(&self.lines, item, 0);
-        // let (idx, line) = if let Some((idx, line)) = self
-        //     .lines
-        //     .iter()
-        //     .enumerate()
-        //     .find(|(_, l)| l.end + 1 >= item.span.start)
-        // {
-        //     (idx, line)
-        // } else {
-        //     panic!("Unable to determine item's line number {:?}", item);
-        // };
         let column = item.span.start.saturating_sub(line.start);
         Position {
             line: idx + 1,
