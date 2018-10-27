@@ -242,12 +242,15 @@ impl Builder {
         self
     }
     /// Set the behavior of the parser when
-    /// handling comments
+    /// handling comments with a builder pattern
     /// default: `false` (discard comments)
+    pub fn set_comments(&mut self, value: bool) {
+        self.comments = value;
     }
     /// Set the behavior of the parser when
     /// handling comments with a builder pattern
     /// default: `false` (discard comments)
+    pub fn comments(&mut self, value: bool) -> &mut Self {
         self.set_comments(value);
         self
     }
@@ -264,12 +267,13 @@ impl Builder {
     }
     /// Complete the builder pattern returning
     /// `Result<Parser, Error>`
+    pub fn build(self) -> Res<Parser> {
         let is_module = self.is_module;
         let comments = self.comments;
         let tolerant = self.tolerant;
         let lines = get_lines(&self.js);
         let scanner = Scanner::new(self.js.clone());
-        Parser::build(is_module, tolerant, comments, scanner, lines)
+        Parser::build(tolerant, comments, is_module, scanner, lines)
     }
 }
 
@@ -287,6 +291,7 @@ pub struct Parser {
     /// The current parsing context
     context: Context,
     /// The configuration provided by the user
+    config: Config,
     /// The internal scanner (see the
     /// `ress` crate for more details)
     scanner: Scanner,
@@ -383,7 +388,7 @@ fn get_lines(text: &str) -> Vec<Line> {
     });
     ret
 }
-
+impl Parser {
     /// Create a new parser with the provided
     /// javascript
     /// This will default to parsing in the
@@ -399,6 +404,7 @@ fn get_lines(text: &str) -> Vec<Line> {
     }
 
     /// Internal constructor for completing the builder pattern
+    pub fn build(tolerant: bool, comments: bool, is_module: bool, scanner: Scanner, lines: Vec<Line>) -> Res<Self> {
         let config = Config {
             tolerant,
             comments,
@@ -412,6 +418,7 @@ fn get_lines(text: &str) -> Vec<Line> {
     }
     /// Internal constructor to allow for both builder pattern
     /// and `new` construction
+    fn _new(scanner: Scanner, lines: Vec<Line>, config: Config, context: Context) -> Res<Self> {
         let look_ahead = Item {
                 token: Token::EoF,
                 span: Span {
