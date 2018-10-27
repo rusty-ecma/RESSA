@@ -376,7 +376,12 @@ fn get_lines(text: &str) -> Vec<Line> {
     ret
 }
 
-impl Parser {
+    /// Create a new parser with the provided
+    /// javascript
+    /// This will default to parsing in the
+    /// script context and discard comments.
+    /// If you wanted change this behavior
+    /// utilize the `Builder` pattern
     pub fn new(text: &str) -> Res<Self> {
         let lines = get_lines(text);
         let s = Scanner::new(text);
@@ -385,7 +390,7 @@ impl Parser {
         Self::_new(s, lines, config, context)
     }
 
-    pub(crate) fn build(is_module: bool, tolerant: bool, comments: bool, scanner: Scanner, lines: Vec<Line>) -> Res<Self> {
+    /// Internal constructor for completing the builder pattern
         let config = Config {
             tolerant,
             comments,
@@ -397,8 +402,7 @@ impl Parser {
         };
         Self::_new(scanner, lines, config, context)
     }
-
-    fn _new(scanner: Scanner, lines: Vec<Line>, config: Config, context: Context) -> Res<Self> {
+    /// and `new` construction
         let look_ahead = Item {
                 token: Token::EoF,
                 span: Span {
@@ -421,7 +425,40 @@ impl Parser {
         let _ = ret.next_item()?;
         Ok(ret)
     }
-
+    /// Wrapper around the `Iterator` implementation for
+    /// Parser
+    /// ```
+    /// extern crate ressa;
+    /// use ressa::{
+    ///     Parser,
+    ///     node::*
+    /// };
+    /// fn main() {
+    ///     let js = "function helloWorld() { alert('Hello world'); }";
+    ///     let mut p = Parser::new(&js).unwrap();
+    ///     let expectation = Program::Script(vec![
+    ///         ProgramPart::decl(
+    ///         Declaration::Function(
+    ///             Function {
+    ///                 id: Some("helloWorld".to_string()),
+    ///                 params: vec![],
+    ///                 body: vec![
+    ///                     ProgramPart::Statement(
+    ///                         Statement::Expr(
+    ///                             Expression::call(Expression::ident("alert"), vec![Expression::string("'Hello world'")])
+    ///                         )
+    ///                     )
+    ///                 ],
+    ///                 generator: false,
+    ///                 is_async: false,
+    ///             }
+    ///         )
+    ///     )
+    ///     ]);
+    ///     let program = p.parse().unwrap();
+    ///     assert_eq!(program, expectation);
+    /// }
+    /// ```
     pub fn parse(&mut self) -> Res<node::Program> {
         debug!(target: "resp:debug", "parse_script {}", self.context.allow_yield);
         let mut body = vec![];
@@ -439,7 +476,7 @@ impl Parser {
             node::Program::Script(body)
         })
     }
-
+    /// Parse all of the directives into a single prologue
     fn parse_directive_prologues(&mut self) -> Res<Vec<node::ProgramPart>> {
         debug!(target: "resp:debug", "parse_directive_prologues {}", self.context.allow_yield);
         let mut ret = vec![];
@@ -461,7 +498,7 @@ impl Parser {
         }
         Ok(ret)
     }
-
+    /// Parse a single directive
     fn parse_directive(&mut self) -> Res<Option<node::Directive>> {
         debug!(target: "resp:debug", "parse_directive {}", self.context.allow_yield);
         if self.look_ahead.token.matches_string_content("use strict") {
@@ -484,29 +521,10 @@ impl Parser {
             Ok(None)
         }
     }
-
-    fn parse_expression(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_expression {}", self.context.allow_yield);
-        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
-        let ret = self.parse_assignment_expr()?;
-        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-        if self.at_punct(Punct::Comma) {
-            let mut list = vec![ret];
-            while !self.look_ahead.token.is_eof() {
-                if !self.at_punct(Punct::Comma) {
-                    break;
-                }
-                let _comma = self.next_item()?;
-                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
-                let expr = self.parse_assignment_expr()?;
-                self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-                list.push(expr);
-            }
-            return Ok(node::Expression::Sequence(list));
-        }
-        Ok(ret)
-    }
-
+    /// This is where we will begin our recursive decent. First
+    /// we check to see if we are at at token that is a known
+    /// statement or declaration (import/export/function/const/let/class)
+    /// otherwise we move on to `Parser::parse_statement`
     fn parse_statement_list_item(&mut self) -> Res<node::ProgramPart> {
         debug!(target: "resp:debug", "parse_statement_list_item_script {}", self.context.allow_yield);
         self.context.is_assignment_target = true;
@@ -565,12 +583,22 @@ impl Parser {
         };
         ret
     }
-
+    /// This will cover all possible import statements supported
+    /// ```js
+    /// import * as Stuff from 'place'; //namespace
+    /// import Thing from 'place'; //default
+    /// import {Thing} from 'place'; //named
+    /// import Person, {Thing} from 'place';// default + named
+    /// import Thing, * as Stuff from 'place';
+    /// import 'place';
+    /// ```
     fn parse_import_decl(&mut self) -> Res<node::ModuleImport> {
         if self.context.in_function_body {
             //error
         }
         self.expect_keyword(Keyword::Import)?;
+        // if the next toke is a string we are at an import
+        // with not specifiers
         if self.look_ahead.is_string() {
             let source = self.parse_module_specifier()?;
             self.consume_semicolon()?;
@@ -579,30 +607,45 @@ impl Parser {
                 source,
             })
         } else {
+            // If we are at an open brace, this is the named
+            //variant
             let specifiers = if self.at_punct(Punct::OpenBrace) {
                 self.parse_named_imports()?
+            // If we are at ta *, this is the namespace variant
             } else if self.at_punct(Punct::Asterisk) {
                 vec![self.parse_import_namespace_specifier()?]
+            // if we are at an identifier that is not `default` this is the default variant
             } else if self.at_possible_ident() && !self.at_keyword(Keyword::Default) {
                 let mut specifiers = vec![self.parse_import_default_specifier()?];
+                // we we find a comma, this will be more complicated than just 1 item
                 if self.at_punct(Punct::Comma) {
                     let _ = self.next_item()?;
+                    // if we find a `*`, we need to add the namespace variant to the
+                    // specifiers
                     if self.at_punct(Punct::Asterisk) {
                         specifiers.push(self.parse_import_namespace_specifier()?);
+                    // if we find an `{` we need to extend the specifiers
+                    // with the named variants
                     } else if self.at_punct(Punct::OpenBrace) {
                         specifiers.append(&mut self.parse_named_imports()?);
                     } else {
+                        // A comma not followed by `{` or `*` is an error
                         return self.error(&self.look_ahead, &["{", "*"]);
                     }
                 }
                 specifiers
+            // import must be followed by an `{`, `*`, `identifier`, or `string`
             } else {
                 return self.error(&self.look_ahead, &["{", "*", "[ident]"])
             };
+            // Import declarations require the contextual keyword
+            // `from`
             if !self.at_contextual_keyword("from") {
                 return self.error(&self.look_ahead, &["from"]);
             }
             let _ = self.next_item()?;
+            // capture the source string for where this import
+            // comes from
             let source = self.parse_module_specifier()?;
             self.consume_semicolon()?;
             Ok(node::ModuleImport {
@@ -611,14 +654,10 @@ impl Parser {
             })
         }
     }
-
-    fn at_possible_ident(&self) -> bool {
-        self.look_ahead.token.is_ident()
-        || self.look_ahead.token.is_keyword()
-        || self.look_ahead.token.is_boolean()
-        || self.look_ahead.token.is_null()
-    }
-
+    /// This will handle the named variant of imports
+    /// ```js
+    /// import {Thing} from 'place';
+    /// ```
     fn parse_named_imports(&mut self) -> Res<Vec<node::ImportSpecifier>> {
         self.expect_punct(Punct::OpenBrace)?;
         let mut ret = vec![];
@@ -3504,7 +3543,7 @@ impl Parser {
         self.context.allow_in = prev_in;
         Ok(expr)
     }
-
+    /// Parse the arguments of an async function
     fn parse_async_args(&mut self) -> Res<Vec<node::Expression>> {
         debug!(target: "resp:debug", "parse_async_args {}", self.context.allow_yield);
         self.expect_punct(Punct::OpenParen)?;
@@ -3532,7 +3571,11 @@ impl Parser {
         self.expect_punct(Punct::CloseParen)?;
         Ok(ret)
     }
-
+    /// Parse an argument of an async function
+    /// note: not sure this is needed
+    /// Expect a comma separator,
+    /// if parsing with tolerance we can tolerate
+    /// a non-existent comma
     fn expect_comma_sep(&mut self) -> Res<()> {
         debug!(target: "resp:debug", "expect_comma_sep {}", self.context.allow_yield);
         if self.config.tolerant {
@@ -3551,13 +3594,7 @@ impl Parser {
         }
     }
 
-    fn parse_async_arg(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_async_arg {}", self.context.allow_yield);
-        let expr = self.parse_assignment_expr()?;
-        self.context.first_covert_initialized_name_error = None;
-        Ok(expr)
-    }
-
+    /// Parse an expression preceded by the `...` operator
     fn parse_spread_element(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_spread_element {}", self.context.allow_yield);
         self.expect_punct(Punct::Spread)?;
@@ -3568,7 +3605,7 @@ impl Parser {
             node::Expression::Spread(Box::new(arg))
         )
     }
-
+    /// Parse function arguments, expecting to open with `(` and close with `)`
     fn parse_args(&mut self) -> Res<Vec<node::Expression>> {
         debug!(target: "resp:debug", "parse_args {}", self.context.allow_yield);
         self.expect_punct(Punct::OpenParen)?;
@@ -3596,7 +3633,9 @@ impl Parser {
         self.expect_punct(Punct::CloseParen)?;
         Ok(args)
     }
-
+    /// This will parse one of two expressions `new Thing()`
+    /// or `new.target`. The later is only valid in a function
+    /// body
     fn parse_new_expr(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_new_expr {}", self.context.allow_yield);
         self.expect_keyword(Keyword::New)?;
@@ -3632,7 +3671,9 @@ impl Parser {
             Ok(node::Expression::New(new))
         }
     }
-
+    /// Determine the precedence for a specific token,
+    /// this will return zero for all tokens except
+    /// `instanceOf`, `in`, or binary punctuation
     fn bin_precedence(&self, tok: &Token) -> usize {
         match tok {
             &Token::Punct(ref p) => Self::determine_precedence(p),
@@ -3646,7 +3687,8 @@ impl Parser {
             _ => 0,
         }
     }
-
+    /// Determine the precedence for a specific
+    /// punctuation
     fn determine_precedence(p: &Punct) -> usize {
         match p {
             &Punct::CloseParen
@@ -3670,7 +3712,8 @@ impl Parser {
             _ => 0,
         }
     }
-
+    /// Set the state back to the previous state
+    /// isolating the previous state
     fn set_isolate_cover_grammar_state(&mut self, prev_bind: bool, prev_assign: bool, prev_first: Option<Item>) -> Res<()> {
         if let Some(ref _e) = prev_first {
             //FIXME this needs todo something
@@ -3681,7 +3724,8 @@ impl Parser {
         self.context.first_covert_initialized_name_error = prev_first;
         Ok(())
     }
-
+    /// Get the context state in order to isolate this state from the
+    /// following operation
     fn isolate_cover_grammar(&mut self) -> (bool, bool, Option<Item>) {
         debug!(target: "resp:debug", "isolate_cover_grammar {}", self.context.allow_yield);
         let ret  = self.get_cover_grammar_state();
@@ -3689,7 +3733,7 @@ impl Parser {
         self.set_isolate_cover_grammar_state(true, true, None).unwrap();
         ret
     }
-
+    /// Get the context state for cover grammar operations
     fn get_cover_grammar_state(&self) -> (bool, bool, Option<Item>) {
         (
             self.context.is_binding_element,
@@ -3697,7 +3741,8 @@ impl Parser {
             self.context.first_covert_initialized_name_error.clone()
         )
     }
-
+    /// Set the context state to the provided values,
+    /// inheriting the previous state
     fn set_inherit_cover_grammar_state(&mut self, is_binding_element: bool, is_assignment: bool, first_covert_initialized_name_error: Option<Item>) {
         self.context.is_binding_element = self.context.is_binding_element && is_binding_element;
         self.context.is_assignment_target = self.context.is_assignment_target && is_assignment;
@@ -3705,7 +3750,8 @@ impl Parser {
             self.context.first_covert_initialized_name_error = first_covert_initialized_name_error;
         }
     }
-
+    /// Capture the context state for a binding_element, assignment and
+    /// first_covert_initialized_name
     fn inherit_cover_grammar(&mut self) -> (bool, bool, Option<Item>) {
         trace!(target: "resp:debug", "inherit_cover_grammar");
         let ret = self.get_cover_grammar_state();
@@ -3749,7 +3795,9 @@ impl Parser {
             }
         }
     }
-
+    /// Get the next token and validate that it matches
+    /// the punct provided, discarding the result
+    /// if it does
     fn expect_punct(&mut self, p: Punct) -> Res<()> {
         let next = self.next_item()?;
         if !next.token.matches_punct_str(&p.to_string()) {
@@ -3757,7 +3805,9 @@ impl Parser {
         }
         Ok(())
     }
-
+    /// move on to the next item and validate it matches
+    /// the keyword provided, discarding the result
+    /// if it does
     fn expect_keyword(&mut self, k: Keyword) -> Res<()> {
         let next = self.next_item()?;
         if !next.token.matches_keyword_str(&k.to_string()) {
@@ -3781,15 +3831,16 @@ impl Parser {
         self.scanner.set_state(state);
         ret
     }
-
+    /// Test for if the next token is a specific punct
     fn at_punct(&self, p: Punct) -> bool {
         self.look_ahead.token.matches_punct(p)
     }
-
+    /// Test for if the next token is a specific keyword
     fn at_keyword(&self, k: Keyword) -> bool {
         self.look_ahead.token.matches_keyword(k)
     }
-
+    /// This test is for all the operators that might be part
+    /// of an assignment statement
     fn at_assign(&self) -> bool {
         self.look_ahead.token.matches_punct(Punct::Assign)
             || self.look_ahead.token.matches_punct(Punct::MultiplyAssign)
@@ -3809,7 +3860,9 @@ impl Parser {
             || self.look_ahead.token.matches_punct(Punct::BitwiseXOrAssign)
             || self.look_ahead.token.matches_punct(Punct::BitwiseAndAssign)
     }
-
+    /// The keyword `async` is conditional, that means to decided
+    /// if we are actually at an async function we need to check the
+    /// next token would need to be on the same line
     fn at_async_function(&mut self) -> bool {
         if self.at_contextual_keyword("async") {
             if let Some(peek) = self.scanner.look_ahead() {
@@ -3823,7 +3876,10 @@ impl Parser {
             false
         }
     }
-
+    /// Since semi-colons are options, this function will
+    /// check the next token, if it is a semi-colon it will
+    /// consume it otherwise we need to either be at a line terminator
+    /// EoF or a close brace
     fn consume_semicolon(&mut self) -> Res<()> {
         if self.at_punct(Punct::SemiColon) {
             let _semi = self.next_item()?;
@@ -3834,15 +3890,19 @@ impl Parser {
         }
         Ok(())
     }
-
+    /// Tests if a token matches an &str that might represent
+    /// a contextual keyword like `async`
     fn at_contextual_keyword(&self, s: &str) -> bool {
         self.look_ahead.token.matches_ident_str(s)
     }
-
+    /// Sort of keywords `eval` and `arguments` have
+    /// a special meaning and will cause problems
+    /// if used in the wrong scope
     fn is_restricted_word(word: &str) -> bool {
         word == "eval" || word == "arguments"
     }
-
+    /// Check if this &str is in the list of reserved
+    /// words in the context of 'use strict'
     fn is_strict_reserved(word: &str) -> bool {
         word == "implements"
             || word == "interface"
@@ -3854,7 +3914,9 @@ impl Parser {
             || word == "yield"
             || word == "let"
     }
-
+    /// Tests if the parser is currently at the
+    /// start of an expression. This consists of a
+    /// subset of punctuation, keywords or a regex literal
     fn is_start_of_expr(&self) -> bool {
         let mut ret = true;
         let token = &self.look_ahead.token;
@@ -3886,7 +3948,9 @@ impl Parser {
         }
         ret
     }
-
+    /// performs a binary search of the list of lines to determine
+    /// which line the item exists within and calculates the relative
+    /// column
     fn get_item_position(&self, item: &Item) -> Position {
         fn search(lines: &[Line], item: &Item, index: usize) -> (usize, Line) {
             let current_len = lines.len();

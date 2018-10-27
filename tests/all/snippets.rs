@@ -372,6 +372,33 @@ fn builder_doc_snippet() {
     }
 }
 
+#[test]
+fn parse_doc_example() {
+    let js = "function helloWorld() { alert('Hello world'); }";
+    let mut p = Parser::new(&js).unwrap();
+    let expectation = Program::Script(vec![
+        ProgramPart::decl(
+        Declaration::Function(
+            Function {
+                id: Some("helloWorld".to_string()),
+                params: vec![],
+                body: vec![
+                    ProgramPart::Statement(
+                        Statement::Expr(
+                            Expression::call(Expression::ident("alert"), vec![Expression::string("'Hello world'")])
+                        )
+                    )
+                ],
+                generator: false,
+                is_async: false,
+            }
+        )
+    )
+    ]);
+    let program = p.parse().unwrap();
+    assert_eq!(program, expectation);
+}
+
 
 fn execute(js: &str, expectation: Program) {
     let s = parse(js);
