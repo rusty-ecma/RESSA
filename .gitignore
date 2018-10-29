@@ -10,3 +10,4 @@ node_modules
 *.json
 .vscode
 !bencher.js
+package-lock.json
