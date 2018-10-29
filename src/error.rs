@@ -1,5 +1,5 @@
 use node::Position;
-use std::fmt::{Formatter, Result, Display};
+use std::fmt::{Display, Formatter, Result};
 #[derive(Debug)]
 pub enum Error {
     UnexpectedToken(Position, String),
@@ -25,7 +25,6 @@ impl Display for Error {
             Error::InvalidGetterParams(ref pos) => write!(f, "Found a getter method that takes arguments at {}, getter methods cannot take arguments", pos),
             Error::InvalidSetterParams(ref pos) => write!(f, "Found a setter method that takes more or less than 1 argument at {}, setter methods must take only one argument", pos),
             Error::NonStrictFeatureInStrictContext(ref pos, ref name) => write!(f, "Attempting to use non-strict feature {} in a strict context at {}", name, pos),
-            
         }
     }
 }

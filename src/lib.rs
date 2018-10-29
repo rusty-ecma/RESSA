@@ -48,14 +48,14 @@
 extern crate ress;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
 extern crate backtrace;
+extern crate env_logger;
 
-use ress::{Item, Keyword, Punct, Scanner, Template, Token, Span};
+use ress::{Item, Keyword, Punct, Scanner, Span, Template, Token};
 
+mod comment_handler;
 mod error;
 pub mod node;
-mod comment_handler;
 
 pub use comment_handler::CommentHandler;
 use comment_handler::DefaultCommentHandler;
@@ -119,9 +119,7 @@ struct Context {
 impl Default for Config {
     fn default() -> Self {
         trace!(target: "resp:debug", "default config");
-        Self {
-            tolerant: false,
-        }
+        Self { tolerant: false }
     }
 }
 
@@ -263,7 +261,8 @@ impl Builder {
     /// An alternate to the `build` method. This will allow
     /// users to define their own comment handler
     pub fn with_comment_handler<CH>(self, comment_handler: CH) -> Res<Parser<CH>>
-    where CH: CommentHandler + Sized
+    where
+        CH: CommentHandler + Sized,
     {
         let lines = get_lines(&self.js);
         let s = Scanner::new(self.js);
@@ -282,7 +281,8 @@ impl Builder {
 /// js allows for both `Module`s as well as `Script`s, these will be
 /// the two `enum` variants.
 pub struct Parser<CH>
-where CH: CommentHandler + Sized
+where
+    CH: CommentHandler + Sized,
 {
     /// The current parsing context
     context: Context,
@@ -311,7 +311,7 @@ where CH: CommentHandler + Sized
     /// of the look_ahead token
     _look_ahead: String,
 
-    comment_handler: CH
+    comment_handler: CH,
 }
 /// The start/end index of a line
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
@@ -359,7 +359,7 @@ fn get_lines(text: &str) -> Vec<Line> {
                     };
                     line_start = byte_position + 1;
                     Some(ret)
-                },
+                }
                 '\u{2028}' | '\u{2029}' => {
                     //These new line characters are both 3 bytes in length
                     //that means we need to include this calculation in both
@@ -404,10 +404,17 @@ impl Parser<DefaultCommentHandler> {
 }
 
 impl<CH> Parser<CH>
-where CH: CommentHandler + Sized
+where
+    CH: CommentHandler + Sized,
 {
     /// Internal constructor for completing the builder pattern
-    pub fn build(tolerant: bool, is_module: bool, scanner: Scanner, lines: Vec<Line>, comment_handler: CH) -> Res<Self> {
+    pub fn build(
+        tolerant: bool,
+        is_module: bool,
+        scanner: Scanner,
+        lines: Vec<Line>,
+        comment_handler: CH,
+    ) -> Res<Self> {
         let config = Config {
             tolerant,
             ..Default::default()
@@ -420,14 +427,17 @@ where CH: CommentHandler + Sized
     }
     /// Internal constructor to allow for both builder pattern
     /// and `new` construction
-    fn _new(scanner: Scanner, lines: Vec<Line>, config: Config, context: Context, comment_handler: CH) -> Res<Self> {
+    fn _new(
+        scanner: Scanner,
+        lines: Vec<Line>,
+        config: Config,
+        context: Context,
+        comment_handler: CH,
+    ) -> Res<Self> {
         let look_ahead = Item {
-                token: Token::EoF,
-                span: Span {
-                    start: 0,
-                    end: 0,
-                }
-            };
+            token: Token::EoF,
+            span: Span { start: 0, end: 0 },
+        };
         let mut ret = Self {
             scanner,
             look_ahead,
@@ -483,10 +493,8 @@ where CH: CommentHandler + Sized
         let mut body = vec![];
         while let Some(part) = self.next() {
             match part {
-                Ok(part) => {
-                    body.push(part)
-                },
-                Err(e) => return Err(e)
+                Ok(part) => body.push(part),
+                Err(e) => return Err(e),
             }
         }
         Ok(if self.context.is_module {
@@ -563,12 +571,12 @@ where CH: CommentHandler + Sized
                         let decl = node::Declaration::Import(Box::new(import));
                         Ok(node::ProgramPart::Decl(decl))
                     }
-                },
+                }
                 &Keyword::Export => {
                     let export = self.parse_export_decl()?;
                     let decl = node::Declaration::Export(Box::new(export));
                     Ok(node::ProgramPart::Decl(decl))
-                },
+                }
                 &Keyword::Const => {
                     let decl = self.parse_lexical_decl(false)?;
                     Ok(node::ProgramPart::Decl(decl))
@@ -655,7 +663,8 @@ where CH: CommentHandler + Sized
                 specifiers
             // import must be followed by an `{`, `*`, `identifier`, or `string`
             } else {
-                return self.expected_token_error(&self.look_ahead, &["{", "*", "[ident]", "[string]"])
+                return self
+                    .expected_token_error(&self.look_ahead, &["{", "*", "[ident]", "[string]"]);
             };
             // Import declarations require the contextual keyword
             // `from`
@@ -667,10 +676,7 @@ where CH: CommentHandler + Sized
             // comes from
             let source = self.parse_module_specifier()?;
             self.consume_semicolon()?;
-            Ok(node::ModuleImport {
-                specifiers,
-                source,
-            })
+            Ok(node::ModuleImport { specifiers, source })
         }
     }
     /// This will handle the named variant of imports
@@ -775,12 +781,17 @@ where CH: CommentHandler + Sized
             let source = self.parse_module_specifier()?;
             Ok(node::ModuleExport::All(source))
         } else if self.look_ahead.token.is_keyword() {
-            if self.look_ahead.token.matches_keyword(Keyword::Let) || self.look_ahead.token.matches_keyword(Keyword::Const) {
+            if self.look_ahead.token.matches_keyword(Keyword::Let)
+                || self.look_ahead.token.matches_keyword(Keyword::Const)
+            {
                 let lex = self.parse_lexical_decl(false)?;
                 let decl = node::NamedExportDecl::Decl(lex);
                 Ok(node::ModuleExport::Named(decl))
             } else if self.look_ahead.token.matches_keyword(Keyword::Var) {
-                let var = node::Declaration::Variable(node::VariableKind::Var, self.parse_variable_decl_list(false)?);
+                let var = node::Declaration::Variable(
+                    node::VariableKind::Var,
+                    self.parse_variable_decl_list(false)?,
+                );
                 let decl = node::NamedExportDecl::Decl(var);
                 Ok(node::ModuleExport::Named(decl))
             } else if self.look_ahead.token.matches_keyword(Keyword::Class) {
@@ -788,13 +799,16 @@ where CH: CommentHandler + Sized
                 let decl = node::Declaration::Class(class);
                 let decl = node::NamedExportDecl::Decl(decl);
                 Ok(node::ModuleExport::Named(decl))
-            } else if  self.look_ahead.token.matches_keyword(Keyword::Function) {
+            } else if self.look_ahead.token.matches_keyword(Keyword::Function) {
                 let func = self.parse_function_decl(true)?;
                 let decl = node::Declaration::Function(func);
                 let decl = node::NamedExportDecl::Decl(decl);
                 Ok(node::ModuleExport::Named(decl))
             } else {
-                return self.expected_token_error(&self.look_ahead, &["let", "var", "const", "class", "function"]);
+                return self.expected_token_error(
+                    &self.look_ahead,
+                    &["let", "var", "const", "class", "function"],
+                );
             }
         } else if self.at_async_function() {
             let func = self.parse_function_decl(false)?;
@@ -839,20 +853,15 @@ where CH: CommentHandler + Sized
         } else {
             None
         };
-        Ok(node::ExportSpecifier {
-            local,
-            exported,
-        })
+        Ok(node::ExportSpecifier { local, exported })
     }
 
     fn parse_module_specifier(&mut self) -> Res<node::Literal> {
         let item = self.next_item()?;
         match &item.token {
-            Token::String(ref s) => {
-                Ok(node::Literal::String(s.to_string()))
-            },
+            Token::String(ref s) => Ok(node::Literal::String(s.to_string())),
 
-            _ => self.expected_token_error(&item, &["[string]"])
+            _ => self.expected_token_error(&item, &["[string]"]),
         }
     }
 
@@ -920,29 +929,29 @@ where CH: CommentHandler + Sized
     fn parse_with_stmt(&mut self) -> Res<node::WithStatement> {
         debug!(target: "resp:debug", "parse_with_stmt {}", self.context.allow_yield);
         if self.context.strict {
-            self.tolerate_error(Error::NonStrictFeatureInStrictContext(self.current_position, "with statements".to_string()))?;
+            self.tolerate_error(Error::NonStrictFeatureInStrictContext(
+                self.current_position,
+                "with statements".to_string(),
+            ))?;
         }
         self.expect_keyword(Keyword::With)?;
         self.expect_punct(Punct::OpenParen)?;
         let obj = self.parse_expression()?;
-        Ok(
-            if !self.at_punct(Punct::CloseParen) {
-                if !self.config.tolerant {
-                    let _ = self.expected_token_error(&self.look_ahead, &[")"])?;
-                }
-                node::WithStatement {
-                    object: obj,
-                    body: Box::new(node::Statement::Empty),
-                }
-            } else {
-                self.expect_punct(Punct::CloseParen)?;
-                node::WithStatement {
-                    object: obj,
-                    body: Box::new(self.parse_statement()?),
-                }
-            },
-     
-        )
+        Ok(if !self.at_punct(Punct::CloseParen) {
+            if !self.config.tolerant {
+                let _ = self.expected_token_error(&self.look_ahead, &[")"])?;
+            }
+            node::WithStatement {
+                object: obj,
+                body: Box::new(node::Statement::Empty),
+            }
+        } else {
+            self.expect_punct(Punct::CloseParen)?;
+            node::WithStatement {
+                object: obj,
+                body: Box::new(self.parse_statement()?),
+            }
+        })
     }
 
     fn parse_while_stmt(&mut self) -> Res<node::WhileStatement> {
@@ -993,7 +1002,7 @@ where CH: CommentHandler + Sized
         }
         let init = if self.at_punct(Punct::Assign) {
             let _ = self.next_item()?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let init = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             Some(init)
@@ -1002,10 +1011,7 @@ where CH: CommentHandler + Sized
         } else {
             None
         };
-        Ok(node::VariableDecl {
-            id: patt,
-            init,
-        })
+        Ok(node::VariableDecl { id: patt, init })
     }
 
     fn parse_try_stmt(&mut self) -> Res<node::TryStatement> {
@@ -1122,14 +1128,14 @@ where CH: CommentHandler + Sized
     fn parse_return_stmt(&mut self) -> Res<Option<node::Expression>> {
         debug!(target: "resp:debug", "parse_return_stmt {}", self.context.allow_yield);
         if !self.context.in_function_body {
-            return self.unexpected_token_error(&self.look_ahead, "cannot return in the global context")
+            return self
+                .unexpected_token_error(&self.look_ahead, "cannot return in the global context");
         }
         self.expect_keyword(Keyword::Return)?;
         // if we are at a semi-colon,or close curly brace or eof
         //the return doesn't have an arg. If we are at a line term
         //we need to account for a string literal or template literal
         //since they both can have new lines
-
 
         let ret = if self.at_return_arg() {
             Some(self.parse_expression()?)
@@ -1281,11 +1287,9 @@ where CH: CommentHandler + Sized
                         }));
                     } else if decl.init.is_none() && self.at_contextual_keyword("of") {
                         let left = node::LoopLeft::Variable(decl);
-                        return Ok(
-                            node::Statement::ForOf(
-                                self.parse_for_of_loop(left, is_await)?
-                            )
-                        );
+                        return Ok(node::Statement::ForOf(
+                            self.parse_for_of_loop(left, is_await)?,
+                        ));
                     } else {
                         let init = node::LoopInit::Variable(vec![decl]);
                         let stmt = self.parse_for_loop_cont(Some(init))?;
@@ -1320,11 +1324,9 @@ where CH: CommentHandler + Sized
                 let left = node::LoopLeft::Pattern(p);
                 let right = self.parse_assignment_expr()?;
                 let body = self.parse_loop_body()?;
-                return Ok(
-                    node::Statement::ForOf(
-                        node::ForOfStatement::new(left, right, body, is_await)
-                    )
-                );
+                return Ok(node::Statement::ForOf(node::ForOfStatement::new(
+                    left, right, body, is_await,
+                )));
             } else {
                 let init = if self.at_punct(Punct::Comma) {
                     let mut seq = vec![init];
@@ -1389,19 +1391,21 @@ where CH: CommentHandler + Sized
         })
     }
 
-    fn parse_for_of_loop(&mut self, left: node::LoopLeft, is_await: bool) -> Res<node::ForOfStatement> {
+    fn parse_for_of_loop(
+        &mut self,
+        left: node::LoopLeft,
+        is_await: bool,
+    ) -> Res<node::ForOfStatement> {
         debug!(target: "resp:debug", "parse_for_of_loop {}", self.context.allow_yield);
         let _ = self.next_item()?;
         let right = self.parse_assignment_expr()?;
         let body = self.parse_loop_body()?;
-        Ok(
-            node::ForOfStatement {
-                left,
-                right,
-                body: Box::new(body),
-                is_await,
-            }
-        )
+        Ok(node::ForOfStatement {
+            left,
+            right,
+            body: Box::new(body),
+            is_await,
+        })
     }
 
     fn parse_loop_body(&mut self) -> Res<node::Statement> {
@@ -1409,7 +1413,7 @@ where CH: CommentHandler + Sized
         self.expect_punct(Punct::CloseParen)?;
         let prev_iter = self.context.in_iteration;
         self.context.in_iteration = true;
-        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+        let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
         let ret = self.parse_statement()?;
         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
         self.context.in_iteration = prev_iter;
@@ -1477,7 +1481,7 @@ where CH: CommentHandler + Sized
             let id = if let node::Expression::Ident(ref ident) = ret {
                 ident.clone()
             } else {
-                return Err(self.reinterpret_error("expression", "ident"))
+                return Err(self.reinterpret_error("expression", "ident"));
             };
 
             if !self.context.label_set.insert(format!("${}", &id)) {
@@ -1523,7 +1527,7 @@ where CH: CommentHandler + Sized
 
     fn parse_expression(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_expression {}", self.context.allow_yield);
-        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+        let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
         let ret = self.parse_assignment_expr()?;
         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
         if self.at_punct(Punct::Comma) {
@@ -1533,7 +1537,7 @@ where CH: CommentHandler + Sized
                     break;
                 }
                 let _comma = self.next_item()?;
-                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                 let expr = self.parse_assignment_expr()?;
                 self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                 list.push(expr);
@@ -1542,7 +1546,6 @@ where CH: CommentHandler + Sized
         }
         Ok(ret)
     }
-
 
     fn parse_block(&mut self) -> Res<node::BlockStatement> {
         debug!(target: "resp:debug", "parse_block {}", self.context.allow_yield);
@@ -1611,11 +1614,11 @@ where CH: CommentHandler + Sized
         if self.context.strict && id.is_restricted() {
             if !self.config.tolerant {
                 return self.unexpected_token_error(&start, "restricted word");
-        }
+            }
         }
         let init = if self.at_punct(Punct::Assign) {
             let _ = self.next_item()?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let init = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             Some(init)
@@ -1625,10 +1628,7 @@ where CH: CommentHandler + Sized
         } else {
             None
         };
-        Ok(node::VariableDecl {
-            id,
-            init,
-        })
+        Ok(node::VariableDecl { id, init })
     }
 
     fn parse_lexical_binding(
@@ -1645,7 +1645,7 @@ where CH: CommentHandler + Sized
             if !self.at_keyword(Keyword::In) && !self.at_contextual_keyword("of") {
                 if self.at_punct(Punct::Assign) {
                     let _ = self.next_item()?;
-                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                     let init = self.parse_assignment_expr()?;
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     Some(init)
@@ -1657,17 +1657,14 @@ where CH: CommentHandler + Sized
             }
         } else if in_for || self.at_punct(Punct::Assign) {
             self.expect_punct(Punct::Assign)?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let init = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             Some(init)
         } else {
             None
         };
-        Ok(node::VariableDecl {
-            id,
-            init,
-        })
+        Ok(node::VariableDecl { id, init })
     }
 
     fn parse_function_decl(&mut self, opt_ident: bool) -> Res<node::Function> {
@@ -1780,7 +1777,7 @@ where CH: CommentHandler + Sized
         };
         let super_class = if self.at_contextual_keyword("extends") {
             let _ = self.next_item()?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let super_class = self.parse_left_hand_side_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             Some(Box::new(super_class))
@@ -1834,7 +1831,7 @@ where CH: CommentHandler + Sized
 
             if new_key.is_static()
                 && (Self::qualified_prop_name(&self.look_ahead.token)
-                || self.at_punct(Punct::Asterisk))
+                    || self.at_punct(Punct::Asterisk))
             {
                 token = self.look_ahead.token.clone();
                 computed = self.at_punct(Punct::OpenBracket);
@@ -1866,22 +1863,25 @@ where CH: CommentHandler + Sized
         let look_ahead_prop_key = Self::qualified_prop_name(&self.look_ahead);
         if token.is_ident() {
             let (at_get, at_set) = if let Some(ref k) = key {
-                (k.matches("get") && look_ahead_prop_key, k.matches("set") && look_ahead_prop_key)
+                (
+                    k.matches("get") && look_ahead_prop_key,
+                    k.matches("set") && look_ahead_prop_key,
+                )
             } else {
                 (false, false)
             };
 
             if at_get {
-                    kind = Some(node::PropertyKind::Get);
-                    computed = self.at_punct(Punct::OpenBracket);
-                    self.context.allow_yield = false;
-                    key = Some(self.parse_object_property_key()?);
-                    value = Some(self.parse_getter_method()?);
+                kind = Some(node::PropertyKind::Get);
+                computed = self.at_punct(Punct::OpenBracket);
+                self.context.allow_yield = false;
+                key = Some(self.parse_object_property_key()?);
+                value = Some(self.parse_getter_method()?);
             } else if at_set {
-                    kind = Some(node::PropertyKind::Set);
-                    computed = self.at_punct(Punct::OpenBracket);
-                    key = Some(self.parse_object_property_key()?);
-                    value = Some(self.parse_setter_method()?);
+                kind = Some(node::PropertyKind::Set);
+                computed = self.at_punct(Punct::OpenBracket);
+                key = Some(self.parse_object_property_key()?);
+                value = Some(self.parse_setter_method()?);
             }
         } else if token.matches_punct(Punct::Asterisk) && look_ahead_prop_key {
             kind = Some(node::PropertyKind::Init);
@@ -1922,11 +1922,15 @@ where CH: CommentHandler + Sized
             }
             if !is_static && key.matches("constructor") {
                 if kind != node::PropertyKind::Method || !method {
-                    return self.expected_token_error(&self.look_ahead, &["[constructor declaration]"]);
+                    return self
+                        .expected_token_error(&self.look_ahead, &["[constructor declaration]"]);
                 }
                 if let Some(ref v) = value {
                     if v.is_generator() {
-                        return self.expected_token_error(&self.look_ahead, &["[non-generator function declaration]"]);
+                        return self.expected_token_error(
+                            &self.look_ahead,
+                            &["[non-generator function declaration]"],
+                        );
                     }
                 }
                 if has_ctor {
@@ -1977,8 +1981,6 @@ where CH: CommentHandler + Sized
         Ok(node::PropertyValue::Expr(node::Expression::Function(func)))
     }
 
-
-
     fn parse_property_method(&mut self) -> Res<node::PropertyValue> {
         debug!(target: "resp:debug", "parse_property_method {}", self.context.allow_yield);
         let prev_yield = self.context.allow_yield;
@@ -2025,22 +2027,22 @@ where CH: CommentHandler + Sized
         }
         let body = self.parse_method_body(formal_params.simple, formal_params.found_restricted)?;
         self.context.allow_yield = prev_yield;
-        Ok(
-            node::PropertyValue::Expr(
-                node::Expression::Function(
-                    node::Function {
-                        id: None,
-                        params: formal_params.params,
-                        body,
-                        generator: is_gen,
-                        is_async: false,
-                    }
-                )
-            )
-        )
+        Ok(node::PropertyValue::Expr(node::Expression::Function(
+            node::Function {
+                id: None,
+                params: formal_params.params,
+                body,
+                generator: is_gen,
+                is_async: false,
+            },
+        )))
     }
 
-    fn parse_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<Vec<node::ProgramPart>> {
+    fn parse_method_body(
+        &mut self,
+        simple: bool,
+        found_restricted: bool,
+    ) -> Res<Vec<node::ProgramPart>> {
         debug!(target: "resp:debug", "parse_method_body {}", self.context.allow_yield);
         self.context.is_assignment_target = false;
         self.context.is_binding_element = false;
@@ -2048,7 +2050,7 @@ where CH: CommentHandler + Sized
         let prev_allow_strict = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
         let start = self.look_ahead.clone();
-        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+        let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
         let body = self.parse_function_source_el()?;
         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
         if self.context.strict && found_restricted && !self.config.tolerant {
@@ -2084,7 +2086,11 @@ where CH: CommentHandler + Sized
         Ok(node::PropertyValue::Expr(node::Expression::Function(func)))
     }
 
-    fn parse_property_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<node::FunctionBody> {
+    fn parse_property_method_body(
+        &mut self,
+        simple: bool,
+        found_restricted: bool,
+    ) -> Res<node::FunctionBody> {
         debug!(target: "resp:debug", "parse_property_method_fn {}", self.context.allow_yield);
         self.context.is_assignment_target = false;
         self.context.is_binding_element = false;
@@ -2097,7 +2103,10 @@ where CH: CommentHandler + Sized
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
         if self.context.strict && found_restricted {
             let pos = self.get_item_position(&start);
-            self.tolerate_error(Error::NonStrictFeatureInStrictContext(pos, "restriced ident".to_string()))?;
+            self.tolerate_error(Error::NonStrictFeatureInStrictContext(
+                pos,
+                "restriced ident".to_string(),
+            ))?;
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow;
@@ -2106,7 +2115,10 @@ where CH: CommentHandler + Sized
 
     fn qualified_prop_name(tok: &Token) -> bool {
         debug!(target: "resp:debug", "qualified_prop_name",);
-        tok.is_ident() || tok.is_keyword() || tok.is_literal() || tok.matches_punct(Punct::OpenBracket)
+        tok.is_ident()
+            || tok.is_keyword()
+            || tok.is_literal()
+            || tok.matches_punct(Punct::OpenBracket)
     }
 
     fn parse_object_property_key(&mut self) -> Res<node::PropertyKey> {
@@ -2116,22 +2128,27 @@ where CH: CommentHandler + Sized
             if item.token.is_oct_literal() {
                 //FIXME: possible tolerable error
             }
-            let id = node::Literal::from_token(&item.token).ok_or(self.reinterpret_error("number or string", "literal"))?;
+            let id = node::Literal::from_token(&item.token)
+                .ok_or(self.reinterpret_error("number or string", "literal"))?;
             Ok(node::PropertyKey::Literal(id))
         } else if item.token.is_ident()
-        || item.token.is_boolean()
-        || item.token.is_null()
-        || item.token.is_keyword() {
+            || item.token.is_boolean()
+            || item.token.is_null()
+            || item.token.is_keyword()
+        {
             let id = item.token.to_string();
             Ok(node::PropertyKey::Ident(id))
         } else if item.token.matches_punct(Punct::OpenBracket) {
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let key = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             let id = if key.is_valid_property_key_literal() {
                 match key {
                     node::Expression::Literal(lit) => node::PropertyKey::Literal(lit),
-                    _ => return self.expected_token_error(&self.look_ahead, &["property key literal"]),
+                    _ => {
+                        return self
+                            .expected_token_error(&self.look_ahead, &["property key literal"])
+                    }
                 }
             } else {
                 let id = self.reinterpret_expr_as_pat(key)?;
@@ -2140,7 +2157,18 @@ where CH: CommentHandler + Sized
             self.expect_punct(Punct::CloseBracket)?;
             Ok(id)
         } else {
-            self.expected_token_error(&item, &["[string]", "[number]", "[ident]", "[boolean]", "null", "[keyword]", "["])
+            self.expected_token_error(
+                &item,
+                &[
+                    "[string]",
+                    "[number]",
+                    "[ident]",
+                    "[boolean]",
+                    "null",
+                    "[keyword]",
+                    "[",
+                ],
+            )
         }
     }
 
@@ -2149,7 +2177,10 @@ where CH: CommentHandler + Sized
         if self.look_ahead.token.is_ident() {
             if (self.context.is_module || self.context.await) && self.at_keyword(Keyword::Await) {
                 if !self.config.tolerant {
-                    return self.unexpected_token_error(&self.look_ahead, "Modules do not allow 'await' to be used as an identifier");
+                    return self.unexpected_token_error(
+                        &self.look_ahead,
+                        "Modules do not allow 'await' to be used as an identifier",
+                    );
                 }
             }
             if self.at_async_function() {
@@ -2192,7 +2223,7 @@ where CH: CommentHandler + Sized
             } else if self.at_punct(Punct::OpenBrace) {
                 self.parse_obj_init()?
             } else {
-                return self.expected_token_error(&self.look_ahead, &["{", "[", "("])
+                return self.expected_token_error(&self.look_ahead, &["{", "[", "("]);
             };
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             Ok(expr)
@@ -2231,7 +2262,10 @@ where CH: CommentHandler + Sized
                     let ident = self.parse_ident_name()?;
                     Ok(node::Expression::Ident(ident))
                 } else {
-                    self.expected_token_error(&self.look_ahead, &["function", "this", "class", "import"])
+                    self.expected_token_error(
+                        &self.look_ahead,
+                        &["function", "this", "class", "import"],
+                    )
                 }
             }
         } else {
@@ -2309,7 +2343,11 @@ where CH: CommentHandler + Sized
                         } else {
                             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
                             exprs.push(self.parse_assignment_expr()?);
-                            self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
+                            self.set_inherit_cover_grammar_state(
+                                prev_bind,
+                                prev_assign,
+                                prev_first,
+                            );
                         }
                     }
                     ex = node::Expression::Sequence(exprs);
@@ -2362,9 +2400,7 @@ where CH: CommentHandler + Sized
                 elements.push(Some(el))
             } else {
                 let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
-                elements.push(Some(
-                    self.parse_assignment_expr()?,
-                ));
+                elements.push(Some(self.parse_assignment_expr()?));
                 self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
                 if !self.at_punct(Punct::CloseBracket) {
                     self.expect_punct(Punct::Comma)?;
@@ -2388,10 +2424,13 @@ where CH: CommentHandler + Sized
                 has_proto = has_proto || found_proto;
                 prop
             };
-            debug!("pushing prop: {}", match prop {
-                node::ObjectProperty::Property(ref prop) => format!("{:?}", prop),
-                node::ObjectProperty::Spread(ref s) => format!("{:?}", s),
-            });
+            debug!(
+                "pushing prop: {}",
+                match prop {
+                    node::ObjectProperty::Property(ref prop) => format!("{:?}", prop),
+                    node::ObjectProperty::Spread(ref s) => format!("{:?}", s),
+                }
+            );
             props.push(prop);
             if !self.at_punct(Punct::CloseBrace) {
                 self.expect_comma_sep()?;
@@ -2463,7 +2502,10 @@ where CH: CommentHandler + Sized
                     if !computed && key.matches("__proto__") {
                         if has_proto {
                             let pos = self.get_item_position(&start);
-                            self.tolerate_error(Error::Redecl(pos, "prototype can only be declared once".to_string()))?;
+                            self.tolerate_error(Error::Redecl(
+                                pos,
+                                "prototype can only be declared once".to_string(),
+                            ))?;
                         }
                         has_proto = true;
                     }
@@ -2530,15 +2572,16 @@ where CH: CommentHandler + Sized
 
     fn at_possible_ident(&self) -> bool {
         self.look_ahead.token.is_ident()
-        || self.look_ahead.token.is_keyword()
-        || self.look_ahead.token.is_boolean()
-        || self.look_ahead.token.is_null()
+            || self.look_ahead.token.is_keyword()
+            || self.look_ahead.token.is_boolean()
+            || self.look_ahead.token.is_null()
     }
 
     fn parse_template_literal(&mut self) -> Res<node::TemplateLiteral> {
         debug!(target: "resp:debug", "parse_template_literal {}", self.context.allow_yield);
         if !self.look_ahead.is_template_head() {
-            return self.expected_token_error(&self.look_ahead, &["template head", "template no sub"]);
+            return self
+                .expected_token_error(&self.look_ahead, &["template head", "template no sub"]);
         }
         let mut expressions = vec![];
         let mut quasis = vec![];
@@ -2594,7 +2637,8 @@ where CH: CommentHandler + Sized
             if item.token.is_restricted() {
                 if self.context.strict {
                     if !self.config.tolerant {
-                        return self.unexpected_token_error(&item, "restricted ident in strict context");
+                        return self
+                            .unexpected_token_error(&item, "restricted ident in strict context");
                     }
                 } else {
                     found_restricted = true;
@@ -2751,7 +2795,7 @@ where CH: CommentHandler + Sized
             let _assign = self.next_item()?;
             let prev_yield = self.context.allow_yield;
             self.context.allow_yield = true;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let right = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             self.context.allow_yield = prev_yield;
@@ -2798,7 +2842,11 @@ where CH: CommentHandler + Sized
         }
     }
 
-    fn parse_array_pattern(&mut self, params: &mut Vec<Item>, _kind: node::VariableKind) -> Res<(bool, node::Pattern)> {
+    fn parse_array_pattern(
+        &mut self,
+        params: &mut Vec<Item>,
+        _kind: node::VariableKind,
+    ) -> Res<(bool, node::Pattern)> {
         debug!(target: "resp:debug", "parse_array_pattern {}", self.context.allow_yield);
         self.expect_punct(Punct::OpenBracket)?;
         let mut elements = vec![];
@@ -2936,7 +2984,7 @@ where CH: CommentHandler + Sized
                             body: node::ArrowFunctionBody::FunctionBody(body),
                         });
                     } else {
-                        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                        let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                         let a = self.parse_assignment_expr()?;
                         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                         current = node::Expression::ArrowFunction(node::ArrowFunctionExpression {
@@ -2953,16 +3001,25 @@ where CH: CommentHandler + Sized
                 if self.at_assign() {
                     if !self.context.is_assignment_target {
                         if !self.config.tolerant {
-                            return self.unexpected_token_error(&self.look_ahead, "Not at assignment target");
+                            return self.unexpected_token_error(
+                                &self.look_ahead,
+                                "Not at assignment target",
+                            );
                         }
                     }
                     if self.context.strict && current.is_ident() {
                         if let node::Expression::Ident(ref i) = current {
                             if Self::is_restricted_word(i) {
-                                return self.expected_token_error(&self.look_ahead, &[&format!("not {}", i)]);
+                                return self.expected_token_error(
+                                    &self.look_ahead,
+                                    &[&format!("not {}", i)],
+                                );
                             }
                             if Self::is_strict_reserved(i) {
-                                return self.expected_token_error(&self.look_ahead, &[&format!("not {}", i)]);
+                                return self.expected_token_error(
+                                    &self.look_ahead,
+                                    &[&format!("not {}", i)],
+                                );
                             }
                         }
                     }
@@ -2998,7 +3055,7 @@ where CH: CommentHandler + Sized
                             )
                         }
                     };
-                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                     let right = self.parse_assignment_expr()?;
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     self.context.first_covert_initialized_name_error = None;
@@ -3172,13 +3229,13 @@ where CH: CommentHandler + Sized
             let _question_mark = self.next_item()?;
             let prev_in = self.context.allow_in;
             self.context.allow_in = true;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let if_true = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             self.context.allow_in = prev_in;
 
             self.expect_punct(Punct::Colon)?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let if_false = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
 
@@ -3208,9 +3265,9 @@ where CH: CommentHandler + Sized
             self.context.is_binding_element = false;
             let mut left = current.clone();
             debug!(target: "resp:debug", "left: {:#?} {}", left, self.context.allow_yield);
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let mut right = self.parse_exponentiation_expression()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             debug!(target: "resp:debug", "right: {:#?} {}", right, self.context.allow_yield);
@@ -3256,7 +3313,7 @@ where CH: CommentHandler + Sized
                 }
                 ops.push(self.next_item()?.token);
                 precs.push(prec);
-                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                 let exp = self.parse_exponentiation_expression()?;
                 self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                 stack.push(exp);
@@ -3305,7 +3362,7 @@ where CH: CommentHandler + Sized
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let left = expr;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let right = self.parse_exponentiation_expression()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             return Ok(node::Expression::Binary(node::BinaryExpression {
@@ -3370,7 +3427,7 @@ where CH: CommentHandler + Sized
                     Punct::Increment => node::UpdateOperator::Increment,
                     Punct::Decrement => node::UpdateOperator::Decrement,
                     _ => unreachable!("Already validated that the next token would be ++ or --"),
-                }
+                },
                 _ => unreachable!("Already validated that the next token would be ++ or --"),
             };
             let start = self.look_ahead.clone();
@@ -3389,7 +3446,8 @@ where CH: CommentHandler + Sized
                 }
             }
             if !self.context.is_assignment_target && !self.config.tolerant {
-                return self.unexpected_token_error(&op, "Cannot increment when not at assignment target");
+                return self
+                    .unexpected_token_error(&op, "Cannot increment when not at assignment target");
             }
             let prefix = true;
             let ret = node::UpdateExpression {
@@ -3416,7 +3474,10 @@ where CH: CommentHandler + Sized
                     }
                     let op = self.next_item()?;
                     if !self.context.is_assignment_target && !self.config.tolerant {
-                        return self.unexpected_token_error(&op, "Cannot increment when not at assignment target");
+                        return self.unexpected_token_error(
+                            &op,
+                            "Cannot increment when not at assignment target",
+                        );
                     }
                     self.context.is_assignment_target = false;
                     self.context.is_binding_element = false;
@@ -3460,7 +3521,7 @@ where CH: CommentHandler + Sized
                 self.context.is_binding_element = false;
                 self.context.is_assignment_target = true;
                 self.expect_punct(Punct::OpenBracket)?;
-                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                 let prop = self.parse_expression()?;
                 self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                 self.expect_punct(Punct::CloseBracket)?;
@@ -3551,7 +3612,10 @@ where CH: CommentHandler + Sized
                 };
                 //TODO: check for bad import call
                 if async_arrow && self.at_punct(Punct::FatArrow) {
-                    let args = args.into_iter().map(|a| node::FunctionArg::Expr(a)).collect();
+                    let args = args
+                        .into_iter()
+                        .map(|a| node::FunctionArg::Expr(a))
+                        .collect();
                     expr = node::Expression::ArrowParamPlaceHolder(args, true);
                 } else {
                     let inner = node::CallExpression {
@@ -3564,7 +3628,7 @@ where CH: CommentHandler + Sized
                 self.context.is_assignment_target = true;
                 self.context.is_binding_element = false;
                 self.expect_punct(Punct::OpenBracket)?;
-                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                 let prop = self.parse_expression()?;
                 self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                 self.expect_punct(Punct::CloseBracket)?;
@@ -3598,7 +3662,7 @@ where CH: CommentHandler + Sized
                 let arg = if self.at_punct(Punct::Spread) {
                     self.parse_spread_element()?
                 } else {
-                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                     let arg = self.parse_async_arg()?;
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     arg
@@ -3652,9 +3716,7 @@ where CH: CommentHandler + Sized
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let arg = self.parse_assignment_expr()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
-        Ok(
-            node::Expression::Spread(Box::new(arg))
-        )
+        Ok(node::Expression::Spread(Box::new(arg)))
     }
     /// Parse function arguments, expecting to open with `(` and close with `)`
     fn parse_args(&mut self) -> Res<Vec<node::Expression>> {
@@ -3666,7 +3728,7 @@ where CH: CommentHandler + Sized
                 let expr = if self.at_punct(Punct::Spread) {
                     self.parse_spread_element()?
                 } else {
-                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                     let expr = self.parse_assignment_expr()?;
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     expr
@@ -3704,7 +3766,7 @@ where CH: CommentHandler + Sized
         } else if self.at_keyword(Keyword::Import) {
             self.expected_token_error(&self.look_ahead, &["not import"])
         } else {
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let callee = self.parse_left_hand_side_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             let args = if self.at_punct(Punct::OpenParen) {
@@ -3765,7 +3827,12 @@ where CH: CommentHandler + Sized
     }
     /// Set the state back to the previous state
     /// isolating the previous state
-    fn set_isolate_cover_grammar_state(&mut self, prev_bind: bool, prev_assign: bool, prev_first: Option<Item>) -> Res<()> {
+    fn set_isolate_cover_grammar_state(
+        &mut self,
+        prev_bind: bool,
+        prev_assign: bool,
+        prev_first: Option<Item>,
+    ) -> Res<()> {
         if let Some(ref _e) = prev_first {
             //FIXME this needs todo something
             //like an error?
@@ -3779,7 +3846,7 @@ where CH: CommentHandler + Sized
     /// following operation
     fn isolate_cover_grammar(&mut self) -> (bool, bool, Option<Item>) {
         debug!(target: "resp:debug", "isolate_cover_grammar {}", self.context.allow_yield);
-        let ret  = self.get_cover_grammar_state();
+        let ret = self.get_cover_grammar_state();
         self.context.is_binding_element = true;
         self.context.is_assignment_target = true;
         self.context.first_covert_initialized_name_error = None;
@@ -3790,12 +3857,17 @@ where CH: CommentHandler + Sized
         (
             self.context.is_binding_element,
             self.context.is_assignment_target,
-            self.context.first_covert_initialized_name_error.clone()
+            self.context.first_covert_initialized_name_error.clone(),
         )
     }
     /// Set the context state to the provided values,
     /// inheriting the previous state
-    fn set_inherit_cover_grammar_state(&mut self, is_binding_element: bool, is_assignment: bool, first_covert_initialized_name_error: Option<Item>) {
+    fn set_inherit_cover_grammar_state(
+        &mut self,
+        is_binding_element: bool,
+        is_assignment: bool,
+        first_covert_initialized_name_error: Option<Item>,
+    ) {
         self.context.is_binding_element = self.context.is_binding_element && is_binding_element;
         self.context.is_assignment_target = self.context.is_assignment_target && is_assignment;
         if first_covert_initialized_name_error.is_some() {
@@ -3870,13 +3942,11 @@ where CH: CommentHandler + Sized
 
     fn at_return_arg(&self) -> bool {
         if self.context.has_line_term {
-            return self.look_ahead.is_string()
-                    || self.look_ahead.is_template()
+            return self.look_ahead.is_string() || self.look_ahead.is_template();
         }
         !self.at_punct(Punct::SemiColon)
-        && !self.at_punct(Punct::CloseBrace)
-        && !self.look_ahead.is_eof()
-
+            && !self.at_punct(Punct::CloseBrace)
+            && !self.look_ahead.is_eof()
     }
 
     fn at_import_call(&mut self) -> bool {
@@ -4099,12 +4169,10 @@ where CH: CommentHandler + Sized
         error!("{:?}", bt);
         let pos = self.get_item_position(item);
         let name = item.token.to_string();
-        Err(
-            Error::UnexpectedToken(
-                pos,
-                format!("Found unexpected token: {}; {}", name, msg)
-            )
-        )
+        Err(Error::UnexpectedToken(
+            pos,
+            format!("Found unexpected token: {}; {}", name, msg),
+        ))
     }
     fn tolerate_error(&self, err: Error) -> Result<(), Error> {
         if !self.config.tolerant {
@@ -4126,7 +4194,7 @@ where CH: CommentHandler + Sized
     fn next_part(&mut self) -> Res<node::ProgramPart> {
         if !self.context.past_prolog {
             if let Some(dir) = self.parse_directive()? {
-                return Ok(node::ProgramPart::Directive(dir))
+                return Ok(node::ProgramPart::Directive(dir));
             } else {
                 self.context.past_prolog = true;
             }
@@ -4138,7 +4206,8 @@ where CH: CommentHandler + Sized
 }
 
 impl<CH> Iterator for Parser<CH>
-where CH: CommentHandler + Sized
+where
+    CH: CommentHandler + Sized,
 {
     type Item = Res<node::ProgramPart>;
     fn next(&mut self) -> Option<Self::Item> {
@@ -4147,7 +4216,6 @@ where CH: CommentHandler + Sized
         } else {
             Some(self.next_part())
         }
-
     }
 }
 
@@ -4176,72 +4244,27 @@ mod test {
         let lf = "lf:0
 0;";
         let lines = get_lines(lf);
-        let expectation = vec![
-            Line {
-                start: 0,
-                end: 4,
-            },
-            Line {
-                start: 5,
-                end: 6
-            }
-        ];
+        let expectation = vec![Line { start: 0, end: 4 }, Line { start: 5, end: 6 }];
         assert_eq!(lines, expectation);
         println!("carriage return");
         let cr = format!("cr:0{}0;", '\r');
         let lines = get_lines(&cr);
-        let expectation = vec![
-            Line {
-                start: 0,
-                end: 4
-            },
-            Line {
-                start: 5,
-                end: 6
-            }
-        ];
+        let expectation = vec![Line { start: 0, end: 4 }, Line { start: 5, end: 6 }];
         assert_eq!(lines, expectation);
         println!("carriage return line feed");
         let crlf = format!("crlf:0{}{}0;", '\r', '\n');
         let lines = get_lines(&crlf);
-        let expectation = vec![
-            Line {
-                start: 0,
-                end: 7
-            },
-            Line {
-                start: 8,
-                end: 9
-            }
-        ];
+        let expectation = vec![Line { start: 0, end: 7 }, Line { start: 8, end: 9 }];
         assert_eq!(lines, expectation);
         println!("line seperator");
         let ls = "ls:0 0;";
         let lines = get_lines(ls);
-        let expectation = vec![
-            Line {
-                start: 0,
-                end: 6
-            },
-            Line {
-                start: 7,
-                end: 8,
-            }
-        ];
+        let expectation = vec![Line { start: 0, end: 6 }, Line { start: 7, end: 8 }];
         assert_eq!(lines, expectation);
         println!("paragraph seperator");
         let ps = "ps:0 0;";
         let lines = get_lines(ps);
-        let expectation = vec![
-            Line {
-                start: 0,
-                end: 6
-            },
-            Line {
-                start: 7,
-                end: 8,
-            }
-        ];
+        let expectation = vec![Line { start: 0, end: 6 }, Line { start: 7, end: 8 }];
         assert_eq!(lines, expectation);
     }
 }

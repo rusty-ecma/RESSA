@@ -1,15 +1,12 @@
-extern crate ressa;
-extern crate log;
 extern crate env_logger;
+extern crate log;
+extern crate ressa;
 
-mod major_libs;
 mod ecma262;
+mod major_libs;
 mod snippets;
 
-use std::{
-    io::Error,
-    fs::read_to_string
-};
+use std::{fs::read_to_string, io::Error};
 
 #[derive(Clone, Copy, Debug)]
 enum Lib {

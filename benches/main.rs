@@ -13,18 +13,15 @@
 //! the parser overhead above the scanner
 //! and a naive comparison against
 //! [esprima](https://github.com/jquery/esprima)
-extern crate test;
-extern crate ressa;
 extern crate ress;
+extern crate ressa;
+extern crate test;
 
-use std::{
-    fs::read_to_string,
-    path::PathBuf,
-};
+use std::{fs::read_to_string, path::PathBuf};
 
-use ressa::Parser;
 use ress::Scanner;
-use test::{Bencher, black_box};
+use ressa::Parser;
+use test::{black_box, Bencher};
 #[bench]
 fn angular1(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::Angular) {
