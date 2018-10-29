@@ -398,6 +398,52 @@ fn parse_doc_example() {
     assert_eq!(program, expectation);
 }
 
+#[test]
+fn readme_example() {
+    let js = "
+function Thing() {
+    return 'stuff';
+}
+";
+    let parser = Parser::new(js).expect("Failed to create parser");
+    for part in parser {
+        let part = part.expect("Error parsing part");
+        match part {
+            ProgramPart::Decl(decl) => match decl {
+                Declaration::Function(f) => {
+                    if let Some(ref id) = f.id {
+                        assert_eq!(id, "Thing");
+                    }
+                    assert!(f.params.len() == 0);
+                    assert!(!f.generator);
+                    assert!(!f.is_async);
+                    for part in f.body {
+                        match part {
+                            ProgramPart::Statement(stmt) => match stmt {
+                                Statement::Return(expr) => {
+                                    if let Some(expr) = expr {
+                                        match expr {
+                                            Expression::Literal(lit) => match lit {
+                                                Literal::String(value) => assert_eq!(value, String::from("'stuff'")),
+                                                _ => ()
+                                            },
+                                            _ => ()
+                                        }
+                                    }
+                                },
+                                _ => (),
+                            },
+                            _ => ()
+                        }
+                    }
+                },
+                _ => ()
+            },
+            _ => (),
+        }
+    }
+}
+
 
 fn execute(js: &str, expectation: Program) {
     let s = parse(js);
