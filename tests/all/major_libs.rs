@@ -1,9 +1,8 @@
-
 #![cfg(test)]
-use ressa::Parser;
 use env_logger;
+use ressa::Parser;
 
-use super::{Lib, get_js_file};
+use super::{get_js_file, Lib};
 
 #[test]
 fn angular1() {
@@ -66,6 +65,9 @@ fn get_min_js(l: Lib) -> Result<String, ::std::io::Error> {
     if let Some(p) = l.min_path() {
         get_js_file(&p)
     } else {
-        Err(::std::io::Error::new(::std::io::ErrorKind::NotFound, format!("No min path for lib: {:?}", l)))
+        Err(::std::io::Error::new(
+            ::std::io::ErrorKind::NotFound,
+            format!("No min path for lib: {:?}", l),
+        ))
     }
 }

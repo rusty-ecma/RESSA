@@ -9,3 +9,5 @@ node_modules
 *.mjs
 *.json
 .vscode
+!bencher.js
+package-lock.json

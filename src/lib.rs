@@ -1,55 +1,131 @@
-#![allow(unused)]
+//! RESSA (Rusty ECMAScript Syntax Analyzer)
+//! A library for parsing js files
+//!
+//! The main interface for this library would be
+//! the `Parser` iterator. A parser is constructed
+//! either via the `::new()` function or a `Builder`.
+//! As part of the constructor, you have to provide
+//! the js you want to parse as an `&str`.
+//!
+//! Once constructed the parser will return a
+//! `ProgramPart` for each iteration.
+//!
+//! A very simple example might look like this
+//! ```
+//! extern crate ressa;
+//! use ressa::{
+//!  Parser,
+//!  node::*,
+//! };
+//! fn main() {
+//!    let js = "function helloWorld() { alert('Hello world'); }";
+//!    let p = Parser::new(&js).unwrap();
+//!    let f = ProgramPart::decl(
+//!        Declaration::Function(
+//!            Function {
+//!                id: Some("helloWorld".to_string()),
+//!                params: vec![],
+//!                body: vec![
+//!                    ProgramPart::Statement(
+//!                        Statement::Expr(
+//!                            Expression::call(Expression::ident("alert"), vec![Expression::string("'Hello world'")])
+//!                        )
+//!                    )
+//!                ],
+//!                generator: false,
+//!                is_async: false,
+//!            }
+//!        )
+//!    );
+//!    for part in p {
+//!        assert_eq!(part.unwrap(), f);
+//!    }
+//! }
+//!```
+//! checkout the `examples` folders for slightly larger
+//! examples.
+//!
 extern crate ress;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
 extern crate backtrace;
+extern crate env_logger;
 
-use ress::{Item, Keyword, Punct, Scanner, Template, Token, Span};
+use ress::{Item, Keyword, Punct, Scanner, Span, Template, Token};
+
+mod comment_handler;
 mod error;
 pub mod node;
+
+pub use comment_handler::CommentHandler;
+use comment_handler::DefaultCommentHandler;
 use error::Error;
 use node::Position;
 use std::{collections::HashSet, mem::replace};
 
-static mut DEBUG: bool = false;
-#[allow(unused)]
+/// The current configuration options.
+/// This will most likely increase over time
 struct Config {
+    /// whether or not to tolerate a subset of errors
     tolerant: bool,
-    comments: bool,
 }
-#[allow(unused)]
+
+/// The current parsing context.
+/// This structure holds the relevant
+/// information to know when some
+/// text might behave differently
+/// depending on what has come before it
 struct Context {
+    /// If the current JS should be treated
+    /// as a JS module
     is_module: bool,
+    /// If `in` is allowed as an identifier
     allow_in: bool,
+    /// If a strict directive is allowed
     allow_strict_directive: bool,
+    /// If `yield` is allowed as an identifier
     allow_yield: bool,
+    /// If await is allowed as an identifier
     await: bool,
+    /// If we have found any possible naming errors
+    /// which are not yet resolved
     first_covert_initialized_name_error: Option<Item>,
+    /// If the current expressions is an assignment target
     is_assignment_target: bool,
+    /// If the current expression is a binding element
     is_binding_element: bool,
+    /// If we have entered a function body
     in_function_body: bool,
+    /// If we have entered a loop block
     in_iteration: bool,
+    /// If we have entered a switch block
     in_switch: bool,
+    /// The currently known labels, this applies
+    /// to labels only, not all identifiers. Errors
+    /// at that level would need to be handled by
+    /// the calling scope
     label_set: HashSet<String>,
+    /// If the current scope has a `'use strict';` directive
+    /// in the prelude
     strict: bool,
+    /// If the scanner has a pending line terminator
+    /// before the next token
     has_line_term: bool,
+    /// If we have passed the initial prelude where a valid
+    /// `'use strict'` directive would exist
     past_prolog: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        trace!(target: "resp:debug", "default");
-        Self {
-            tolerant: false,
-            comments: false,
-        }
+        trace!(target: "resp:debug", "default config");
+        Self { tolerant: false }
     }
 }
 
 impl Default for Context {
     fn default() -> Self {
-        trace!(target: "resp:debug", "default ",);
+        trace!(target: "resp:debug", "default context",);
         Self {
             is_module: false,
             await: false,
@@ -69,11 +145,64 @@ impl Default for Context {
         }
     }
 }
-
+/// This is used to create a `Parser` using
+/// the builder method
+/// ```
+/// use ressa::Builder;
+/// use ressa::node::*;
+/// fn main() {
+///     let js = "for (var i = 0; i < 100; i++) {
+///         console.log('loop', i);
+///         }";
+///     let p = Builder::new()
+///                     .module(false)
+///                     .js(js)
+///                     .build()
+///                     .unwrap();
+///     for part in p {
+///         let expectation = ProgramPart::Statement(
+///             Statement::For(
+///                 ForStatement {
+///                     init: Some(
+///                         LoopInit::Variable(
+///                             vec![VariableDecl::with_value("i", Expression::number("0"))]
+///                         )
+///                     ),
+///                     test: Some(
+///                         Expression::binary(Expression::ident("i"), BinaryOperator::LessThan, Expression::number("100"))
+///                     ),
+///                     update: Some(
+///                         Expression::Update(
+///                             UpdateExpression {
+///                                 operator: UpdateOperator::Increment,
+///                                 argument: Box::new(Expression::ident("i")),
+///                                 prefix: false,
+///                             }
+///                         )
+///                     ),
+///                     body:
+///                         Box::new(Statement::Block(
+///                             vec![ProgramPart::Statement(
+///                                 Statement::Expr(
+///                                     Expression::call(Expression::member(Expression::ident("console"), Expression::ident("log"), false),
+///                                     vec![
+///                                         Expression::string("'loop'"),
+///                                         Expression::ident("i"),
+///                                     ])
+///                                 )
+///                             )]
+///                         )
+///                     )
+///                 }
+///             )
+///         );
+///         assert_eq!(part.unwrap(), expectation);
+///     }
+/// }
+/// ```
 pub struct Builder {
     tolerant: bool,
     is_module: bool,
-    comments: bool,
     js: String,
 }
 
@@ -82,85 +211,127 @@ impl Builder {
         Self {
             tolerant: false,
             is_module: false,
-            comments: false,
             js: String::new(),
         }
     }
-
+    /// Enable or disable error tolerance
+    /// default: `false`
     pub fn set_tolerant(&mut self, value: bool) {
         self.tolerant = value;
     }
-
+    /// Enable or disable error tolerance with a builder
+    /// pattern
+    /// default: `false`
     pub fn tolerant(&mut self, value: bool) -> &mut Self {
         self.set_tolerant(value);
         self
     }
-
+    /// Set the parsing context to module or script
+    /// default: `false` (script)
     pub fn set_module(&mut self, value: bool) {
-        self.is_module = false;
+        self.is_module = value;
     }
-
+    /// Set the parsing context to module or script
+    /// with a builder pattern
+    /// default: `false` (script)
     pub fn module(&mut self, value: bool) -> &mut Self {
         self.set_module(value);
         self
     }
-
-    pub fn set_comments(&mut self, value: bool) {
-        self.comments = value;
-    }
-
-    pub fn comments(&mut self, value: bool) -> &mut Self {
-        self.set_comments(value);
-        self
-    }
-
+    /// Set the js text that this parser would operate
+    /// on
     pub fn set_js(&mut self, js: impl Into<String>) {
         self.js = js.into();
     }
-
+    /// Set the js text that this parser would operate
+    /// on with a builder pattern
     pub fn js(&mut self, js: impl Into<String>) -> &mut Self {
         self.set_js(js);
         self
     }
-
-    pub fn build(&self) -> Res<Parser> {
+    /// Complete the builder pattern returning
+    /// `Result<Parser, Error>`
+    pub fn build(&self) -> Res<Parser<DefaultCommentHandler>> {
         let is_module = self.is_module;
-        let comments = self.comments;
         let tolerant = self.tolerant;
         let lines = get_lines(&self.js);
         let scanner = Scanner::new(self.js.clone());
-        Parser::build(is_module, tolerant, comments, scanner, lines)
+        Parser::build(tolerant, is_module, scanner, lines, DefaultCommentHandler)
+    }
+    /// An alternate to the `build` method. This will allow
+    /// users to define their own comment handler
+    pub fn with_comment_handler<CH>(self, comment_handler: CH) -> Res<Parser<CH>>
+    where
+        CH: CommentHandler + Sized,
+    {
+        let lines = get_lines(&self.js);
+        let s = Scanner::new(self.js);
+        Parser::build(self.tolerant, self.is_module, s, lines, comment_handler)
     }
 }
 
-#[allow(unused)]
-pub struct Parser {
+/// This is the primary interface that you would interact with.
+/// There are two main ways to use it, the first is to utilize
+/// the `Iterator` implementation. Each iteration will return
+/// a `Result<ProgramPart, Error>`.
+/// The other option is to use the `parse` method, which is just
+/// a wrapper around the `collect` method on `Iterator`, however
+/// the final result will be a `Result<Program, Error>` and the
+/// `ProgramPart` collection will be the inner data. Since modern
+/// js allows for both `Module`s as well as `Script`s, these will be
+/// the two `enum` variants.
+pub struct Parser<CH>
+where
+    CH: CommentHandler + Sized,
+{
+    /// The current parsing context
     context: Context,
+    /// The configuration provided by the user
     config: Config,
+    /// The internal scanner (see the
+    /// `ress` crate for more details)
     scanner: Scanner,
+    /// The indexes that each line starts/ends at
     lines: Vec<Line>,
+    /// The next item,
     look_ahead: Item,
+    /// Since we are looking ahead, we need
+    /// to make sure we don't miss the eof
+    /// by using this flag
     found_eof: bool,
-    tokens: Vec<Item>,
-    comments: Vec<Item>,
+    /// a possible container for tokens, currently
+    /// it is unused
+    _tokens: Vec<Item>,
+    /// a possible container for comments, currently
+    /// it is unused
+    _comments: Vec<Item>,
+    /// The current position we are parsing
     current_position: node::Position,
+    /// To ease debugging this will be a String representation
+    /// of the look_ahead token
     _look_ahead: String,
+
+    comment_handler: CH,
 }
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+/// The start/end index of a line
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
 pub struct Line {
     start: usize,
     end: usize,
 }
-
+/// The result type for the Parser operations
 type Res<T> = Result<T, Error>;
-
+/// Capture the lines from the raw js text
 fn get_lines(text: &str) -> Vec<Line> {
+    // Obviously we will start at 0
     let mut line_start = 0;
+    // This is the byte position, not the character
+    // position to account for multi byte chars
     let mut byte_position = 0;
+    // loop over the characters
     let mut ret: Vec<Line> = text
         .chars()
         .filter_map(|c| {
-
             let ret = match c {
                 '\r' => {
                     // look ahead 1 char to see if it is a newline pair
@@ -181,7 +352,7 @@ fn get_lines(text: &str) -> Vec<Line> {
                         None
                     }
                 }
-                '\n' | '\u{2028}' | '\u{2029}' | '\u{000A}' => {
+                '\n' => {
                     let ret = Line {
                         start: line_start,
                         end: byte_position,
@@ -189,49 +360,84 @@ fn get_lines(text: &str) -> Vec<Line> {
                     line_start = byte_position + 1;
                     Some(ret)
                 }
+                '\u{2028}' | '\u{2029}' => {
+                    //These new line characters are both 3 bytes in length
+                    //that means we need to include this calculation in both
+                    // the end field and the next line start
+                    let ret = Line {
+                        start: line_start,
+                        end: byte_position + 2,
+                    };
+                    line_start = byte_position + 3;
+                    Some(ret)
+                }
                 _ => None,
             };
+            // Since chars can be up to 4 bytes wide, we
+            // want to move the full width of the current byte
             byte_position += c.len_utf8();
             ret
         }).collect();
-
+    // Since we shouldn't have only a new line char at EOF,
+    // This will capture the last line of the text
     ret.push(Line {
         start: line_start,
-        end: text.len(),
+        end: text.len() - 1,
     });
     ret
 }
 
-impl Parser {
+impl Parser<DefaultCommentHandler> {
+    /// Create a new parser with the provided
+    /// javascript
+    /// This will default to parsing in the
+    /// script context and discard comments.
+    /// If you wanted change this behavior
+    /// utilize the `Builder` pattern
     pub fn new(text: &str) -> Res<Self> {
         let lines = get_lines(text);
         let s = Scanner::new(text);
         let config = Config::default();
         let context = Context::default();
-        Self::_new(s, lines, config, context)
+        Self::_new(s, lines, config, context, DefaultCommentHandler)
     }
+}
 
-    pub(crate) fn build(is_module: bool, tolerant: bool, comments: bool, scanner: Scanner, lines: Vec<Line>) -> Res<Self> {
+impl<CH> Parser<CH>
+where
+    CH: CommentHandler + Sized,
+{
+    /// Internal constructor for completing the builder pattern
+    pub fn build(
+        tolerant: bool,
+        is_module: bool,
+        scanner: Scanner,
+        lines: Vec<Line>,
+        comment_handler: CH,
+    ) -> Res<Self> {
         let config = Config {
             tolerant,
-            comments,
             ..Default::default()
         };
         let context = Context {
             is_module,
             ..Default::default()
         };
-        Self::_new(scanner, lines, config, context)
+        Self::_new(scanner, lines, config, context, comment_handler)
     }
-
-    fn _new(scanner: Scanner, lines: Vec<Line>, config: Config, context: Context) -> Res<Self> {
+    /// Internal constructor to allow for both builder pattern
+    /// and `new` construction
+    fn _new(
+        scanner: Scanner,
+        lines: Vec<Line>,
+        config: Config,
+        context: Context,
+        comment_handler: CH,
+    ) -> Res<Self> {
         let look_ahead = Item {
-                token: Token::EoF,
-                span: Span {
-                    start: 0,
-                    end: 0,
-                }
-            };
+            token: Token::EoF,
+            span: Span { start: 0, end: 0 },
+        };
         let mut ret = Self {
             scanner,
             look_ahead,
@@ -239,24 +445,56 @@ impl Parser {
             found_eof: false,
             config,
             context,
-            tokens: vec![],
-            comments: vec![],
+            _tokens: vec![],
+            _comments: vec![],
             current_position: node::Position::start(),
             _look_ahead: String::new(),
+            comment_handler,
         };
         let _ = ret.next_item()?;
         Ok(ret)
     }
-
+    /// Wrapper around the `Iterator` implementation for
+    /// Parser
+    /// ```
+    /// extern crate ressa;
+    /// use ressa::{
+    ///     Parser,
+    ///     node::*
+    /// };
+    /// fn main() {
+    ///     let js = "function helloWorld() { alert('Hello world'); }";
+    ///     let mut p = Parser::new(&js).unwrap();
+    ///     let expectation = Program::Script(vec![
+    ///         ProgramPart::decl(
+    ///         Declaration::Function(
+    ///             Function {
+    ///                 id: Some("helloWorld".to_string()),
+    ///                 params: vec![],
+    ///                 body: vec![
+    ///                     ProgramPart::Statement(
+    ///                         Statement::Expr(
+    ///                             Expression::call(Expression::ident("alert"), vec![Expression::string("'Hello world'")])
+    ///                         )
+    ///                     )
+    ///                 ],
+    ///                 generator: false,
+    ///                 is_async: false,
+    ///             }
+    ///         )
+    ///     )
+    ///     ]);
+    ///     let program = p.parse().unwrap();
+    ///     assert_eq!(program, expectation);
+    /// }
+    /// ```
     pub fn parse(&mut self) -> Res<node::Program> {
         debug!(target: "resp:debug", "parse_script {}", self.context.allow_yield);
         let mut body = vec![];
         while let Some(part) = self.next() {
             match part {
-                Ok(part) => {
-                    body.push(part)
-                },
-                Err(e) => return Err(e)
+                Ok(part) => body.push(part),
+                Err(e) => return Err(e),
             }
         }
         Ok(if self.context.is_module {
@@ -265,7 +503,7 @@ impl Parser {
             node::Program::Script(body)
         })
     }
-
+    /// Parse all of the directives into a single prologue
     fn parse_directive_prologues(&mut self) -> Res<Vec<node::ProgramPart>> {
         debug!(target: "resp:debug", "parse_directive_prologues {}", self.context.allow_yield);
         let mut ret = vec![];
@@ -276,7 +514,7 @@ impl Parser {
             if let Some(dir) = self.parse_directive()? {
                 if dir.directive == "use strict" {
                     if !self.context.allow_strict_directive {
-                        return self.error(&self.look_ahead, &[]);
+                        return self.expected_token_error(&self.look_ahead, &[]);
                     }
                     self.context.strict = true;
                 }
@@ -287,7 +525,7 @@ impl Parser {
         }
         Ok(ret)
     }
-
+    /// Parse a single directive
     fn parse_directive(&mut self) -> Res<Option<node::Directive>> {
         debug!(target: "resp:debug", "parse_directive {}", self.context.allow_yield);
         if self.look_ahead.token.matches_string_content("use strict") {
@@ -310,29 +548,10 @@ impl Parser {
             Ok(None)
         }
     }
-
-    fn parse_expression(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_expression {}", self.context.allow_yield);
-        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
-        let ret = self.parse_assignment_expr()?;
-        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-        if self.at_punct(Punct::Comma) {
-            let mut list = vec![ret];
-            while !self.look_ahead.token.is_eof() {
-                if !self.at_punct(Punct::Comma) {
-                    break;
-                }
-                let _comma = self.next_item()?;
-                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
-                let expr = self.parse_assignment_expr()?;
-                self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-                list.push(expr);
-            }
-            return Ok(node::Expression::Sequence(list));
-        }
-        Ok(ret)
-    }
-
+    /// This is where we will begin our recursive decent. First
+    /// we check to see if we are at at token that is a known
+    /// statement or declaration (import/export/function/const/let/class)
+    /// otherwise we move on to `Parser::parse_statement`
     fn parse_statement_list_item(&mut self) -> Res<node::ProgramPart> {
         debug!(target: "resp:debug", "parse_statement_list_item_script {}", self.context.allow_yield);
         self.context.is_assignment_target = true;
@@ -352,12 +571,12 @@ impl Parser {
                         let decl = node::Declaration::Import(Box::new(import));
                         Ok(node::ProgramPart::Decl(decl))
                     }
-                },
+                }
                 &Keyword::Export => {
                     let export = self.parse_export_decl()?;
                     let decl = node::Declaration::Export(Box::new(export));
                     Ok(node::ProgramPart::Decl(decl))
-                },
+                }
                 &Keyword::Const => {
                     let decl = self.parse_lexical_decl(false)?;
                     Ok(node::ProgramPart::Decl(decl))
@@ -391,12 +610,22 @@ impl Parser {
         };
         ret
     }
-
+    /// This will cover all possible import statements supported
+    /// ```js
+    /// import * as Stuff from 'place'; //namespace
+    /// import Thing from 'place'; //default
+    /// import {Thing} from 'place'; //named
+    /// import Person, {Thing} from 'place';// default + named
+    /// import Thing, * as Stuff from 'place';
+    /// import 'place';
+    /// ```
     fn parse_import_decl(&mut self) -> Res<node::ModuleImport> {
         if self.context.in_function_body {
             //error
         }
         self.expect_keyword(Keyword::Import)?;
+        // if the next toke is a string we are at an import
+        // with not specifiers
         if self.look_ahead.is_string() {
             let source = self.parse_module_specifier()?;
             self.consume_semicolon()?;
@@ -405,46 +634,55 @@ impl Parser {
                 source,
             })
         } else {
+            // If we are at an open brace, this is the named
+            //variant
             let specifiers = if self.at_punct(Punct::OpenBrace) {
                 self.parse_named_imports()?
+            // If we are at ta *, this is the namespace variant
             } else if self.at_punct(Punct::Asterisk) {
                 vec![self.parse_import_namespace_specifier()?]
+            // if we are at an identifier that is not `default` this is the default variant
             } else if self.at_possible_ident() && !self.at_keyword(Keyword::Default) {
                 let mut specifiers = vec![self.parse_import_default_specifier()?];
+                // we we find a comma, this will be more complicated than just 1 item
                 if self.at_punct(Punct::Comma) {
                     let _ = self.next_item()?;
+                    // if we find a `*`, we need to add the namespace variant to the
+                    // specifiers
                     if self.at_punct(Punct::Asterisk) {
                         specifiers.push(self.parse_import_namespace_specifier()?);
+                    // if we find an `{` we need to extend the specifiers
+                    // with the named variants
                     } else if self.at_punct(Punct::OpenBrace) {
                         specifiers.append(&mut self.parse_named_imports()?);
                     } else {
-                        return self.error(&self.look_ahead, &["{", "*"]);
+                        // A comma not followed by `{` or `*` is an error
+                        return self.expected_token_error(&self.look_ahead, &["{", "*"]);
                     }
                 }
                 specifiers
+            // import must be followed by an `{`, `*`, `identifier`, or `string`
             } else {
-                return self.error(&self.look_ahead, &["{", "*", "[ident]"])
+                return self
+                    .expected_token_error(&self.look_ahead, &["{", "*", "[ident]", "[string]"]);
             };
+            // Import declarations require the contextual keyword
+            // `from`
             if !self.at_contextual_keyword("from") {
-                return self.error(&self.look_ahead, &["from"]);
+                return self.expected_token_error(&self.look_ahead, &["from"]);
             }
             let _ = self.next_item()?;
+            // capture the source string for where this import
+            // comes from
             let source = self.parse_module_specifier()?;
             self.consume_semicolon()?;
-            Ok(node::ModuleImport {
-                specifiers,
-                source,
-            })
+            Ok(node::ModuleImport { specifiers, source })
         }
     }
-
-    fn at_possible_ident(&self) -> bool {
-        self.look_ahead.token.is_ident()
-        || self.look_ahead.token.is_keyword()
-        || self.look_ahead.token.is_boolean()
-        || self.look_ahead.token.is_null()
-    }
-
+    /// This will handle the named variant of imports
+    /// ```js
+    /// import {Thing} from 'place';
+    /// ```
     fn parse_named_imports(&mut self) -> Res<Vec<node::ImportSpecifier>> {
         self.expect_punct(Punct::OpenBrace)?;
         let mut ret = vec![];
@@ -481,18 +719,10 @@ impl Parser {
         Ok(node::ImportSpecifier::Normal(imported, local))
     }
 
-    fn parse_local_import_ident(&mut self) -> Res<Option<node::Identifier>> {
-        Ok(if self.at_contextual_keyword("as") {
-            Some(self.parse_var_ident(false)?)
-        } else {
-            None
-        })
-    }
-
     fn parse_import_namespace_specifier(&mut self) -> Res<node::ImportSpecifier> {
         self.expect_punct(Punct::Asterisk)?;
         if !self.at_contextual_keyword("as") {
-            return self.error(&self.look_ahead, &["as"]);
+            return self.expected_token_error(&self.look_ahead, &["as"]);
         }
         let _ = self.next_item()?;
         let ident = self.parse_ident_name()?;
@@ -551,12 +781,17 @@ impl Parser {
             let source = self.parse_module_specifier()?;
             Ok(node::ModuleExport::All(source))
         } else if self.look_ahead.token.is_keyword() {
-            if self.look_ahead.token.matches_keyword(Keyword::Let) || self.look_ahead.token.matches_keyword(Keyword::Const) {
+            if self.look_ahead.token.matches_keyword(Keyword::Let)
+                || self.look_ahead.token.matches_keyword(Keyword::Const)
+            {
                 let lex = self.parse_lexical_decl(false)?;
                 let decl = node::NamedExportDecl::Decl(lex);
                 Ok(node::ModuleExport::Named(decl))
             } else if self.look_ahead.token.matches_keyword(Keyword::Var) {
-                let var = node::Declaration::Variable(node::VariableKind::Var, self.parse_variable_decl_list(false)?);
+                let var = node::Declaration::Variable(
+                    node::VariableKind::Var,
+                    self.parse_variable_decl_list(false)?,
+                );
                 let decl = node::NamedExportDecl::Decl(var);
                 Ok(node::ModuleExport::Named(decl))
             } else if self.look_ahead.token.matches_keyword(Keyword::Class) {
@@ -564,13 +799,16 @@ impl Parser {
                 let decl = node::Declaration::Class(class);
                 let decl = node::NamedExportDecl::Decl(decl);
                 Ok(node::ModuleExport::Named(decl))
-            } else if  self.look_ahead.token.matches_keyword(Keyword::Function) {
+            } else if self.look_ahead.token.matches_keyword(Keyword::Function) {
                 let func = self.parse_function_decl(true)?;
                 let decl = node::Declaration::Function(func);
                 let decl = node::NamedExportDecl::Decl(decl);
                 Ok(node::ModuleExport::Named(decl))
             } else {
-                return self.error(&self.look_ahead, &["let", "var", "const", "class", "function"]);
+                return self.expected_token_error(
+                    &self.look_ahead,
+                    &["let", "var", "const", "class", "function"],
+                );
             }
         } else if self.at_async_function() {
             let func = self.parse_function_decl(false)?;
@@ -598,7 +836,7 @@ impl Parser {
                 let decl = node::NamedExportDecl::Specifier(specifiers, Some(source));
                 Ok(node::ModuleExport::Named(decl))
             } else if found_default {
-                self.error(&self.look_ahead, &[""])
+                self.expected_token_error(&self.look_ahead, &[""])
             } else {
                 self.consume_semicolon()?;
                 let decl = node::NamedExportDecl::Specifier(specifiers, None);
@@ -615,20 +853,15 @@ impl Parser {
         } else {
             None
         };
-        Ok(node::ExportSpecifier {
-            local,
-            exported,
-        })
+        Ok(node::ExportSpecifier { local, exported })
     }
 
     fn parse_module_specifier(&mut self) -> Res<node::Literal> {
         let item = self.next_item()?;
         match &item.token {
-            Token::String(ref s) => {
-                Ok(node::Literal::String(s.to_string()))
-            },
+            Token::String(ref s) => Ok(node::Literal::String(s.to_string())),
 
-            _ => self.error(&item, &["[string]"])
+            _ => self.expected_token_error(&item, &["[string]"]),
         }
     }
 
@@ -688,7 +921,7 @@ impl Parser {
                 Keyword::With => node::Statement::With(self.parse_with_stmt()?),
                 _ => node::Statement::Expr(self.parse_expression_statement()?),
             },
-            _ => return self.error(&self.look_ahead, &[]),
+            _ => return self.expected_token_error(&self.look_ahead, &[]),
         };
         Ok(stmt)
     }
@@ -696,26 +929,29 @@ impl Parser {
     fn parse_with_stmt(&mut self) -> Res<node::WithStatement> {
         debug!(target: "resp:debug", "parse_with_stmt {}", self.context.allow_yield);
         if self.context.strict {
-            // error
+            self.tolerate_error(Error::NonStrictFeatureInStrictContext(
+                self.current_position,
+                "with statements".to_string(),
+            ))?;
         }
         self.expect_keyword(Keyword::With)?;
         self.expect_punct(Punct::OpenParen)?;
         let obj = self.parse_expression()?;
-        Ok(
-            if !self.at_punct(Punct::CloseParen) && self.config.tolerant {
-                //tolerate error
-                node::WithStatement {
-                    object: obj,
-                    body: Box::new(node::Statement::Empty),
-                }
-            } else {
-                self.expect_punct(Punct::CloseParen)?;
-                node::WithStatement {
-                    object: obj,
-                    body: Box::new(self.parse_statement()?),
-                }
-            },
-        )
+        Ok(if !self.at_punct(Punct::CloseParen) {
+            if !self.config.tolerant {
+                let _ = self.expected_token_error(&self.look_ahead, &[")"])?;
+            }
+            node::WithStatement {
+                object: obj,
+                body: Box::new(node::Statement::Empty),
+            }
+        } else {
+            self.expect_punct(Punct::CloseParen)?;
+            node::WithStatement {
+                object: obj,
+                body: Box::new(self.parse_statement()?),
+            }
+        })
     }
 
     fn parse_while_stmt(&mut self) -> Res<node::WhileStatement> {
@@ -723,8 +959,10 @@ impl Parser {
         self.expect_keyword(Keyword::While)?;
         self.expect_punct(Punct::OpenParen)?;
         let test = self.parse_expression()?;
-        let body = if !self.at_punct(Punct::CloseParen) && self.config.tolerant {
-            //tolerate error
+        let body = if !self.at_punct(Punct::CloseParen) {
+            if !self.config.tolerant {
+                return self.expected_token_error(&self.look_ahead, &[")"]);
+            }
             node::Statement::Empty
         } else {
             self.expect_punct(Punct::CloseParen)?;
@@ -764,19 +1002,16 @@ impl Parser {
         }
         let init = if self.at_punct(Punct::Assign) {
             let _ = self.next_item()?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let init = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             Some(init)
         } else if !patt.is_ident() && !in_for {
-            return self.error(&self.look_ahead, &["="]);
+            return self.expected_token_error(&self.look_ahead, &["="]);
         } else {
             None
         };
-        Ok(node::VariableDecl {
-            id: patt,
-            init,
-        })
+        Ok(node::VariableDecl { id: patt, init })
     }
 
     fn parse_try_stmt(&mut self) -> Res<node::TryStatement> {
@@ -853,7 +1088,7 @@ impl Parser {
             let case = self.parse_switch_case()?;
             if case.test.is_none() {
                 if found_default {
-                    return self.error(&self.look_ahead, &[]);
+                    return self.expected_token_error(&self.look_ahead, &[]);
                 }
                 found_default = true;
             }
@@ -893,14 +1128,14 @@ impl Parser {
     fn parse_return_stmt(&mut self) -> Res<Option<node::Expression>> {
         debug!(target: "resp:debug", "parse_return_stmt {}", self.context.allow_yield);
         if !self.context.in_function_body {
-            //tolerate error
+            return self
+                .unexpected_token_error(&self.look_ahead, "cannot return in the global context");
         }
         self.expect_keyword(Keyword::Return)?;
         // if we are at a semi-colon,or close curly brace or eof
         //the return doesn't have an arg. If we are at a line term
         //we need to account for a string literal or template literal
         //since they both can have new lines
-
 
         let ret = if self.at_return_arg() {
             Some(self.parse_expression()?)
@@ -912,24 +1147,15 @@ impl Parser {
         Ok(ret)
     }
 
-    fn at_return_arg(&self) -> bool {
-        if self.context.has_line_term {
-            return self.look_ahead.is_string()
-                    || self.look_ahead.is_template()
-        }
-        !self.at_punct(Punct::SemiColon)
-        && !self.at_punct(Punct::CloseBrace)
-        && !self.look_ahead.is_eof()
-
-    }
-
     fn parse_if_stmt(&mut self) -> Res<node::IfStatement> {
         debug!(target: "resp:debug", "parse_if_stmt {}", self.context.allow_yield);
         self.expect_keyword(Keyword::If)?;
         self.expect_punct(Punct::OpenParen)?;
         let test = self.parse_expression()?;
-        let (consequent, alternate) = if !self.at_punct(Punct::CloseParen) && self.config.tolerant {
-            //tolerate error
+        let (consequent, alternate) = if !self.at_punct(Punct::CloseParen) {
+            if !self.config.tolerant {
+                return self.expected_token_error(&self.look_ahead, &[")"]);
+            }
             (Box::new(node::Statement::Empty), None)
         } else {
             self.expect_punct(Punct::CloseParen)?;
@@ -952,7 +1178,9 @@ impl Parser {
     fn parse_if_clause(&mut self) -> Res<node::Statement> {
         debug!(target: "resp:debug", "parse_if_clause {}", self.context.allow_yield);
         if self.context.strict && self.at_keyword(Keyword::Function) {
-            //tolerate error
+            if !self.config.tolerant {
+                return self.unexpected_token_error(&self.look_ahead, "");
+            }
         }
         self.parse_statement()
     }
@@ -985,7 +1213,6 @@ impl Parser {
         }
 
         if self.at_keyword(Keyword::Var) {
-            let kind = node::VariableKind::Var;
             let _ = self.next_item()?;
             let prev_in = self.context.allow_in;
             self.context.allow_in = false;
@@ -995,7 +1222,7 @@ impl Parser {
                 let decl = if let Some(d) = bindings.pop() {
                     d
                 } else {
-                    return self.error(&self.look_ahead, &["variable decl"]);
+                    return self.expected_token_error(&self.look_ahead, &["variable decl"]);
                 };
                 if self.at_keyword(Keyword::In) {
                     let left = node::LoopLeft::Variable(decl);
@@ -1023,7 +1250,7 @@ impl Parser {
                     Keyword::Let => node::VariableKind::Let,
                     _ => unreachable!(),
                 },
-                _ => return self.error(&kind, &["const", "let"]),
+                _ => return self.expected_token_error(&kind, &["const", "let"]),
             };
             if !self.context.strict && self.look_ahead.token.matches_keyword(Keyword::In) {
                 let _in = self.next_item()?;
@@ -1042,11 +1269,12 @@ impl Parser {
                 let prev_in = self.context.allow_in;
                 self.context.allow_in = false;
                 let mut decls = self.parse_binding_list(kind, true)?;
+                self.context.allow_in = prev_in;
                 if decls.len() == 1 {
                     let decl = if let Some(d) = decls.pop() {
                         d
                     } else {
-                        return self.error(&self.look_ahead, &["variable decl"]);
+                        return self.expected_token_error(&self.look_ahead, &["variable decl"]);
                     };
                     if decl.init.is_none() && self.at_keyword(Keyword::In) {
                         let left = node::LoopLeft::Variable(decl);
@@ -1059,11 +1287,9 @@ impl Parser {
                         }));
                     } else if decl.init.is_none() && self.at_contextual_keyword("of") {
                         let left = node::LoopLeft::Variable(decl);
-                        return Ok(
-                            node::Statement::ForOf(
-                                self.parse_for_of_loop(left, is_await)?
-                            )
-                        );
+                        return Ok(node::Statement::ForOf(
+                            self.parse_for_of_loop(left, is_await)?,
+                        ));
                     } else {
                         let init = node::LoopInit::Variable(vec![decl]);
                         let stmt = self.parse_for_loop_cont(Some(init))?;
@@ -1076,7 +1302,6 @@ impl Parser {
                 }
             }
         } else {
-            let start = self.look_ahead.clone();
             let prev_in = self.context.allow_in;
             self.context.allow_in = false;
             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
@@ -1099,11 +1324,9 @@ impl Parser {
                 let left = node::LoopLeft::Pattern(p);
                 let right = self.parse_assignment_expr()?;
                 let body = self.parse_loop_body()?;
-                return Ok(
-                    node::Statement::ForOf(
-                        node::ForOfStatement::new(left, right, body, is_await)
-                    )
-                );
+                return Ok(node::Statement::ForOf(node::ForOfStatement::new(
+                    left, right, body, is_await,
+                )));
             } else {
                 let init = if self.at_punct(Punct::Comma) {
                     let mut seq = vec![init];
@@ -1122,7 +1345,7 @@ impl Parser {
         }
     }
 
-    fn parse_for_loop(&mut self, kind: node::VariableKind) -> Res<node::ForStatement> {
+    fn parse_for_loop(&mut self, _kind: node::VariableKind) -> Res<node::ForStatement> {
         debug!(target: "resp:debug", "parse_for_loop {}", self.context.allow_yield);
         let init = if self.at_punct(Punct::SemiColon) {
             None
@@ -1168,19 +1391,21 @@ impl Parser {
         })
     }
 
-    fn parse_for_of_loop(&mut self, left: node::LoopLeft, is_await: bool) -> Res<node::ForOfStatement> {
+    fn parse_for_of_loop(
+        &mut self,
+        left: node::LoopLeft,
+        is_await: bool,
+    ) -> Res<node::ForOfStatement> {
         debug!(target: "resp:debug", "parse_for_of_loop {}", self.context.allow_yield);
         let _ = self.next_item()?;
         let right = self.parse_assignment_expr()?;
         let body = self.parse_loop_body()?;
-        Ok(
-            node::ForOfStatement {
-                left,
-                right,
-                body: Box::new(body),
-                is_await,
-            }
-        )
+        Ok(node::ForOfStatement {
+            left,
+            right,
+            body: Box::new(body),
+            is_await,
+        })
     }
 
     fn parse_loop_body(&mut self) -> Res<node::Statement> {
@@ -1188,7 +1413,7 @@ impl Parser {
         self.expect_punct(Punct::CloseParen)?;
         let prev_iter = self.context.in_iteration;
         self.context.in_iteration = true;
-        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+        let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
         let ret = self.parse_statement()?;
         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
         self.context.in_iteration = prev_iter;
@@ -1249,20 +1474,24 @@ impl Parser {
     }
 
     fn parse_labelled_statement(&mut self) -> Res<node::Statement> {
-        debug!(target: "resp:debug", "parse_labelled_statement, {:?} {}", self.look_ahead.token, self.context.allow_yield);
+        debug!(target: "resp:debug", "parse_labelled_statement, {:?}", self.look_ahead.token);
         let ret = self.parse_expression()?;
         if ret.is_ident() && self.at_punct(Punct::Colon) {
             let _colon = self.next_item()?;
             let id = if let node::Expression::Ident(ref ident) = ret {
                 ident.clone()
             } else {
-                return Err(self.reinterpret_error("expression", "ident"))
+                return Err(self.reinterpret_error("expression", "ident"));
             };
 
-            if !self.context.label_set.insert(format!("${}", id)) {
-                //error, multiple ids in this scope.
+            if !self.context.label_set.insert(format!("${}", &id)) {
+                return Err(self.redecl_error(&id));
             }
             let body = if self.at_keyword(Keyword::Class) {
+                let class = self.next_item()?;
+                if !self.config.tolerant {
+                    return self.unexpected_token_error(&class, "");
+                }
                 let body = self.parse_class_body()?;
                 let cls = node::Class {
                     id: None,
@@ -1278,6 +1507,7 @@ impl Parser {
             } else {
                 self.parse_statement()?
             };
+            self.context.label_set.remove(&format!("${}", &id));
             Ok(node::Statement::Labeled(node::LabeledStatement {
                 label: id,
                 body: Box::new(body),
@@ -1292,6 +1522,28 @@ impl Parser {
         debug!(target: "resp:debug", "parse_expression_statement {}", self.context.allow_yield);
         let ret = self.parse_expression()?;
         self.consume_semicolon()?;
+        Ok(ret)
+    }
+
+    fn parse_expression(&mut self) -> Res<node::Expression> {
+        debug!(target: "resp:debug", "parse_expression {}", self.context.allow_yield);
+        let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
+        let ret = self.parse_assignment_expr()?;
+        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+        if self.at_punct(Punct::Comma) {
+            let mut list = vec![ret];
+            while !self.look_ahead.token.is_eof() {
+                if !self.at_punct(Punct::Comma) {
+                    break;
+                }
+                let _comma = self.next_item()?;
+                let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
+                let expr = self.parse_assignment_expr()?;
+                self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+                list.push(expr);
+            }
+            return Ok(node::Expression::Sequence(list));
+        }
         Ok(ret)
     }
 
@@ -1324,9 +1576,9 @@ impl Parser {
             &Token::Keyword(ref k) => match k {
                 Keyword::Let => node::VariableKind::Let,
                 Keyword::Const => node::VariableKind::Const,
-                _ => return self.error(&next, &["let", "const"]),
+                _ => return self.expected_token_error(&next, &["let", "const"]),
             },
-            _ => return self.error(&next, &["let", "const"]),
+            _ => return self.expected_token_error(&next, &["let", "const"]),
         };
         let decl = self.parse_binding_list(kind, in_for)?;
         self.consume_semicolon()?;
@@ -1357,13 +1609,16 @@ impl Parser {
     }
 
     fn parse_variable_decl(&mut self, in_for: bool) -> Res<node::VariableDecl> {
+        let start = self.look_ahead.clone();
         let (_, id) = self.parse_pattern(Some(node::VariableKind::Var), &mut vec![])?;
         if self.context.strict && id.is_restricted() {
-            //tolerate error
+            if !self.config.tolerant {
+                return self.unexpected_token_error(&start, "restricted word");
+            }
         }
         let init = if self.at_punct(Punct::Assign) {
             let _ = self.next_item()?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let init = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             Some(init)
@@ -1373,10 +1628,7 @@ impl Parser {
         } else {
             None
         };
-        Ok(node::VariableDecl {
-            id,
-            init,
-        })
+        Ok(node::VariableDecl { id, init })
     }
 
     fn parse_lexical_binding(
@@ -1385,41 +1637,34 @@ impl Parser {
         in_for: bool,
     ) -> Res<node::VariableDecl> {
         debug!(target: "resp:debug", "parse_lexical_binding {}", self.context.allow_yield);
-        let is_var = match kind {
-            node::VariableKind::Const | node::VariableKind::Let => false,
-            _ => true,
-        };
         let (_, id) = self.parse_pattern(Some(kind), &mut vec![])?;
         if self.context.strict && id.is_restricted() {
-            return self.error(&self.look_ahead, &["not eval", "not arguments"]);
+            return self.expected_token_error(&self.look_ahead, &["not eval", "not arguments"]);
         }
         let init = if kind == node::VariableKind::Const {
             if !self.at_keyword(Keyword::In) && !self.at_contextual_keyword("of") {
                 if self.at_punct(Punct::Assign) {
                     let _ = self.next_item()?;
-                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                     let init = self.parse_assignment_expr()?;
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     Some(init)
                 } else {
-                    return self.error(&self.look_ahead, &["="]);
+                    return self.expected_token_error(&self.look_ahead, &["="]);
                 }
             } else {
                 None
             }
         } else if in_for || self.at_punct(Punct::Assign) {
             self.expect_punct(Punct::Assign)?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let init = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             Some(init)
         } else {
             None
         };
-        Ok(node::VariableDecl {
-            id,
-            init,
-        })
+        Ok(node::VariableDecl { id, init })
     }
 
     fn parse_function_decl(&mut self, opt_ident: bool) -> Res<node::Function> {
@@ -1444,7 +1689,7 @@ impl Parser {
             let start = self.look_ahead.clone();
             let id = self.parse_var_ident(false)?;
             if self.context.strict && start.token.is_restricted() {
-                return self.error(&start, &[]);
+                return self.expected_token_error(&start, &[]);
             }
             let mut first_restricted = if !self.context.strict {
                 if start.token.is_restricted() {
@@ -1475,11 +1720,11 @@ impl Parser {
         let body = self.parse_function_source_el()?;
         if self.context.strict {
             if let Some(ref item) = first_restricted {
-                return self.error(item, &[]);
+                return self.expected_token_error(item, &[]);
             }
         }
         if self.context.strict && strict {
-            return self.error(&self.look_ahead, &[]);
+            return self.expected_token_error(&self.look_ahead, &[]);
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow_strict;
@@ -1532,7 +1777,7 @@ impl Parser {
         };
         let super_class = if self.at_contextual_keyword("extends") {
             let _ = self.next_item()?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let super_class = self.parse_left_hand_side_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             Some(Box::new(super_class))
@@ -1586,7 +1831,7 @@ impl Parser {
 
             if new_key.is_static()
                 && (Self::qualified_prop_name(&self.look_ahead.token)
-                || self.at_punct(Punct::Asterisk))
+                    || self.at_punct(Punct::Asterisk))
             {
                 token = self.look_ahead.token.clone();
                 computed = self.at_punct(Punct::OpenBracket);
@@ -1607,7 +1852,7 @@ impl Parser {
                     && !self.look_ahead.token.matches_punct(Punct::OpenParen)
                     && !self.look_ahead.token.matches_punct(Punct::Asterisk)
                 {
-                    return self.error(&self.look_ahead, &[":", "(", "*"]);
+                    return self.expected_token_error(&self.look_ahead, &[":", "(", "*"]);
                 }
             }
         }
@@ -1618,22 +1863,25 @@ impl Parser {
         let look_ahead_prop_key = Self::qualified_prop_name(&self.look_ahead);
         if token.is_ident() {
             let (at_get, at_set) = if let Some(ref k) = key {
-                (k.matches("get") && look_ahead_prop_key, k.matches("set") && look_ahead_prop_key)
+                (
+                    k.matches("get") && look_ahead_prop_key,
+                    k.matches("set") && look_ahead_prop_key,
+                )
             } else {
                 (false, false)
             };
 
             if at_get {
-                    kind = Some(node::PropertyKind::Get);
-                    computed = self.at_punct(Punct::OpenBracket);
-                    self.context.allow_yield = false;
-                    key = Some(self.parse_object_property_key()?);
-                    value = Some(self.parse_getter_method()?);
+                kind = Some(node::PropertyKind::Get);
+                computed = self.at_punct(Punct::OpenBracket);
+                self.context.allow_yield = false;
+                key = Some(self.parse_object_property_key()?);
+                value = Some(self.parse_getter_method()?);
             } else if at_set {
-                    kind = Some(node::PropertyKind::Set);
-                    computed = self.at_punct(Punct::OpenBracket);
-                    key = Some(self.parse_object_property_key()?);
-                    value = Some(self.parse_setter_method()?);
+                kind = Some(node::PropertyKind::Set);
+                computed = self.at_punct(Punct::OpenBracket);
+                key = Some(self.parse_object_property_key()?);
+                value = Some(self.parse_setter_method()?);
             }
         } else if token.matches_punct(Punct::Asterisk) && look_ahead_prop_key {
             kind = Some(node::PropertyKind::Init);
@@ -1656,7 +1904,7 @@ impl Parser {
         let mut kind = if let Some(k) = kind {
             k
         } else {
-            return self.error(&self.look_ahead, &[]);
+            return self.expected_token_error(&self.look_ahead, &[]);
         };
 
         if kind == node::PropertyKind::Init {
@@ -1666,23 +1914,27 @@ impl Parser {
         let key = if let Some(k) = key {
             k
         } else {
-            return self.error(&self.look_ahead, &[]);
+            return self.expected_token_error(&self.look_ahead, &[]);
         };
         if !computed {
             if is_static && key.matches("prototype") {
-                return self.error(&self.look_ahead, &[]);
+                return self.expected_token_error(&self.look_ahead, &[]);
             }
             if !is_static && key.matches("constructor") {
                 if kind != node::PropertyKind::Method || !method {
-                    return self.error(&self.look_ahead, &["[constructor declaration]"]);
+                    return self
+                        .expected_token_error(&self.look_ahead, &["[constructor declaration]"]);
                 }
                 if let Some(ref v) = value {
                     if v.is_generator() {
-                        return self.error(&self.look_ahead, &["[non-generator function declaration]"]);
+                        return self.expected_token_error(
+                            &self.look_ahead,
+                            &["[non-generator function declaration]"],
+                        );
                     }
                 }
                 if has_ctor {
-                    return self.error(&self.look_ahead, &[]);
+                    return self.expected_token_error(&self.look_ahead, &[]);
                 } else {
                     has_ctor = true;
                 }
@@ -1693,7 +1945,7 @@ impl Parser {
         let value = if let Some(v) = value {
             v
         } else {
-            return self.error(&self.look_ahead, &[]);
+            return self.expected_token_error(&self.look_ahead, &[]);
         };
 
         Ok((
@@ -1728,8 +1980,6 @@ impl Parser {
         };
         Ok(node::PropertyValue::Expr(node::Expression::Function(func)))
     }
-
-
 
     fn parse_property_method(&mut self) -> Res<node::PropertyValue> {
         debug!(target: "resp:debug", "parse_property_method {}", self.context.allow_yield);
@@ -1768,41 +2018,43 @@ impl Parser {
 
     fn parse_getter_method(&mut self) -> Res<node::PropertyValue> {
         debug!(target: "resp:debug", "parse_getter_method {}", self.context.allow_yield);
-        let mut is_gen = false;
+        let is_gen = false;
         let prev_yield = self.context.allow_yield;
+        let start = self.look_ahead.clone();
         let formal_params = self.parse_formal_params()?;
         if formal_params.params.len() > 0 {
-            //tolerate error
+            self.tolerate_error(Error::InvalidGetterParams(self.get_item_position(&start)))?;
         }
         let body = self.parse_method_body(formal_params.simple, formal_params.found_restricted)?;
         self.context.allow_yield = prev_yield;
-        Ok(
-            node::PropertyValue::Expr(
-                node::Expression::Function(
-                    node::Function {
-                        id: None,
-                        params: formal_params.params,
-                        body,
-                        generator: is_gen,
-                        is_async: false,
-                    }
-                )
-            )
-        )
+        Ok(node::PropertyValue::Expr(node::Expression::Function(
+            node::Function {
+                id: None,
+                params: formal_params.params,
+                body,
+                generator: is_gen,
+                is_async: false,
+            },
+        )))
     }
 
-    fn parse_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<Vec<node::ProgramPart>> {
+    fn parse_method_body(
+        &mut self,
+        simple: bool,
+        found_restricted: bool,
+    ) -> Res<Vec<node::ProgramPart>> {
         debug!(target: "resp:debug", "parse_method_body {}", self.context.allow_yield);
         self.context.is_assignment_target = false;
         self.context.is_binding_element = false;
         let prev_strict = self.context.strict;
         let prev_allow_strict = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
-        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+        let start = self.look_ahead.clone();
+        let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
         let body = self.parse_function_source_el()?;
         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-        if self.context.strict && found_restricted {
-            //tolerate error
+        if self.context.strict && found_restricted && !self.config.tolerant {
+            self.unexpected_token_error(&start, "restricted ident")?;
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow_strict;
@@ -1813,12 +2065,14 @@ impl Parser {
         debug!(target: "resp:debug", "parse_setter_method {}", self.context.allow_yield);
         let prev_allow = self.context.allow_yield;
         self.context.allow_yield = true;
+        let start = self.look_ahead.clone();
         let params = self.parse_formal_params()?;
+        self.context.allow_yield = prev_allow;
         if params.params.len() != 1 {
-            //tolerate error
+            self.tolerate_error(Error::InvalidSetterParams(self.get_item_position(&start)))?;
         } else if let Some(ref param) = params.params.get(0) {
             if param.is_rest() {
-                //tolerate error
+                self.tolerate_error(Error::InvalidSetterParams(self.get_item_position(&start)))?;
             }
         }
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
@@ -1832,18 +2086,27 @@ impl Parser {
         Ok(node::PropertyValue::Expr(node::Expression::Function(func)))
     }
 
-    fn parse_property_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<node::FunctionBody> {
+    fn parse_property_method_body(
+        &mut self,
+        simple: bool,
+        found_restricted: bool,
+    ) -> Res<node::FunctionBody> {
         debug!(target: "resp:debug", "parse_property_method_fn {}", self.context.allow_yield);
         self.context.is_assignment_target = false;
         self.context.is_binding_element = false;
         let prev_strict = self.context.strict;
         let prev_allow = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
+        let start = self.look_ahead.clone();
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let ret = self.parse_function_source_el()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
         if self.context.strict && found_restricted {
-            //tolerate error
+            let pos = self.get_item_position(&start);
+            self.tolerate_error(Error::NonStrictFeatureInStrictContext(
+                pos,
+                "restriced ident".to_string(),
+            ))?;
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow;
@@ -1852,7 +2115,10 @@ impl Parser {
 
     fn qualified_prop_name(tok: &Token) -> bool {
         debug!(target: "resp:debug", "qualified_prop_name",);
-        tok.is_ident() || tok.is_keyword() || tok.is_literal() || tok.matches_punct(Punct::OpenBracket)
+        tok.is_ident()
+            || tok.is_keyword()
+            || tok.is_literal()
+            || tok.matches_punct(Punct::OpenBracket)
     }
 
     fn parse_object_property_key(&mut self) -> Res<node::PropertyKey> {
@@ -1860,24 +2126,29 @@ impl Parser {
         let item = self.next_item()?;
         if item.token.is_string() || item.token.is_numeric() {
             if item.token.is_oct_literal() {
-                //tolerate error
+                //FIXME: possible tolerable error
             }
-            let id = node::Literal::from_token(&item.token).ok_or(self.reinterpret_error("number or string", "literal"))?;
+            let id = node::Literal::from_token(&item.token)
+                .ok_or(self.reinterpret_error("number or string", "literal"))?;
             Ok(node::PropertyKey::Literal(id))
         } else if item.token.is_ident()
-        || item.token.is_boolean()
-        || item.token.is_null()
-        || item.token.is_keyword() {
+            || item.token.is_boolean()
+            || item.token.is_null()
+            || item.token.is_keyword()
+        {
             let id = item.token.to_string();
             Ok(node::PropertyKey::Ident(id))
         } else if item.token.matches_punct(Punct::OpenBracket) {
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let key = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             let id = if key.is_valid_property_key_literal() {
                 match key {
                     node::Expression::Literal(lit) => node::PropertyKey::Literal(lit),
-                    _ => return self.error(&self.look_ahead, &["property key literal"]),
+                    _ => {
+                        return self
+                            .expected_token_error(&self.look_ahead, &["property key literal"])
+                    }
                 }
             } else {
                 let id = self.reinterpret_expr_as_pat(key)?;
@@ -1886,7 +2157,18 @@ impl Parser {
             self.expect_punct(Punct::CloseBracket)?;
             Ok(id)
         } else {
-            self.error(&item, &["[string]", "[number]", "[ident]", "[boolean]", "null", "[keyword]", "["])
+            self.expected_token_error(
+                &item,
+                &[
+                    "[string]",
+                    "[number]",
+                    "[ident]",
+                    "[boolean]",
+                    "null",
+                    "[keyword]",
+                    "[",
+                ],
+            )
         }
     }
 
@@ -1894,7 +2176,12 @@ impl Parser {
         debug!(target: "resp:debug", "parse_primary_expression {}", self.context.allow_yield);
         if self.look_ahead.token.is_ident() {
             if (self.context.is_module || self.context.await) && self.at_keyword(Keyword::Await) {
-                // tolerate unexpected token
+                if !self.config.tolerant {
+                    return self.unexpected_token_error(
+                        &self.look_ahead,
+                        "Modules do not allow 'await' to be used as an identifier",
+                    );
+                }
             }
             if self.at_async_function() {
                 self.parse_function_expr()
@@ -1904,7 +2191,7 @@ impl Parser {
             }
         } else if self.look_ahead.token.is_numeric() || self.look_ahead.token.is_string() {
             if self.context.strict && self.look_ahead.token.is_oct_literal() {
-                //tolerate unexpected token
+                //FIXME: possible tolerable error
             }
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
@@ -1936,7 +2223,7 @@ impl Parser {
             } else if self.at_punct(Punct::OpenBrace) {
                 self.parse_obj_init()?
             } else {
-                return self.error(&self.look_ahead, &["{", "[", "("])
+                return self.expected_token_error(&self.look_ahead, &["{", "[", "("]);
             };
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             Ok(expr)
@@ -1975,11 +2262,14 @@ impl Parser {
                     let ident = self.parse_ident_name()?;
                     Ok(node::Expression::Ident(ident))
                 } else {
-                    self.error(&self.look_ahead, &["function", "this", "class", "import"])
+                    self.expected_token_error(
+                        &self.look_ahead,
+                        &["function", "this", "class", "import"],
+                    )
                 }
             }
         } else {
-            self.error(
+            self.expected_token_error(
                 &self.look_ahead,
                 &[
                     "[identifier]",
@@ -1995,23 +2285,6 @@ impl Parser {
                     "import",
                 ],
             )
-        }
-    }
-
-    fn at_import_call(&mut self) -> bool {
-        debug!(target: "resp:debug", "at_import_call {}", self.context.allow_yield);
-        if self.at_keyword(Keyword::Import) {
-            let state = self.scanner.get_state();
-            self.scanner.skip_comments();
-            let ret = if let Some(next) = self.scanner.next() {
-                next.token.matches_punct(Punct::OpenParen)
-            } else {
-                false
-            };
-            self.scanner.set_state(state);
-            ret
-        } else {
-            false
         }
     }
 
@@ -2057,7 +2330,7 @@ impl Parser {
                             ));
                         } else if self.at_punct(Punct::Spread) {
                             if !self.context.is_binding_element {
-                                return self.error(&self.look_ahead, &["not ..."]);
+                                return self.expected_token_error(&self.look_ahead, &["not ..."]);
                             }
                             let (_, rest) = self.parse_rest_element(&mut params)?;
                             let mut args: Vec<node::FunctionArg> = exprs
@@ -2070,7 +2343,11 @@ impl Parser {
                         } else {
                             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
                             exprs.push(self.parse_assignment_expr()?);
-                            self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
+                            self.set_inherit_cover_grammar_state(
+                                prev_bind,
+                                prev_assign,
+                                prev_first,
+                            );
                         }
                     }
                     ex = node::Expression::Sequence(exprs);
@@ -2085,7 +2362,7 @@ impl Parser {
                         ));
                     }
                     if !self.context.is_binding_element {
-                        return self.error(&self.look_ahead, &["binding element"]);
+                        return self.expected_token_error(&self.look_ahead, &["binding element"]);
                     }
                     if let node::Expression::Sequence(seq) = ex {
                         let args = seq
@@ -2123,16 +2400,14 @@ impl Parser {
                 elements.push(Some(el))
             } else {
                 let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
-                elements.push(Some(
-                    self.parse_assignment_expr()?,
-                ));
+                elements.push(Some(self.parse_assignment_expr()?));
                 self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
                 if !self.at_punct(Punct::CloseBracket) {
                     self.expect_punct(Punct::Comma)?;
                 }
             }
         }
-        self.expect_punct(Punct::CloseBracket);
+        self.expect_punct(Punct::CloseBracket)?;
         Ok(node::Expression::Array(elements))
     }
     fn parse_obj_init(&mut self) -> Res<node::Expression> {
@@ -2149,10 +2424,13 @@ impl Parser {
                 has_proto = has_proto || found_proto;
                 prop
             };
-            debug!("pushing prop: {}", match prop {
-                node::ObjectProperty::Property(ref prop) => format!("{:?}", prop),
-                node::ObjectProperty::Spread(ref s) => format!("{:?}", s),
-            });
+            debug!(
+                "pushing prop: {}",
+                match prop {
+                    node::ObjectProperty::Property(ref prop) => format!("{:?}", prop),
+                    node::ObjectProperty::Spread(ref s) => format!("{:?}", s),
+                }
+            );
             props.push(prop);
             if !self.at_punct(Punct::CloseBrace) {
                 self.expect_comma_sep()?;
@@ -2223,7 +2501,11 @@ impl Parser {
                 if self.at_punct(Punct::Colon) && !is_async {
                     if !computed && key.matches("__proto__") {
                         if has_proto {
-                            //tolerate error
+                            let pos = self.get_item_position(&start);
+                            self.tolerate_error(Error::Redecl(
+                                pos,
+                                "prototype can only be declared once".to_string(),
+                            ))?;
                         }
                         has_proto = true;
                     }
@@ -2259,7 +2541,7 @@ impl Parser {
                         let _ = self.next_item()?;
                         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
                         let inner = self.parse_assignment_expr()?;
-                        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first);
+                        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                         node::ObjectProperty::Property(node::Property {
                             computed,
                             key,
@@ -2279,32 +2561,27 @@ impl Parser {
                         })
                     }
                 } else {
-                    return self.error(&start, &["object property value"]);
+                    return self.expected_token_error(&start, &["object property value"]);
                 }
             } else {
-                return self.error(&start, &["object property key"]);
+                return self.expected_token_error(&start, &["object property key"]);
             }
         };
         Ok((has_proto, prop))
     }
 
-    fn at_qualified_prop_key(&self) -> bool {
-        match &self.look_ahead.token {
-            Token::Ident(_)
-            | Token::String(_)
-            | Token::Boolean(_)
-            | Token::Numeric(_)
-            | Token::Null
-            | Token::Keyword(_) => true,
-            Token::Punct(ref p) => p == &Punct::OpenBracket,
-            _ => false,
-        }
+    fn at_possible_ident(&self) -> bool {
+        self.look_ahead.token.is_ident()
+            || self.look_ahead.token.is_keyword()
+            || self.look_ahead.token.is_boolean()
+            || self.look_ahead.token.is_null()
     }
 
     fn parse_template_literal(&mut self) -> Res<node::TemplateLiteral> {
         debug!(target: "resp:debug", "parse_template_literal {}", self.context.allow_yield);
         if !self.look_ahead.is_template_head() {
-            return self.error(&self.look_ahead, &["template head", "template no sub"]);
+            return self
+                .expected_token_error(&self.look_ahead, &["template head", "template no sub"]);
         }
         let mut expressions = vec![];
         let mut quasis = vec![];
@@ -2334,12 +2611,12 @@ impl Parser {
             };
             Ok(node::TemplateElement { raw, cooked, tail })
         } else {
-            self.error(&self.look_ahead, &["Template part"])
+            self.expected_token_error(&self.look_ahead, &["Template part"])
         }
     }
 
     fn parse_function_expr(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_function_expr {}", self.context.allow_yield);
+        debug!(target: "resp:debug", "parse_function_expr");
         let is_async = self.at_contextual_keyword("async");
         if is_async {
             let _ = self.next_item()?;
@@ -2359,7 +2636,10 @@ impl Parser {
             let id = self.parse_fn_name(is_gen)?;
             if item.token.is_restricted() {
                 if self.context.strict {
-                    //tolerate unexpected token
+                    if !self.config.tolerant {
+                        return self
+                            .unexpected_token_error(&item, "restricted ident in strict context");
+                    }
                 } else {
                     found_restricted = true;
                 }
@@ -2372,13 +2652,16 @@ impl Parser {
             None
         };
         let formal_params = self.parse_formal_params()?;
-        found_restricted = formal_params.found_restricted;
+        found_restricted = found_restricted || formal_params.found_restricted;
         let prev_strict = self.context.strict;
         let prev_strict_dir = formal_params.simple;
+        let start = self.look_ahead.clone();
         let body = self.parse_function_source_el()?;
         if self.context.strict && found_restricted {
-            //throw error about the use of a restricted name
-            //or maybe tolerate error? Not super clear
+            //TODO: Double check this
+            if !self.config.tolerant {
+                return self.unexpected_token_error(&start, "restricted ident in strict context");
+            }
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_strict_dir;
@@ -2411,7 +2694,7 @@ impl Parser {
             Token::Keyword(k) => Ok(k.to_string()),
             Token::Boolean(b) => Ok(b.into()),
             Token::Null => Ok("null".to_string()),
-            _ => self.error(&ident, &["identifier name"]),
+            _ => self.expected_token_error(&ident, &["identifier name"]),
         }
     }
 
@@ -2420,24 +2703,24 @@ impl Parser {
         let ident = self.next_item()?;
         if ident.token.matches_keyword(Keyword::Yield) {
             if self.context.strict || !self.context.allow_yield {
-                return self.error(&ident, &["variable identifier"]);
+                return self.expected_token_error(&ident, &["variable identifier"]);
             }
         } else if !ident.token.is_ident() {
             if self.context.strict && ident.token.is_strict_reserved() {
-                return self.error(&ident, &["variable identifier"]);
+                return self.expected_token_error(&ident, &["variable identifier"]);
             }
             if self.context.strict || ident.token.matches_keyword(Keyword::Let) || !is_var {
-                return self.error(&ident, &["variable identifier"]);
+                return self.expected_token_error(&ident, &["variable identifier"]);
             }
         } else if (self.context.is_module || self.context.await)
             && ident.token.matches_ident_str("await")
         {
-            return self.error(&ident, &["variable identifier"]);
+            return self.expected_token_error(&ident, &["variable identifier"]);
         }
         match &ident.token {
             &Token::Ident(ref i) => Ok(i.to_string()),
             &Token::Keyword(ref k) => Ok(k.to_string()),
-            _ => self.error(&ident, &["variable identifier"]),
+            _ => self.expected_token_error(&ident, &["variable identifier"]),
         }
     }
 
@@ -2491,10 +2774,10 @@ impl Parser {
         self.expect_punct(Punct::Spread)?;
         let (restricted, arg) = self.parse_pattern(None, params)?;
         if self.at_punct(Punct::Assign) {
-            return self.error(&self.look_ahead, &["not assignment"]);
+            return self.expected_token_error(&self.look_ahead, &["not assignment"]);
         }
         if !self.at_punct(Punct::CloseParen) {
-            return self.error(&self.look_ahead, &[")"]);
+            return self.expected_token_error(&self.look_ahead, &[")"]);
         }
         Ok((restricted, arg))
     }
@@ -2512,7 +2795,7 @@ impl Parser {
             let _assign = self.next_item()?;
             let prev_yield = self.context.allow_yield;
             self.context.allow_yield = true;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let right = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             self.context.allow_yield = prev_yield;
@@ -2537,14 +2820,13 @@ impl Parser {
             let kind = kind.unwrap_or(node::VariableKind::Var);
             self.parse_array_pattern(params, kind)
         } else if self.at_punct(Punct::OpenBrace) {
-            let kind = kind.unwrap_or(node::VariableKind::Var);
             self.parse_object_pattern()
         } else {
             let is_var = if let Some(kind) = kind {
                 match kind {
                     node::VariableKind::Const | node::VariableKind::Let => {
                         if self.at_keyword(Keyword::Let) {
-                            return self.error(&self.look_ahead, &["identifier"]);
+                            return self.expected_token_error(&self.look_ahead, &["identifier"]);
                         }
                         false
                     }
@@ -2560,7 +2842,11 @@ impl Parser {
         }
     }
 
-    fn parse_array_pattern(&mut self, params: &mut Vec<Item>, kind: node::VariableKind) -> Res<(bool, node::Pattern)> {
+    fn parse_array_pattern(
+        &mut self,
+        params: &mut Vec<Item>,
+        _kind: node::VariableKind,
+    ) -> Res<(bool, node::Pattern)> {
         debug!(target: "resp:debug", "parse_array_pattern {}", self.context.allow_yield);
         self.expect_punct(Punct::OpenBracket)?;
         let mut elements = vec![];
@@ -2624,7 +2910,7 @@ impl Parser {
         debug!(target: "resp:debug", "parse_property_pattern {}", self.context.allow_yield);
         let mut computed = false;
         let mut short_hand = false;
-        let mut method = false;
+        let method = false;
         let (key, value) = if self.look_ahead.token.is_ident() {
             let key = node::PropertyKey::Ident(self.parse_var_ident(false)?);
             let value = if self.at_punct(Punct::Assign) {
@@ -2698,7 +2984,7 @@ impl Parser {
                             body: node::ArrowFunctionBody::FunctionBody(body),
                         });
                     } else {
-                        let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                        let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                         let a = self.parse_assignment_expr()?;
                         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                         current = node::Expression::ArrowFunction(node::ArrowFunctionExpression {
@@ -2714,15 +3000,26 @@ impl Parser {
             } else {
                 if self.at_assign() {
                     if !self.context.is_assignment_target {
-                        //tolerate error
+                        if !self.config.tolerant {
+                            return self.unexpected_token_error(
+                                &self.look_ahead,
+                                "Not at assignment target",
+                            );
+                        }
                     }
                     if self.context.strict && current.is_ident() {
                         if let node::Expression::Ident(ref i) = current {
                             if Self::is_restricted_word(i) {
-                                return self.error(&self.look_ahead, &[&format!("not {}", i)]);
+                                return self.expected_token_error(
+                                    &self.look_ahead,
+                                    &[&format!("not {}", i)],
+                                );
                             }
                             if Self::is_strict_reserved(i) {
-                                return self.error(&self.look_ahead, &[&format!("not {}", i)]);
+                                return self.expected_token_error(
+                                    &self.look_ahead,
+                                    &[&format!("not {}", i)],
+                                );
                             }
                         }
                     }
@@ -2739,7 +3036,7 @@ impl Parser {
                             if let Some(op) = node::AssignmentOperator::from_punct(p) {
                                 op
                             } else {
-                                return self.error(
+                                return self.expected_token_error(
                                     &item,
                                     &[
                                         "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=",
@@ -2749,7 +3046,7 @@ impl Parser {
                             }
                         }
                         _ => {
-                            return self.error(
+                            return self.expected_token_error(
                                 &item,
                                 &[
                                     "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=",
@@ -2758,7 +3055,7 @@ impl Parser {
                             )
                         }
                     };
-                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                     let right = self.parse_assignment_expr()?;
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     self.context.first_covert_initialized_name_error = None;
@@ -2784,7 +3081,6 @@ impl Parser {
         } else {
             return Ok(None);
         };
-        let mut simple = true;
         let mut invalid_param = false;
         params = params
             .into_iter()
@@ -2827,7 +3123,7 @@ impl Parser {
                 }
             }).collect();
         if invalid_param {
-            return self.error(
+            return self.expected_token_error(
                 &self.look_ahead,
                 &["not a yield expression in a function param"],
             );
@@ -2837,7 +3133,7 @@ impl Parser {
                 match param {
                     node::FunctionArg::Expr(ref e) => match e {
                         node::Expression::Yield(_) => {
-                            return self.error(
+                            return self.expected_token_error(
                                 &self.look_ahead,
                                 &["not a yield expression in a function param"],
                             )
@@ -2926,7 +3222,6 @@ impl Parser {
 
     fn parse_conditional_expr(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_conditional_expr {}", self.context.allow_yield);
-        let start = self.look_ahead.clone();
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let expr = self.parse_binary_expression()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
@@ -2934,13 +3229,13 @@ impl Parser {
             let _question_mark = self.next_item()?;
             let prev_in = self.context.allow_in;
             self.context.allow_in = true;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let if_true = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             self.context.allow_in = prev_in;
 
             self.expect_punct(Punct::Colon)?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let if_false = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
 
@@ -2958,11 +3253,10 @@ impl Parser {
 
     fn parse_binary_expression(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_binary_expression {}", self.context.allow_yield);
-        let start = self.look_ahead.clone();
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let mut current = self.parse_exponentiation_expression()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
-        let mut token = self.look_ahead.clone();
+        let token = self.look_ahead.clone();
         let mut prec = self.bin_precedence(&token.token);
         if prec > 0 {
             debug!(target: "resp:debug", "prec: {} > 0 {}", prec, self.context.allow_yield);
@@ -2971,9 +3265,9 @@ impl Parser {
             self.context.is_binding_element = false;
             let mut left = current.clone();
             debug!(target: "resp:debug", "left: {:#?} {}", left, self.context.allow_yield);
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let mut right = self.parse_exponentiation_expression()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             debug!(target: "resp:debug", "right: {:#?} {}", right, self.context.allow_yield);
@@ -3019,7 +3313,7 @@ impl Parser {
                 }
                 ops.push(self.next_item()?.token);
                 precs.push(prec);
-                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                 let exp = self.parse_exponentiation_expression()?;
                 self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                 stack.push(exp);
@@ -3060,7 +3354,6 @@ impl Parser {
 
     fn parse_exponentiation_expression(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_exponentiation_expression {}", self.context.allow_yield);
-        let start = self.look_ahead.clone();
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let expr = self.parse_unary_expression()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
@@ -3069,7 +3362,7 @@ impl Parser {
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let left = expr;
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let right = self.parse_exponentiation_expression()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             return Ok(node::Expression::Binary(node::BinaryExpression {
@@ -3097,7 +3390,9 @@ impl Parser {
             let arg = self.parse_unary_expression()?;
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             if op.token.matches_keyword(Keyword::Delete) && self.context.strict && arg.is_ident() {
-                //tolerate error
+                if !self.config.tolerant {
+                    return self.unexpected_token_error(&op, "Cannot delete ident in strict mode");
+                }
             }
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
@@ -3126,30 +3421,37 @@ impl Parser {
         debug!(target: "resp:debug", "parse_update_expr {}", self.context.allow_yield);
         let start = self.look_ahead.clone();
         if self.at_punct(Punct::Increment) || self.at_punct(Punct::Decrement) {
-            let next = self.next_item()?;
+            let op = self.next_item()?;
+            let operator = match op.token {
+                Token::Punct(ref p) => match p {
+                    Punct::Increment => node::UpdateOperator::Increment,
+                    Punct::Decrement => node::UpdateOperator::Decrement,
+                    _ => unreachable!("Already validated that the next token would be ++ or --"),
+                },
+                _ => unreachable!("Already validated that the next token would be ++ or --"),
+            };
+            let start = self.look_ahead.clone();
             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
             let ex = self.parse_unary_expression()?;
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             if self.context.strict && ex.is_ident() {
                 match &ex {
                     &node::Expression::Ident(ref i) => if Self::is_restricted_word(i) {
-                        // tolerate error
+                        // TODO: double check this
+                        if !self.config.tolerant {
+                            return self.unexpected_token_error(&start, "restricted ident");
+                        }
                     },
                     _ => (),
                 }
             }
-            if !self.context.is_assignment_target {
-                // tolerate error
+            if !self.context.is_assignment_target && !self.config.tolerant {
+                return self
+                    .unexpected_token_error(&op, "Cannot increment when not at assignment target");
             }
             let prefix = true;
             let ret = node::UpdateExpression {
-                operator: if start.token.matches_punct(Punct::Increment) {
-                    node::UpdateOperator::Increment
-                } else if start.token.matches_punct(Punct::Decrement) {
-                    node::UpdateOperator::Decrement
-                } else {
-                    return self.error(&start, &["++", "--"]);
-                },
+                operator,
                 argument: Box::new(ex),
                 prefix,
             };
@@ -3165,17 +3467,20 @@ impl Parser {
                     if self.context.strict {
                         match &expr {
                             &node::Expression::Ident(ref i) => if Self::is_restricted_word(i) {
-                                return self.error(&start, &[]);
+                                return self.expected_token_error(&start, &[]);
                             },
                             _ => (),
                         }
                     }
-                    if !self.context.is_assignment_target {
-                        // tolerate error
+                    let op = self.next_item()?;
+                    if !self.context.is_assignment_target && !self.config.tolerant {
+                        return self.unexpected_token_error(
+                            &op,
+                            "Cannot increment when not at assignment target",
+                        );
                     }
                     self.context.is_assignment_target = false;
                     self.context.is_binding_element = false;
-                    let op = self.next_item()?;
                     let prefix = false;
                     let ret = node::UpdateExpression {
                         operator: if op.token.matches_punct(Punct::Increment) {
@@ -3183,7 +3488,7 @@ impl Parser {
                         } else if op.token.matches_punct(Punct::Decrement) {
                             node::UpdateOperator::Decrement
                         } else {
-                            return self.error(&op, &["++", "--"]);
+                            return self.expected_token_error(&op, &["++", "--"]);
                         },
                         argument: Box::new(expr),
                         prefix,
@@ -3216,7 +3521,7 @@ impl Parser {
                 self.context.is_binding_element = false;
                 self.context.is_assignment_target = true;
                 self.expect_punct(Punct::OpenBracket)?;
-                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                 let prop = self.parse_expression()?;
                 self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                 self.expect_punct(Punct::CloseBracket)?;
@@ -3253,7 +3558,7 @@ impl Parser {
     fn parse_super(&mut self) -> Res<node::Expression> {
         self.expect_keyword(Keyword::Super)?;
         if !self.at_punct(Punct::OpenBracket) && !self.at_punct(Punct::Period) {
-            return self.error(&self.look_ahead, &["[", "."]);
+            return self.expected_token_error(&self.look_ahead, &["[", "."]);
         }
         Ok(node::Expression::SuperExpression)
     }
@@ -3271,7 +3576,7 @@ impl Parser {
                 && !self.at_punct(Punct::Period)
                 && !self.at_punct(Punct::OpenBracket)
             {
-                return self.error(&self.look_ahead, &["(", ".", "["]);
+                return self.expected_token_error(&self.look_ahead, &["(", ".", "["]);
             }
             node::Expression::SuperExpression
         } else {
@@ -3307,7 +3612,10 @@ impl Parser {
                 };
                 //TODO: check for bad import call
                 if async_arrow && self.at_punct(Punct::FatArrow) {
-                    let args = args.into_iter().map(|a| node::FunctionArg::Expr(a)).collect();
+                    let args = args
+                        .into_iter()
+                        .map(|a| node::FunctionArg::Expr(a))
+                        .collect();
                     expr = node::Expression::ArrowParamPlaceHolder(args, true);
                 } else {
                     let inner = node::CallExpression {
@@ -3320,7 +3628,7 @@ impl Parser {
                 self.context.is_assignment_target = true;
                 self.context.is_binding_element = false;
                 self.expect_punct(Punct::OpenBracket)?;
-                let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                 let prop = self.parse_expression()?;
                 self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                 self.expect_punct(Punct::CloseBracket)?;
@@ -3344,7 +3652,7 @@ impl Parser {
         self.context.allow_in = prev_in;
         Ok(expr)
     }
-
+    /// Parse the arguments of an async function
     fn parse_async_args(&mut self) -> Res<Vec<node::Expression>> {
         debug!(target: "resp:debug", "parse_async_args {}", self.context.allow_yield);
         self.expect_punct(Punct::OpenParen)?;
@@ -3354,7 +3662,7 @@ impl Parser {
                 let arg = if self.at_punct(Punct::Spread) {
                     self.parse_spread_element()?
                 } else {
-                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                     let arg = self.parse_async_arg()?;
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     arg
@@ -3372,7 +3680,17 @@ impl Parser {
         self.expect_punct(Punct::CloseParen)?;
         Ok(ret)
     }
-
+    /// Parse an argument of an async function
+    /// note: not sure this is needed
+    fn parse_async_arg(&mut self) -> Res<node::Expression> {
+        debug!(target: "resp:debug", "parse_async_arg {}", self.context.allow_yield);
+        let expr = self.parse_assignment_expr()?;
+        self.context.first_covert_initialized_name_error = None;
+        Ok(expr)
+    }
+    /// Expect a comma separator,
+    /// if parsing with tolerance we can tolerate
+    /// a non-existent comma
     fn expect_comma_sep(&mut self) -> Res<()> {
         debug!(target: "resp:debug", "expect_comma_sep {}", self.context.allow_yield);
         if self.config.tolerant {
@@ -3383,7 +3701,7 @@ impl Parser {
                 //tolerate unexpected
                 Ok(())
             } else {
-                //tolerate unexpected... differently
+                //TODO: double check this
                 Ok(())
             }
         } else {
@@ -3391,24 +3709,16 @@ impl Parser {
         }
     }
 
-    fn parse_async_arg(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_async_arg {}", self.context.allow_yield);
-        let expr = self.parse_assignment_expr()?;
-        self.context.first_covert_initialized_name_error = None;
-        Ok(expr)
-    }
-
+    /// Parse an expression preceded by the `...` operator
     fn parse_spread_element(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_spread_element {}", self.context.allow_yield);
         self.expect_punct(Punct::Spread)?;
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let arg = self.parse_assignment_expr()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
-        Ok(
-            node::Expression::Spread(Box::new(arg))
-        )
+        Ok(node::Expression::Spread(Box::new(arg)))
     }
-
+    /// Parse function arguments, expecting to open with `(` and close with `)`
     fn parse_args(&mut self) -> Res<Vec<node::Expression>> {
         debug!(target: "resp:debug", "parse_args {}", self.context.allow_yield);
         self.expect_punct(Punct::OpenParen)?;
@@ -3418,7 +3728,7 @@ impl Parser {
                 let expr = if self.at_punct(Punct::Spread) {
                     self.parse_spread_element()?
                 } else {
-                    let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+                    let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                     let expr = self.parse_assignment_expr()?;
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     expr
@@ -3436,7 +3746,9 @@ impl Parser {
         self.expect_punct(Punct::CloseParen)?;
         Ok(args)
     }
-
+    /// This will parse one of two expressions `new Thing()`
+    /// or `new.target`. The later is only valid in a function
+    /// body
     fn parse_new_expr(&mut self) -> Res<node::Expression> {
         debug!(target: "resp:debug", "parse_new_expr {}", self.context.allow_yield);
         self.expect_keyword(Keyword::New)?;
@@ -3449,12 +3761,12 @@ impl Parser {
                     property,
                 }))
             } else {
-                self.error(&self.look_ahead, &["[constructor function call]"])
+                self.expected_token_error(&self.look_ahead, &["[constructor function call]"])
             }
         } else if self.at_keyword(Keyword::Import) {
-            self.error(&self.look_ahead, &["not import"])
+            self.expected_token_error(&self.look_ahead, &["not import"])
         } else {
-            let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let callee = self.parse_left_hand_side_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             let args = if self.at_punct(Punct::OpenParen) {
@@ -3472,7 +3784,9 @@ impl Parser {
             Ok(node::Expression::New(new))
         }
     }
-
+    /// Determine the precedence for a specific token,
+    /// this will return zero for all tokens except
+    /// `instanceOf`, `in`, or binary punctuation
     fn bin_precedence(&self, tok: &Token) -> usize {
         match tok {
             &Token::Punct(ref p) => Self::determine_precedence(p),
@@ -3486,7 +3800,8 @@ impl Parser {
             _ => 0,
         }
     }
-
+    /// Determine the precedence for a specific
+    /// punctuation
     fn determine_precedence(p: &Punct) -> usize {
         match p {
             &Punct::CloseParen
@@ -3510,9 +3825,15 @@ impl Parser {
             _ => 0,
         }
     }
-
-    fn set_isolate_cover_grammar_state(&mut self, prev_bind: bool, prev_assign: bool, prev_first: Option<Item>) -> Res<()> {
-        if let Some(ref e) = prev_first {
+    /// Set the state back to the previous state
+    /// isolating the previous state
+    fn set_isolate_cover_grammar_state(
+        &mut self,
+        prev_bind: bool,
+        prev_assign: bool,
+        prev_first: Option<Item>,
+    ) -> Res<()> {
+        if let Some(ref _e) = prev_first {
             //FIXME this needs todo something
             //like an error?
         }
@@ -3521,34 +3842,46 @@ impl Parser {
         self.context.first_covert_initialized_name_error = prev_first;
         Ok(())
     }
-
+    /// Get the context state in order to isolate this state from the
+    /// following operation
     fn isolate_cover_grammar(&mut self) -> (bool, bool, Option<Item>) {
         debug!(target: "resp:debug", "isolate_cover_grammar {}", self.context.allow_yield);
-        let ret  = self.get_cover_grammar_state();
-        self.set_isolate_cover_grammar_state(true, true, None);
+        let ret = self.get_cover_grammar_state();
+        self.context.is_binding_element = true;
+        self.context.is_assignment_target = true;
+        self.context.first_covert_initialized_name_error = None;
         ret
     }
-
+    /// Get the context state for cover grammar operations
     fn get_cover_grammar_state(&self) -> (bool, bool, Option<Item>) {
         (
             self.context.is_binding_element,
             self.context.is_assignment_target,
-            self.context.first_covert_initialized_name_error.clone()
+            self.context.first_covert_initialized_name_error.clone(),
         )
     }
-
-    fn set_inherit_cover_grammar_state(&mut self, is_binding_element: bool, is_assignment: bool, first_covert_initialized_name_error: Option<Item>) {
+    /// Set the context state to the provided values,
+    /// inheriting the previous state
+    fn set_inherit_cover_grammar_state(
+        &mut self,
+        is_binding_element: bool,
+        is_assignment: bool,
+        first_covert_initialized_name_error: Option<Item>,
+    ) {
         self.context.is_binding_element = self.context.is_binding_element && is_binding_element;
         self.context.is_assignment_target = self.context.is_assignment_target && is_assignment;
         if first_covert_initialized_name_error.is_some() {
             self.context.first_covert_initialized_name_error = first_covert_initialized_name_error;
         }
     }
-
+    /// Capture the context state for a binding_element, assignment and
+    /// first_covert_initialized_name
     fn inherit_cover_grammar(&mut self) -> (bool, bool, Option<Item>) {
         trace!(target: "resp:debug", "inherit_cover_grammar");
         let ret = self.get_cover_grammar_state();
-        self.set_inherit_cover_grammar_state(true, true, None);
+        self.context.is_binding_element = true;
+        self.context.is_assignment_target = true;
+        self.context.first_covert_initialized_name_error = None;
         ret
     }
     /// Request the next token from the scanner
@@ -3556,28 +3889,15 @@ impl Parser {
     /// and return the last token
     fn next_item(&mut self) -> Res<Item> {
         trace!(target: "resp:trace", "{:?}", self.look_ahead);
-        unsafe {
-            if self.scanner.cursor > 8 {
-                    DEBUG = true
-            }
-        }
         loop {
             self.context.has_line_term = self.scanner.pending_new_line;
             if let Some(look_ahead) = self.scanner.next() {
                 self._look_ahead = format!("{:?}", look_ahead.token);
-                unsafe {
-                    if DEBUG {
-                        // println!("{:?}", look_ahead);
-                    }
-                }
                 if look_ahead.token.is_comment() {
-                    if self.config.comments {
-                        self.comments.push(look_ahead);
-                    }
+                    self.comment_handler.handle_comment(look_ahead);
                     continue;
                 }
                 let old_pos = self.get_item_position(&self.look_ahead);
-                let new_pos = self.get_item_position(&look_ahead);
                 self.current_position = old_pos;
                 let ret = replace(&mut self.look_ahead, look_ahead);
                 return Ok(ret);
@@ -3599,56 +3919,70 @@ impl Parser {
             }
         }
     }
-
+    /// Get the next token and validate that it matches
+    /// the punct provided, discarding the result
+    /// if it does
     fn expect_punct(&mut self, p: Punct) -> Res<()> {
         let next = self.next_item()?;
         if !next.token.matches_punct_str(&p.to_string()) {
-            return self.error(&next, &[&format!("{:?}", p)]);
+            return self.expected_token_error(&next, &[&format!("{:?}", p)]);
         }
         Ok(())
     }
-
+    /// move on to the next item and validate it matches
+    /// the keyword provided, discarding the result
+    /// if it does
     fn expect_keyword(&mut self, k: Keyword) -> Res<()> {
         let next = self.next_item()?;
         if !next.token.matches_keyword_str(&k.to_string()) {
-            return self.error(&next, &[&format!("{:?}", k)]);
+            return self.expected_token_error(&next, &[&format!("{:?}", k)]);
         }
         Ok(())
     }
 
-    fn at_binary_punct(&mut self) -> bool {
+    fn at_return_arg(&self) -> bool {
+        if self.context.has_line_term {
+            return self.look_ahead.is_string() || self.look_ahead.is_template();
+        }
+        !self.at_punct(Punct::SemiColon)
+            && !self.at_punct(Punct::CloseBrace)
+            && !self.look_ahead.is_eof()
+    }
+
+    fn at_import_call(&mut self) -> bool {
+        debug!(target: "resp:debug", "at_import_call {}", self.context.allow_yield);
+        if self.at_keyword(Keyword::Import) {
+            let state = self.scanner.get_state();
+            self.scanner.skip_comments();
+            let ret = if let Some(next) = self.scanner.next() {
+                next.token.matches_punct(Punct::OpenParen)
+            } else {
+                false
+            };
+            self.scanner.set_state(state);
+            ret
+        } else {
+            false
+        }
+    }
+
+    fn at_qualified_prop_key(&self) -> bool {
         match &self.look_ahead.token {
-            Token::Keyword(ref k) => match k {
-                Keyword::InstanceOf => true,
-                Keyword::In => true,
-                _ => false,
-            },
-            Token::Punct(ref p) => match p {
-                Punct::Equal => true,
-                Punct::NotEqual => true,
-                Punct::StrictEquals => true,
-                Punct::StrictNotEquals => true,
-                Punct::LessThan => true,
-                Punct::LessThanEqual => true,
-                Punct::GreaterThan => true,
-                Punct::GreaterThanEqual => true,
-                Punct::LeftShift => true,
-                Punct::RightShift => true,
-                Punct::UnsignedRightShift => true,
-                Punct::Plus => true,
-                Punct::Minus => true,
-                Punct::Asterisk => true,
-                Punct::ForwardSlash => true,
-                Punct::Modulo => true,
-                Punct::LogicalAnd => true,
-                Punct::LogicalOr => true,
-                Punct::Caret => true,
-                _ => false,
-            },
+            Token::Ident(_)
+            | Token::String(_)
+            | Token::Boolean(_)
+            | Token::Numeric(_)
+            | Token::Null
+            | Token::Keyword(_) => true,
+            Token::Punct(ref p) => p == &Punct::OpenBracket,
             _ => false,
         }
     }
 
+    /// Lexical declarations require the next token
+    /// (not including any comments)
+    /// must be an identifier, `let`, `yield`
+    /// `{`, or `[`
     fn at_lexical_decl(&mut self) -> bool {
         let state = self.scanner.get_state();
         self.scanner.skip_comments();
@@ -3664,15 +3998,16 @@ impl Parser {
         self.scanner.set_state(state);
         ret
     }
-
+    /// Test for if the next token is a specific punct
     fn at_punct(&self, p: Punct) -> bool {
         self.look_ahead.token.matches_punct(p)
     }
-
+    /// Test for if the next token is a specific keyword
     fn at_keyword(&self, k: Keyword) -> bool {
         self.look_ahead.token.matches_keyword(k)
     }
-
+    /// This test is for all the operators that might be part
+    /// of an assignment statement
     fn at_assign(&self) -> bool {
         self.look_ahead.token.matches_punct(Punct::Assign)
             || self.look_ahead.token.matches_punct(Punct::MultiplyAssign)
@@ -3692,7 +4027,9 @@ impl Parser {
             || self.look_ahead.token.matches_punct(Punct::BitwiseXOrAssign)
             || self.look_ahead.token.matches_punct(Punct::BitwiseAndAssign)
     }
-
+    /// The keyword `async` is conditional, that means to decided
+    /// if we are actually at an async function we need to check the
+    /// next token would need to be on the same line
     fn at_async_function(&mut self) -> bool {
         if self.at_contextual_keyword("async") {
             if let Some(peek) = self.scanner.look_ahead() {
@@ -3706,26 +4043,33 @@ impl Parser {
             false
         }
     }
-
+    /// Since semi-colons are options, this function will
+    /// check the next token, if it is a semi-colon it will
+    /// consume it otherwise we need to either be at a line terminator
+    /// EoF or a close brace
     fn consume_semicolon(&mut self) -> Res<()> {
         if self.at_punct(Punct::SemiColon) {
             let _semi = self.next_item()?;
         } else if !self.context.has_line_term {
             if !self.look_ahead.token.is_eof() && !self.at_punct(Punct::CloseBrace) {
-                return self.error(&self.look_ahead, &["eof", "}"]);
+                return self.expected_token_error(&self.look_ahead, &["eof", "}"]);
             }
         }
         Ok(())
     }
-
+    /// Tests if a token matches an &str that might represent
+    /// a contextual keyword like `async`
     fn at_contextual_keyword(&self, s: &str) -> bool {
         self.look_ahead.token.matches_ident_str(s)
     }
-
+    /// Sort of keywords `eval` and `arguments` have
+    /// a special meaning and will cause problems
+    /// if used in the wrong scope
     fn is_restricted_word(word: &str) -> bool {
         word == "eval" || word == "arguments"
     }
-
+    /// Check if this &str is in the list of reserved
+    /// words in the context of 'use strict'
     fn is_strict_reserved(word: &str) -> bool {
         word == "implements"
             || word == "interface"
@@ -3737,7 +4081,9 @@ impl Parser {
             || word == "yield"
             || word == "let"
     }
-
+    /// Tests if the parser is currently at the
+    /// start of an expression. This consists of a
+    /// subset of punctuation, keywords or a regex literal
     fn is_start_of_expr(&self) -> bool {
         let mut ret = true;
         let token = &self.look_ahead.token;
@@ -3769,18 +4115,28 @@ impl Parser {
         }
         ret
     }
-
+    /// performs a binary search of the list of lines to determine
+    /// which line the item exists within and calculates the relative
+    /// column
     fn get_item_position(&self, item: &Item) -> Position {
-        let (idx, line) = if let Some((idx, line)) = self
-            .lines
-            .iter()
-            .enumerate()
-            .find(|(_, l)| l.end + 1 >= item.span.start)
-        {
-            (idx, line)
-        } else {
-            panic!("Unable to determine item's line number {:?}", item);
-        };
+        fn search(lines: &[Line], item: &Item, index: usize) -> (usize, Line) {
+            let current_len = lines.len();
+            if current_len <= 2 {
+                if lines[0].end + 1 >= item.span.start {
+                    (index, lines[0])
+                } else {
+                    (index + 1, lines[1])
+                }
+            } else {
+                let half = current_len >> 1;
+                if lines[half].start + 1 >= item.span.start {
+                    search(&lines[..=half], item, index + half)
+                } else {
+                    search(&lines[half..], item, index)
+                }
+            }
+        }
+        let (idx, line) = search(&self.lines, item, 0);
         let column = item.span.start.saturating_sub(line.start);
         Position {
             line: idx + 1,
@@ -3788,7 +4144,7 @@ impl Parser {
         }
     }
 
-    fn error<T>(&self, item: &Item, expectation: &[&str]) -> Res<T> {
+    fn expected_token_error<T>(&self, item: &Item, expectation: &[&str]) -> Res<T> {
         let bt = backtrace::Backtrace::new();
         error!("{:?}", bt);
         let pos = self.get_item_position(item);
@@ -3808,6 +4164,23 @@ impl Parser {
             format!("Expected {}; found {:?}", expectation, item.token),
         ))
     }
+    fn unexpected_token_error<T>(&self, item: &Item, msg: &str) -> Res<T> {
+        let bt = backtrace::Backtrace::new();
+        error!("{:?}", bt);
+        let pos = self.get_item_position(item);
+        let name = item.token.to_string();
+        Err(Error::UnexpectedToken(
+            pos,
+            format!("Found unexpected token: {}; {}", name, msg),
+        ))
+    }
+    fn tolerate_error(&self, err: Error) -> Result<(), Error> {
+        if !self.config.tolerant {
+            Err(err)
+        } else {
+            Ok(())
+        }
+    }
     fn op_error(&self, msg: &str) -> Error {
         Error::OperationError(self.current_position, msg.to_owned())
     }
@@ -3821,7 +4194,7 @@ impl Parser {
     fn next_part(&mut self) -> Res<node::ProgramPart> {
         if !self.context.past_prolog {
             if let Some(dir) = self.parse_directive()? {
-                return Ok(node::ProgramPart::Directive(dir))
+                return Ok(node::ProgramPart::Directive(dir));
             } else {
                 self.context.past_prolog = true;
             }
@@ -3832,7 +4205,10 @@ impl Parser {
     }
 }
 
-impl Iterator for Parser {
+impl<CH> Iterator for Parser<CH>
+where
+    CH: CommentHandler + Sized,
+{
     type Item = Res<node::ProgramPart>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.look_ahead.token.is_eof() {
@@ -3840,7 +4216,6 @@ impl Iterator for Parser {
         } else {
             Some(self.next_part())
         }
-
     }
 }
 
@@ -3860,33 +4235,36 @@ struct CoverFormalListOptions {
     first_restricted: Option<node::Expression>,
 }
 
-pub(crate) fn init_logging() {
-    let mut b = env_logger::Builder::new();
-    b.target(env_logger::Target::Stdout);
-
-    if let Ok(args) = ::std::env::var("RUST_LOG") {
-        b.parse(&args);
-    }
-    let _ = b.try_init();
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     #[test]
     fn split_lines() {
-        let js = "lineFeed:0\n0;";
-        let lines = get_lines(js);
-        let expectation = vec![
-            Line {
-                start: 0,
-                end: 10,
-            },
-            Line {
-                start: 11,
-                end: 13
-            }
-        ];
+        println!("line feed");
+        let lf = "lf:0
+0;";
+        let lines = get_lines(lf);
+        let expectation = vec![Line { start: 0, end: 4 }, Line { start: 5, end: 6 }];
+        assert_eq!(lines, expectation);
+        println!("carriage return");
+        let cr = format!("cr:0{}0;", '\r');
+        let lines = get_lines(&cr);
+        let expectation = vec![Line { start: 0, end: 4 }, Line { start: 5, end: 6 }];
+        assert_eq!(lines, expectation);
+        println!("carriage return line feed");
+        let crlf = format!("crlf:0{}{}0;", '\r', '\n');
+        let lines = get_lines(&crlf);
+        let expectation = vec![Line { start: 0, end: 7 }, Line { start: 8, end: 9 }];
+        assert_eq!(lines, expectation);
+        println!("line seperator");
+        let ls = "ls:0 0;";
+        let lines = get_lines(ls);
+        let expectation = vec![Line { start: 0, end: 6 }, Line { start: 7, end: 8 }];
+        assert_eq!(lines, expectation);
+        println!("paragraph seperator");
+        let ps = "ps:0 0;";
+        let lines = get_lines(ps);
+        let expectation = vec![Line { start: 0, end: 6 }, Line { start: 7, end: 8 }];
         assert_eq!(lines, expectation);
     }
 }
