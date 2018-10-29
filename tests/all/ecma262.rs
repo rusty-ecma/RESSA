@@ -50,7 +50,8 @@ fn es2015_module() {
         "export default (0, 1);",
     ];
     for export in js_list {
-        let p = Builder::new().module(true).js(export).build().expect("Faield to create parser");
+        let mut b = Builder::new();
+        let p = b.module(true).js(export).build().expect("Failed to create parser");
         let _res: Vec<ProgramPart> = p.map(|i| match i {
             Ok(i) => i,
             Err(e) => panic!("Error parsing {}\n{}", export, e),

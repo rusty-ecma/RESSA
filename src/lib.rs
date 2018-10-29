@@ -157,13 +157,12 @@ impl Default for Context {
 ///         console.log('loop', i);
 ///         }";
 ///     let p = Builder::new()
-///                     .comments(false)
 ///                     .module(false)
 ///                     .js(js)
 ///                     .build()
 ///                     .unwrap();
 ///     for part in p {
-///         let expecation = ProgramPart::Statement(
+///         let expectation = ProgramPart::Statement(
 ///             Statement::For(
 ///                 ForStatement {
 ///                     init: Some(
@@ -254,16 +253,13 @@ impl Builder {
     }
     /// Complete the builder pattern returning
     /// `Result<Parser, Error>`
-    pub fn build(self) -> Res<Parser<DefaultCommentHandler>> {
+    pub fn build(&self) -> Res<Parser<DefaultCommentHandler>> {
         let is_module = self.is_module;
         let tolerant = self.tolerant;
         let lines = get_lines(&self.js);
         let scanner = Scanner::new(self.js.clone());
         Parser::build(tolerant, is_module, scanner, lines, DefaultCommentHandler)
     }
-}
-
-impl Builder {
     /// An alternate to the `build` method. This will allow
     /// users to define their own comment handler
     pub fn with_comment_handler<CH>(self, comment_handler: CH) -> Res<Parser<CH>>
@@ -510,7 +506,7 @@ where CH: CommentHandler + Sized
             if let Some(dir) = self.parse_directive()? {
                 if dir.directive == "use strict" {
                     if !self.context.allow_strict_directive {
-                        return self.error(&self.look_ahead, &[]);
+                        return self.expected_token_error(&self.look_ahead, &[]);
                     }
                     self.context.strict = true;
                 }
@@ -653,18 +649,18 @@ where CH: CommentHandler + Sized
                         specifiers.append(&mut self.parse_named_imports()?);
                     } else {
                         // A comma not followed by `{` or `*` is an error
-                        return self.error(&self.look_ahead, &["{", "*"]);
+                        return self.expected_token_error(&self.look_ahead, &["{", "*"]);
                     }
                 }
                 specifiers
             // import must be followed by an `{`, `*`, `identifier`, or `string`
             } else {
-                return self.error(&self.look_ahead, &["{", "*", "[ident]", "[string]"])
+                return self.expected_token_error(&self.look_ahead, &["{", "*", "[ident]", "[string]"])
             };
             // Import declarations require the contextual keyword
             // `from`
             if !self.at_contextual_keyword("from") {
-                return self.error(&self.look_ahead, &["from"]);
+                return self.expected_token_error(&self.look_ahead, &["from"]);
             }
             let _ = self.next_item()?;
             // capture the source string for where this import
@@ -720,7 +716,7 @@ where CH: CommentHandler + Sized
     fn parse_import_namespace_specifier(&mut self) -> Res<node::ImportSpecifier> {
         self.expect_punct(Punct::Asterisk)?;
         if !self.at_contextual_keyword("as") {
-            return self.error(&self.look_ahead, &["as"]);
+            return self.expected_token_error(&self.look_ahead, &["as"]);
         }
         let _ = self.next_item()?;
         let ident = self.parse_ident_name()?;
@@ -798,7 +794,7 @@ where CH: CommentHandler + Sized
                 let decl = node::NamedExportDecl::Decl(decl);
                 Ok(node::ModuleExport::Named(decl))
             } else {
-                return self.error(&self.look_ahead, &["let", "var", "const", "class", "function"]);
+                return self.expected_token_error(&self.look_ahead, &["let", "var", "const", "class", "function"]);
             }
         } else if self.at_async_function() {
             let func = self.parse_function_decl(false)?;
@@ -826,7 +822,7 @@ where CH: CommentHandler + Sized
                 let decl = node::NamedExportDecl::Specifier(specifiers, Some(source));
                 Ok(node::ModuleExport::Named(decl))
             } else if found_default {
-                self.error(&self.look_ahead, &[""])
+                self.expected_token_error(&self.look_ahead, &[""])
             } else {
                 self.consume_semicolon()?;
                 let decl = node::NamedExportDecl::Specifier(specifiers, None);
@@ -856,7 +852,7 @@ where CH: CommentHandler + Sized
                 Ok(node::Literal::String(s.to_string()))
             },
 
-            _ => self.error(&item, &["[string]"])
+            _ => self.expected_token_error(&item, &["[string]"])
         }
     }
 
@@ -916,7 +912,7 @@ where CH: CommentHandler + Sized
                 Keyword::With => node::Statement::With(self.parse_with_stmt()?),
                 _ => node::Statement::Expr(self.parse_expression_statement()?),
             },
-            _ => return self.error(&self.look_ahead, &[]),
+            _ => return self.expected_token_error(&self.look_ahead, &[]),
         };
         Ok(stmt)
     }
@@ -924,14 +920,16 @@ where CH: CommentHandler + Sized
     fn parse_with_stmt(&mut self) -> Res<node::WithStatement> {
         debug!(target: "resp:debug", "parse_with_stmt {}", self.context.allow_yield);
         if self.context.strict {
-            // error
+            self.tolerate_error(Error::NonStrictFeatureInStrictContext(self.current_position, "with statements".to_string()))?;
         }
         self.expect_keyword(Keyword::With)?;
         self.expect_punct(Punct::OpenParen)?;
         let obj = self.parse_expression()?;
         Ok(
-            if !self.at_punct(Punct::CloseParen) && self.config.tolerant {
-                //tolerate error
+            if !self.at_punct(Punct::CloseParen) {
+                if !self.config.tolerant {
+                    let _ = self.expected_token_error(&self.look_ahead, &[")"])?;
+                }
                 node::WithStatement {
                     object: obj,
                     body: Box::new(node::Statement::Empty),
@@ -943,6 +941,7 @@ where CH: CommentHandler + Sized
                     body: Box::new(self.parse_statement()?),
                 }
             },
+     
         )
     }
 
@@ -951,8 +950,10 @@ where CH: CommentHandler + Sized
         self.expect_keyword(Keyword::While)?;
         self.expect_punct(Punct::OpenParen)?;
         let test = self.parse_expression()?;
-        let body = if !self.at_punct(Punct::CloseParen) && self.config.tolerant {
-            //tolerate error
+        let body = if !self.at_punct(Punct::CloseParen) {
+            if !self.config.tolerant {
+                return self.expected_token_error(&self.look_ahead, &[")"]);
+            }
             node::Statement::Empty
         } else {
             self.expect_punct(Punct::CloseParen)?;
@@ -997,7 +998,7 @@ where CH: CommentHandler + Sized
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             Some(init)
         } else if !patt.is_ident() && !in_for {
-            return self.error(&self.look_ahead, &["="]);
+            return self.expected_token_error(&self.look_ahead, &["="]);
         } else {
             None
         };
@@ -1081,7 +1082,7 @@ where CH: CommentHandler + Sized
             let case = self.parse_switch_case()?;
             if case.test.is_none() {
                 if found_default {
-                    return self.error(&self.look_ahead, &[]);
+                    return self.expected_token_error(&self.look_ahead, &[]);
                 }
                 found_default = true;
             }
@@ -1121,7 +1122,7 @@ where CH: CommentHandler + Sized
     fn parse_return_stmt(&mut self) -> Res<Option<node::Expression>> {
         debug!(target: "resp:debug", "parse_return_stmt {}", self.context.allow_yield);
         if !self.context.in_function_body {
-            //tolerate error
+            return self.unexpected_token_error(&self.look_ahead, "cannot return in the global context")
         }
         self.expect_keyword(Keyword::Return)?;
         // if we are at a semi-colon,or close curly brace or eof
@@ -1145,8 +1146,10 @@ where CH: CommentHandler + Sized
         self.expect_keyword(Keyword::If)?;
         self.expect_punct(Punct::OpenParen)?;
         let test = self.parse_expression()?;
-        let (consequent, alternate) = if !self.at_punct(Punct::CloseParen) && self.config.tolerant {
-            //tolerate error
+        let (consequent, alternate) = if !self.at_punct(Punct::CloseParen) {
+            if !self.config.tolerant {
+                return self.expected_token_error(&self.look_ahead, &[")"]);
+            }
             (Box::new(node::Statement::Empty), None)
         } else {
             self.expect_punct(Punct::CloseParen)?;
@@ -1169,7 +1172,9 @@ where CH: CommentHandler + Sized
     fn parse_if_clause(&mut self) -> Res<node::Statement> {
         debug!(target: "resp:debug", "parse_if_clause {}", self.context.allow_yield);
         if self.context.strict && self.at_keyword(Keyword::Function) {
-            //tolerate error
+            if !self.config.tolerant {
+                return self.unexpected_token_error(&self.look_ahead, "");
+            }
         }
         self.parse_statement()
     }
@@ -1211,7 +1216,7 @@ where CH: CommentHandler + Sized
                 let decl = if let Some(d) = bindings.pop() {
                     d
                 } else {
-                    return self.error(&self.look_ahead, &["variable decl"]);
+                    return self.expected_token_error(&self.look_ahead, &["variable decl"]);
                 };
                 if self.at_keyword(Keyword::In) {
                     let left = node::LoopLeft::Variable(decl);
@@ -1239,7 +1244,7 @@ where CH: CommentHandler + Sized
                     Keyword::Let => node::VariableKind::Let,
                     _ => unreachable!(),
                 },
-                _ => return self.error(&kind, &["const", "let"]),
+                _ => return self.expected_token_error(&kind, &["const", "let"]),
             };
             if !self.context.strict && self.look_ahead.token.matches_keyword(Keyword::In) {
                 let _in = self.next_item()?;
@@ -1263,7 +1268,7 @@ where CH: CommentHandler + Sized
                     let decl = if let Some(d) = decls.pop() {
                         d
                     } else {
-                        return self.error(&self.look_ahead, &["variable decl"]);
+                        return self.expected_token_error(&self.look_ahead, &["variable decl"]);
                     };
                     if decl.init.is_none() && self.at_keyword(Keyword::In) {
                         let left = node::LoopLeft::Variable(decl);
@@ -1479,7 +1484,10 @@ where CH: CommentHandler + Sized
                 return Err(self.redecl_error(&id));
             }
             let body = if self.at_keyword(Keyword::Class) {
-                //tolerate error, unexpected token
+                let class = self.next_item()?;
+                if !self.config.tolerant {
+                    return self.unexpected_token_error(&class, "");
+                }
                 let body = self.parse_class_body()?;
                 let cls = node::Class {
                     id: None,
@@ -1565,9 +1573,9 @@ where CH: CommentHandler + Sized
             &Token::Keyword(ref k) => match k {
                 Keyword::Let => node::VariableKind::Let,
                 Keyword::Const => node::VariableKind::Const,
-                _ => return self.error(&next, &["let", "const"]),
+                _ => return self.expected_token_error(&next, &["let", "const"]),
             },
-            _ => return self.error(&next, &["let", "const"]),
+            _ => return self.expected_token_error(&next, &["let", "const"]),
         };
         let decl = self.parse_binding_list(kind, in_for)?;
         self.consume_semicolon()?;
@@ -1598,9 +1606,12 @@ where CH: CommentHandler + Sized
     }
 
     fn parse_variable_decl(&mut self, in_for: bool) -> Res<node::VariableDecl> {
+        let start = self.look_ahead.clone();
         let (_, id) = self.parse_pattern(Some(node::VariableKind::Var), &mut vec![])?;
         if self.context.strict && id.is_restricted() {
-            //tolerate error
+            if !self.config.tolerant {
+                return self.unexpected_token_error(&start, "restricted word");
+        }
         }
         let init = if self.at_punct(Punct::Assign) {
             let _ = self.next_item()?;
@@ -1628,7 +1639,7 @@ where CH: CommentHandler + Sized
         debug!(target: "resp:debug", "parse_lexical_binding {}", self.context.allow_yield);
         let (_, id) = self.parse_pattern(Some(kind), &mut vec![])?;
         if self.context.strict && id.is_restricted() {
-            return self.error(&self.look_ahead, &["not eval", "not arguments"]);
+            return self.expected_token_error(&self.look_ahead, &["not eval", "not arguments"]);
         }
         let init = if kind == node::VariableKind::Const {
             if !self.at_keyword(Keyword::In) && !self.at_contextual_keyword("of") {
@@ -1639,7 +1650,7 @@ where CH: CommentHandler + Sized
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     Some(init)
                 } else {
-                    return self.error(&self.look_ahead, &["="]);
+                    return self.expected_token_error(&self.look_ahead, &["="]);
                 }
             } else {
                 None
@@ -1681,7 +1692,7 @@ where CH: CommentHandler + Sized
             let start = self.look_ahead.clone();
             let id = self.parse_var_ident(false)?;
             if self.context.strict && start.token.is_restricted() {
-                return self.error(&start, &[]);
+                return self.expected_token_error(&start, &[]);
             }
             let mut first_restricted = if !self.context.strict {
                 if start.token.is_restricted() {
@@ -1712,11 +1723,11 @@ where CH: CommentHandler + Sized
         let body = self.parse_function_source_el()?;
         if self.context.strict {
             if let Some(ref item) = first_restricted {
-                return self.error(item, &[]);
+                return self.expected_token_error(item, &[]);
             }
         }
         if self.context.strict && strict {
-            return self.error(&self.look_ahead, &[]);
+            return self.expected_token_error(&self.look_ahead, &[]);
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow_strict;
@@ -1844,7 +1855,7 @@ where CH: CommentHandler + Sized
                     && !self.look_ahead.token.matches_punct(Punct::OpenParen)
                     && !self.look_ahead.token.matches_punct(Punct::Asterisk)
                 {
-                    return self.error(&self.look_ahead, &[":", "(", "*"]);
+                    return self.expected_token_error(&self.look_ahead, &[":", "(", "*"]);
                 }
             }
         }
@@ -1893,7 +1904,7 @@ where CH: CommentHandler + Sized
         let mut kind = if let Some(k) = kind {
             k
         } else {
-            return self.error(&self.look_ahead, &[]);
+            return self.expected_token_error(&self.look_ahead, &[]);
         };
 
         if kind == node::PropertyKind::Init {
@@ -1903,23 +1914,23 @@ where CH: CommentHandler + Sized
         let key = if let Some(k) = key {
             k
         } else {
-            return self.error(&self.look_ahead, &[]);
+            return self.expected_token_error(&self.look_ahead, &[]);
         };
         if !computed {
             if is_static && key.matches("prototype") {
-                return self.error(&self.look_ahead, &[]);
+                return self.expected_token_error(&self.look_ahead, &[]);
             }
             if !is_static && key.matches("constructor") {
                 if kind != node::PropertyKind::Method || !method {
-                    return self.error(&self.look_ahead, &["[constructor declaration]"]);
+                    return self.expected_token_error(&self.look_ahead, &["[constructor declaration]"]);
                 }
                 if let Some(ref v) = value {
                     if v.is_generator() {
-                        return self.error(&self.look_ahead, &["[non-generator function declaration]"]);
+                        return self.expected_token_error(&self.look_ahead, &["[non-generator function declaration]"]);
                     }
                 }
                 if has_ctor {
-                    return self.error(&self.look_ahead, &[]);
+                    return self.expected_token_error(&self.look_ahead, &[]);
                 } else {
                     has_ctor = true;
                 }
@@ -1930,7 +1941,7 @@ where CH: CommentHandler + Sized
         let value = if let Some(v) = value {
             v
         } else {
-            return self.error(&self.look_ahead, &[]);
+            return self.expected_token_error(&self.look_ahead, &[]);
         };
 
         Ok((
@@ -2007,9 +2018,10 @@ where CH: CommentHandler + Sized
         debug!(target: "resp:debug", "parse_getter_method {}", self.context.allow_yield);
         let is_gen = false;
         let prev_yield = self.context.allow_yield;
+        let start = self.look_ahead.clone();
         let formal_params = self.parse_formal_params()?;
         if formal_params.params.len() > 0 {
-            //tolerate error
+            self.tolerate_error(Error::InvalidGetterParams(self.get_item_position(&start)))?;
         }
         let body = self.parse_method_body(formal_params.simple, formal_params.found_restricted)?;
         self.context.allow_yield = prev_yield;
@@ -2035,11 +2047,12 @@ where CH: CommentHandler + Sized
         let prev_strict = self.context.strict;
         let prev_allow_strict = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
+        let start = self.look_ahead.clone();
         let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
         let body = self.parse_function_source_el()?;
         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-        if self.context.strict && found_restricted {
-            //tolerate error
+        if self.context.strict && found_restricted && !self.config.tolerant {
+            self.unexpected_token_error(&start, "restricted ident")?;
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow_strict;
@@ -2050,13 +2063,14 @@ where CH: CommentHandler + Sized
         debug!(target: "resp:debug", "parse_setter_method {}", self.context.allow_yield);
         let prev_allow = self.context.allow_yield;
         self.context.allow_yield = true;
+        let start = self.look_ahead.clone();
         let params = self.parse_formal_params()?;
         self.context.allow_yield = prev_allow;
         if params.params.len() != 1 {
-            //tolerate error
+            self.tolerate_error(Error::InvalidSetterParams(self.get_item_position(&start)))?;
         } else if let Some(ref param) = params.params.get(0) {
             if param.is_rest() {
-                //tolerate error
+                self.tolerate_error(Error::InvalidSetterParams(self.get_item_position(&start)))?;
             }
         }
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
@@ -2077,11 +2091,13 @@ where CH: CommentHandler + Sized
         let prev_strict = self.context.strict;
         let prev_allow = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
+        let start = self.look_ahead.clone();
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let ret = self.parse_function_source_el()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
         if self.context.strict && found_restricted {
-            //tolerate error
+            let pos = self.get_item_position(&start);
+            self.tolerate_error(Error::NonStrictFeatureInStrictContext(pos, "restriced ident".to_string()))?;
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow;
@@ -2098,7 +2114,7 @@ where CH: CommentHandler + Sized
         let item = self.next_item()?;
         if item.token.is_string() || item.token.is_numeric() {
             if item.token.is_oct_literal() {
-                //tolerate error
+                //FIXME: possible tolerable error
             }
             let id = node::Literal::from_token(&item.token).ok_or(self.reinterpret_error("number or string", "literal"))?;
             Ok(node::PropertyKey::Literal(id))
@@ -2115,7 +2131,7 @@ where CH: CommentHandler + Sized
             let id = if key.is_valid_property_key_literal() {
                 match key {
                     node::Expression::Literal(lit) => node::PropertyKey::Literal(lit),
-                    _ => return self.error(&self.look_ahead, &["property key literal"]),
+                    _ => return self.expected_token_error(&self.look_ahead, &["property key literal"]),
                 }
             } else {
                 let id = self.reinterpret_expr_as_pat(key)?;
@@ -2124,7 +2140,7 @@ where CH: CommentHandler + Sized
             self.expect_punct(Punct::CloseBracket)?;
             Ok(id)
         } else {
-            self.error(&item, &["[string]", "[number]", "[ident]", "[boolean]", "null", "[keyword]", "["])
+            self.expected_token_error(&item, &["[string]", "[number]", "[ident]", "[boolean]", "null", "[keyword]", "["])
         }
     }
 
@@ -2132,7 +2148,9 @@ where CH: CommentHandler + Sized
         debug!(target: "resp:debug", "parse_primary_expression {}", self.context.allow_yield);
         if self.look_ahead.token.is_ident() {
             if (self.context.is_module || self.context.await) && self.at_keyword(Keyword::Await) {
-                // tolerate unexpected token
+                if !self.config.tolerant {
+                    return self.unexpected_token_error(&self.look_ahead, "Modules do not allow 'await' to be used as an identifier");
+                }
             }
             if self.at_async_function() {
                 self.parse_function_expr()
@@ -2142,7 +2160,7 @@ where CH: CommentHandler + Sized
             }
         } else if self.look_ahead.token.is_numeric() || self.look_ahead.token.is_string() {
             if self.context.strict && self.look_ahead.token.is_oct_literal() {
-                //tolerate unexpected token
+                //FIXME: possible tolerable error
             }
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
@@ -2174,7 +2192,7 @@ where CH: CommentHandler + Sized
             } else if self.at_punct(Punct::OpenBrace) {
                 self.parse_obj_init()?
             } else {
-                return self.error(&self.look_ahead, &["{", "[", "("])
+                return self.expected_token_error(&self.look_ahead, &["{", "[", "("])
             };
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             Ok(expr)
@@ -2213,11 +2231,11 @@ where CH: CommentHandler + Sized
                     let ident = self.parse_ident_name()?;
                     Ok(node::Expression::Ident(ident))
                 } else {
-                    self.error(&self.look_ahead, &["function", "this", "class", "import"])
+                    self.expected_token_error(&self.look_ahead, &["function", "this", "class", "import"])
                 }
             }
         } else {
-            self.error(
+            self.expected_token_error(
                 &self.look_ahead,
                 &[
                     "[identifier]",
@@ -2278,7 +2296,7 @@ where CH: CommentHandler + Sized
                             ));
                         } else if self.at_punct(Punct::Spread) {
                             if !self.context.is_binding_element {
-                                return self.error(&self.look_ahead, &["not ..."]);
+                                return self.expected_token_error(&self.look_ahead, &["not ..."]);
                             }
                             let (_, rest) = self.parse_rest_element(&mut params)?;
                             let mut args: Vec<node::FunctionArg> = exprs
@@ -2306,7 +2324,7 @@ where CH: CommentHandler + Sized
                         ));
                     }
                     if !self.context.is_binding_element {
-                        return self.error(&self.look_ahead, &["binding element"]);
+                        return self.expected_token_error(&self.look_ahead, &["binding element"]);
                     }
                     if let node::Expression::Sequence(seq) = ex {
                         let args = seq
@@ -2444,7 +2462,8 @@ where CH: CommentHandler + Sized
                 if self.at_punct(Punct::Colon) && !is_async {
                     if !computed && key.matches("__proto__") {
                         if has_proto {
-                            //tolerate error
+                            let pos = self.get_item_position(&start);
+                            self.tolerate_error(Error::Redecl(pos, "prototype can only be declared once".to_string()))?;
                         }
                         has_proto = true;
                     }
@@ -2500,10 +2519,10 @@ where CH: CommentHandler + Sized
                         })
                     }
                 } else {
-                    return self.error(&start, &["object property value"]);
+                    return self.expected_token_error(&start, &["object property value"]);
                 }
             } else {
-                return self.error(&start, &["object property key"]);
+                return self.expected_token_error(&start, &["object property key"]);
             }
         };
         Ok((has_proto, prop))
@@ -2519,7 +2538,7 @@ where CH: CommentHandler + Sized
     fn parse_template_literal(&mut self) -> Res<node::TemplateLiteral> {
         debug!(target: "resp:debug", "parse_template_literal {}", self.context.allow_yield);
         if !self.look_ahead.is_template_head() {
-            return self.error(&self.look_ahead, &["template head", "template no sub"]);
+            return self.expected_token_error(&self.look_ahead, &["template head", "template no sub"]);
         }
         let mut expressions = vec![];
         let mut quasis = vec![];
@@ -2549,7 +2568,7 @@ where CH: CommentHandler + Sized
             };
             Ok(node::TemplateElement { raw, cooked, tail })
         } else {
-            self.error(&self.look_ahead, &["Template part"])
+            self.expected_token_error(&self.look_ahead, &["Template part"])
         }
     }
 
@@ -2574,7 +2593,9 @@ where CH: CommentHandler + Sized
             let id = self.parse_fn_name(is_gen)?;
             if item.token.is_restricted() {
                 if self.context.strict {
-                    //tolerate unexpected token
+                    if !self.config.tolerant {
+                        return self.unexpected_token_error(&item, "restricted ident in strict context");
+                    }
                 } else {
                     found_restricted = true;
                 }
@@ -2590,11 +2611,13 @@ where CH: CommentHandler + Sized
         found_restricted = found_restricted || formal_params.found_restricted;
         let prev_strict = self.context.strict;
         let prev_strict_dir = formal_params.simple;
+        let start = self.look_ahead.clone();
         let body = self.parse_function_source_el()?;
         if self.context.strict && found_restricted {
-            //throw error about the use of a restricted name
-            //or maybe tolerate error? Not super clear
-            error!("strict context but found restricted");
+            //TODO: Double check this
+            if !self.config.tolerant {
+                return self.unexpected_token_error(&start, "restricted ident in strict context");
+            }
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_strict_dir;
@@ -2627,7 +2650,7 @@ where CH: CommentHandler + Sized
             Token::Keyword(k) => Ok(k.to_string()),
             Token::Boolean(b) => Ok(b.into()),
             Token::Null => Ok("null".to_string()),
-            _ => self.error(&ident, &["identifier name"]),
+            _ => self.expected_token_error(&ident, &["identifier name"]),
         }
     }
 
@@ -2636,24 +2659,24 @@ where CH: CommentHandler + Sized
         let ident = self.next_item()?;
         if ident.token.matches_keyword(Keyword::Yield) {
             if self.context.strict || !self.context.allow_yield {
-                return self.error(&ident, &["variable identifier"]);
+                return self.expected_token_error(&ident, &["variable identifier"]);
             }
         } else if !ident.token.is_ident() {
             if self.context.strict && ident.token.is_strict_reserved() {
-                return self.error(&ident, &["variable identifier"]);
+                return self.expected_token_error(&ident, &["variable identifier"]);
             }
             if self.context.strict || ident.token.matches_keyword(Keyword::Let) || !is_var {
-                return self.error(&ident, &["variable identifier"]);
+                return self.expected_token_error(&ident, &["variable identifier"]);
             }
         } else if (self.context.is_module || self.context.await)
             && ident.token.matches_ident_str("await")
         {
-            return self.error(&ident, &["variable identifier"]);
+            return self.expected_token_error(&ident, &["variable identifier"]);
         }
         match &ident.token {
             &Token::Ident(ref i) => Ok(i.to_string()),
             &Token::Keyword(ref k) => Ok(k.to_string()),
-            _ => self.error(&ident, &["variable identifier"]),
+            _ => self.expected_token_error(&ident, &["variable identifier"]),
         }
     }
 
@@ -2707,10 +2730,10 @@ where CH: CommentHandler + Sized
         self.expect_punct(Punct::Spread)?;
         let (restricted, arg) = self.parse_pattern(None, params)?;
         if self.at_punct(Punct::Assign) {
-            return self.error(&self.look_ahead, &["not assignment"]);
+            return self.expected_token_error(&self.look_ahead, &["not assignment"]);
         }
         if !self.at_punct(Punct::CloseParen) {
-            return self.error(&self.look_ahead, &[")"]);
+            return self.expected_token_error(&self.look_ahead, &[")"]);
         }
         Ok((restricted, arg))
     }
@@ -2759,7 +2782,7 @@ where CH: CommentHandler + Sized
                 match kind {
                     node::VariableKind::Const | node::VariableKind::Let => {
                         if self.at_keyword(Keyword::Let) {
-                            return self.error(&self.look_ahead, &["identifier"]);
+                            return self.expected_token_error(&self.look_ahead, &["identifier"]);
                         }
                         false
                     }
@@ -2929,15 +2952,17 @@ where CH: CommentHandler + Sized
             } else {
                 if self.at_assign() {
                     if !self.context.is_assignment_target {
-                        //tolerate error
+                        if !self.config.tolerant {
+                            return self.unexpected_token_error(&self.look_ahead, "Not at assignment target");
+                        }
                     }
                     if self.context.strict && current.is_ident() {
                         if let node::Expression::Ident(ref i) = current {
                             if Self::is_restricted_word(i) {
-                                return self.error(&self.look_ahead, &[&format!("not {}", i)]);
+                                return self.expected_token_error(&self.look_ahead, &[&format!("not {}", i)]);
                             }
                             if Self::is_strict_reserved(i) {
-                                return self.error(&self.look_ahead, &[&format!("not {}", i)]);
+                                return self.expected_token_error(&self.look_ahead, &[&format!("not {}", i)]);
                             }
                         }
                     }
@@ -2954,7 +2979,7 @@ where CH: CommentHandler + Sized
                             if let Some(op) = node::AssignmentOperator::from_punct(p) {
                                 op
                             } else {
-                                return self.error(
+                                return self.expected_token_error(
                                     &item,
                                     &[
                                         "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=",
@@ -2964,7 +2989,7 @@ where CH: CommentHandler + Sized
                             }
                         }
                         _ => {
-                            return self.error(
+                            return self.expected_token_error(
                                 &item,
                                 &[
                                     "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=",
@@ -3041,7 +3066,7 @@ where CH: CommentHandler + Sized
                 }
             }).collect();
         if invalid_param {
-            return self.error(
+            return self.expected_token_error(
                 &self.look_ahead,
                 &["not a yield expression in a function param"],
             );
@@ -3051,7 +3076,7 @@ where CH: CommentHandler + Sized
                 match param {
                     node::FunctionArg::Expr(ref e) => match e {
                         node::Expression::Yield(_) => {
-                            return self.error(
+                            return self.expected_token_error(
                                 &self.look_ahead,
                                 &["not a yield expression in a function param"],
                             )
@@ -3308,7 +3333,9 @@ where CH: CommentHandler + Sized
             let arg = self.parse_unary_expression()?;
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             if op.token.matches_keyword(Keyword::Delete) && self.context.strict && arg.is_ident() {
-                //tolerate error
+                if !self.config.tolerant {
+                    return self.unexpected_token_error(&op, "Cannot delete ident in strict mode");
+                }
             }
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
@@ -3337,30 +3364,36 @@ where CH: CommentHandler + Sized
         debug!(target: "resp:debug", "parse_update_expr {}", self.context.allow_yield);
         let start = self.look_ahead.clone();
         if self.at_punct(Punct::Increment) || self.at_punct(Punct::Decrement) {
-            let _ = self.next_item()?;
+            let op = self.next_item()?;
+            let operator = match op.token {
+                Token::Punct(ref p) => match p {
+                    Punct::Increment => node::UpdateOperator::Increment,
+                    Punct::Decrement => node::UpdateOperator::Decrement,
+                    _ => unreachable!("Already validated that the next token would be ++ or --"),
+                }
+                _ => unreachable!("Already validated that the next token would be ++ or --"),
+            };
+            let start = self.look_ahead.clone();
             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
             let ex = self.parse_unary_expression()?;
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             if self.context.strict && ex.is_ident() {
                 match &ex {
                     &node::Expression::Ident(ref i) => if Self::is_restricted_word(i) {
-                        // tolerate error
+                        // TODO: double check this
+                        if !self.config.tolerant {
+                            return self.unexpected_token_error(&start, "restricted ident");
+                        }
                     },
                     _ => (),
                 }
             }
-            if !self.context.is_assignment_target {
-                // tolerate error
+            if !self.context.is_assignment_target && !self.config.tolerant {
+                return self.unexpected_token_error(&op, "Cannot increment when not at assignment target");
             }
             let prefix = true;
             let ret = node::UpdateExpression {
-                operator: if start.token.matches_punct(Punct::Increment) {
-                    node::UpdateOperator::Increment
-                } else if start.token.matches_punct(Punct::Decrement) {
-                    node::UpdateOperator::Decrement
-                } else {
-                    return self.error(&start, &["++", "--"]);
-                },
+                operator,
                 argument: Box::new(ex),
                 prefix,
             };
@@ -3376,17 +3409,17 @@ where CH: CommentHandler + Sized
                     if self.context.strict {
                         match &expr {
                             &node::Expression::Ident(ref i) => if Self::is_restricted_word(i) {
-                                return self.error(&start, &[]);
+                                return self.expected_token_error(&start, &[]);
                             },
                             _ => (),
                         }
                     }
-                    if !self.context.is_assignment_target {
-                        // tolerate error
+                    let op = self.next_item()?;
+                    if !self.context.is_assignment_target && !self.config.tolerant {
+                        return self.unexpected_token_error(&op, "Cannot increment when not at assignment target");
                     }
                     self.context.is_assignment_target = false;
                     self.context.is_binding_element = false;
-                    let op = self.next_item()?;
                     let prefix = false;
                     let ret = node::UpdateExpression {
                         operator: if op.token.matches_punct(Punct::Increment) {
@@ -3394,7 +3427,7 @@ where CH: CommentHandler + Sized
                         } else if op.token.matches_punct(Punct::Decrement) {
                             node::UpdateOperator::Decrement
                         } else {
-                            return self.error(&op, &["++", "--"]);
+                            return self.expected_token_error(&op, &["++", "--"]);
                         },
                         argument: Box::new(expr),
                         prefix,
@@ -3464,7 +3497,7 @@ where CH: CommentHandler + Sized
     fn parse_super(&mut self) -> Res<node::Expression> {
         self.expect_keyword(Keyword::Super)?;
         if !self.at_punct(Punct::OpenBracket) && !self.at_punct(Punct::Period) {
-            return self.error(&self.look_ahead, &["[", "."]);
+            return self.expected_token_error(&self.look_ahead, &["[", "."]);
         }
         Ok(node::Expression::SuperExpression)
     }
@@ -3482,7 +3515,7 @@ where CH: CommentHandler + Sized
                 && !self.at_punct(Punct::Period)
                 && !self.at_punct(Punct::OpenBracket)
             {
-                return self.error(&self.look_ahead, &["(", ".", "["]);
+                return self.expected_token_error(&self.look_ahead, &["(", ".", "["]);
             }
             node::Expression::SuperExpression
         } else {
@@ -3604,7 +3637,7 @@ where CH: CommentHandler + Sized
                 //tolerate unexpected
                 Ok(())
             } else {
-                //tolerate unexpected... differently
+                //TODO: double check this
                 Ok(())
             }
         } else {
@@ -3666,10 +3699,10 @@ where CH: CommentHandler + Sized
                     property,
                 }))
             } else {
-                self.error(&self.look_ahead, &["[constructor function call]"])
+                self.expected_token_error(&self.look_ahead, &["[constructor function call]"])
             }
         } else if self.at_keyword(Keyword::Import) {
-            self.error(&self.look_ahead, &["not import"])
+            self.expected_token_error(&self.look_ahead, &["not import"])
         } else {
             let (prev_bind, prev_assign, prev_first)  = self.isolate_cover_grammar();
             let callee = self.parse_left_hand_side_expr()?;
@@ -3747,8 +3780,9 @@ where CH: CommentHandler + Sized
     fn isolate_cover_grammar(&mut self) -> (bool, bool, Option<Item>) {
         debug!(target: "resp:debug", "isolate_cover_grammar {}", self.context.allow_yield);
         let ret  = self.get_cover_grammar_state();
-        //with none in the third position, this can never error.
-        self.set_isolate_cover_grammar_state(true, true, None).unwrap();
+        self.context.is_binding_element = true;
+        self.context.is_assignment_target = true;
+        self.context.first_covert_initialized_name_error = None;
         ret
     }
     /// Get the context state for cover grammar operations
@@ -3773,7 +3807,9 @@ where CH: CommentHandler + Sized
     fn inherit_cover_grammar(&mut self) -> (bool, bool, Option<Item>) {
         trace!(target: "resp:debug", "inherit_cover_grammar");
         let ret = self.get_cover_grammar_state();
-        self.set_inherit_cover_grammar_state(true, true, None);
+        self.context.is_binding_element = true;
+        self.context.is_assignment_target = true;
+        self.context.first_covert_initialized_name_error = None;
         ret
     }
     /// Request the next token from the scanner
@@ -3817,7 +3853,7 @@ where CH: CommentHandler + Sized
     fn expect_punct(&mut self, p: Punct) -> Res<()> {
         let next = self.next_item()?;
         if !next.token.matches_punct_str(&p.to_string()) {
-            return self.error(&next, &[&format!("{:?}", p)]);
+            return self.expected_token_error(&next, &[&format!("{:?}", p)]);
         }
         Ok(())
     }
@@ -3827,7 +3863,7 @@ where CH: CommentHandler + Sized
     fn expect_keyword(&mut self, k: Keyword) -> Res<()> {
         let next = self.next_item()?;
         if !next.token.matches_keyword_str(&k.to_string()) {
-            return self.error(&next, &[&format!("{:?}", k)]);
+            return self.expected_token_error(&next, &[&format!("{:?}", k)]);
         }
         Ok(())
     }
@@ -3946,7 +3982,7 @@ where CH: CommentHandler + Sized
             let _semi = self.next_item()?;
         } else if !self.context.has_line_term {
             if !self.look_ahead.token.is_eof() && !self.at_punct(Punct::CloseBrace) {
-                return self.error(&self.look_ahead, &["eof", "}"]);
+                return self.expected_token_error(&self.look_ahead, &["eof", "}"]);
             }
         }
         Ok(())
@@ -4038,7 +4074,7 @@ where CH: CommentHandler + Sized
         }
     }
 
-    fn error<T>(&self, item: &Item, expectation: &[&str]) -> Res<T> {
+    fn expected_token_error<T>(&self, item: &Item, expectation: &[&str]) -> Res<T> {
         let bt = backtrace::Backtrace::new();
         error!("{:?}", bt);
         let pos = self.get_item_position(item);
@@ -4057,6 +4093,25 @@ where CH: CommentHandler + Sized
             pos,
             format!("Expected {}; found {:?}", expectation, item.token),
         ))
+    }
+    fn unexpected_token_error<T>(&self, item: &Item, msg: &str) -> Res<T> {
+        let bt = backtrace::Backtrace::new();
+        error!("{:?}", bt);
+        let pos = self.get_item_position(item);
+        let name = item.token.to_string();
+        Err(
+            Error::UnexpectedToken(
+                pos,
+                format!("Found unexpected token: {}; {}", name, msg)
+            )
+        )
+    }
+    fn tolerate_error(&self, err: Error) -> Result<(), Error> {
+        if !self.config.tolerant {
+            Err(err)
+        } else {
+            Ok(())
+        }
     }
     fn op_error(&self, msg: &str) -> Error {
         Error::OperationError(self.current_position, msg.to_owned())

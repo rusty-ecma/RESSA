@@ -326,7 +326,6 @@ fn builder_doc_snippet() {
         console.log('loop', i);
         }";
     let p = Builder::new()
-                    .comments(false)
                     .module(false)
                     .js(js)
                     .build()

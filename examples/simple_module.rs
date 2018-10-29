@@ -6,7 +6,6 @@ fn main() {
     let mut p = builder
                 .module(true)
                 .tolerant(false)
-                .comments(false)
                 .js(js)
                 .build().unwrap();
     let script = p.parse().unwrap();
