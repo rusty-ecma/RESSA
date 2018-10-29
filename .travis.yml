@@ -13,7 +13,6 @@ matrix:
         - rm -rf /home/travis/.cargo/registry
       script:
         - cargo test
-        - cargo +beta test
       after_script:
       stages:
         after_script:
