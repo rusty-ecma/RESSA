@@ -52,8 +52,13 @@ extern crate env_logger;
 extern crate backtrace;
 
 use ress::{Item, Keyword, Punct, Scanner, Template, Token, Span};
+
 mod error;
 pub mod node;
+mod comment_handler;
+
+pub use comment_handler::CommentHandler;
+use comment_handler::DefaultCommentHandler;
 use error::Error;
 use node::Position;
 use std::{collections::HashSet, mem::replace};
@@ -63,12 +68,10 @@ use std::{collections::HashSet, mem::replace};
 struct Config {
     /// whether or not to tolerate a subset of errors
     tolerant: bool,
-    /// whether or not to collect comments or ignore them
-    comments: bool,
 }
 
 /// The current parsing context.
-/// This structure holds the relivant
+/// This structure holds the relevant
 /// information to know when some
 /// text might behave differently
 /// depending on what has come before it
@@ -118,7 +121,6 @@ impl Default for Config {
         trace!(target: "resp:debug", "default config");
         Self {
             tolerant: false,
-            comments: false,
         }
     }
 }
@@ -204,7 +206,6 @@ impl Default for Context {
 pub struct Builder {
     tolerant: bool,
     is_module: bool,
-    comments: bool,
     js: String,
 }
 
@@ -213,7 +214,6 @@ impl Builder {
         Self {
             tolerant: false,
             is_module: false,
-            comments: false,
             js: String::new(),
         }
     }
@@ -241,19 +241,6 @@ impl Builder {
         self.set_module(value);
         self
     }
-    /// Set the behavior of the parser when
-    /// handling comments with a builder pattern
-    /// default: `false` (discard comments)
-    pub fn set_comments(&mut self, value: bool) {
-        self.comments = value;
-    }
-    /// Set the behavior of the parser when
-    /// handling comments with a builder pattern
-    /// default: `false` (discard comments)
-    pub fn comments(&mut self, value: bool) -> &mut Self {
-        self.set_comments(value);
-        self
-    }
     /// Set the js text that this parser would operate
     /// on
     pub fn set_js(&mut self, js: impl Into<String>) {
@@ -267,13 +254,24 @@ impl Builder {
     }
     /// Complete the builder pattern returning
     /// `Result<Parser, Error>`
-    pub fn build(self) -> Res<Parser> {
+    pub fn build(self) -> Res<Parser<DefaultCommentHandler>> {
         let is_module = self.is_module;
-        let comments = self.comments;
         let tolerant = self.tolerant;
         let lines = get_lines(&self.js);
         let scanner = Scanner::new(self.js.clone());
-        Parser::build(tolerant, comments, is_module, scanner, lines)
+        Parser::build(tolerant, is_module, scanner, lines, DefaultCommentHandler)
+    }
+}
+
+impl Builder {
+    /// An alternate to the `build` method. This will allow
+    /// users to define their own comment handler
+    pub fn with_comment_handler<CH>(self, comment_handler: CH) -> Res<Parser<CH>>
+    where CH: CommentHandler + Sized
+    {
+        let lines = get_lines(&self.js);
+        let s = Scanner::new(self.js);
+        Parser::build(self.tolerant, self.is_module, s, lines, comment_handler)
     }
 }
 
@@ -287,7 +285,9 @@ impl Builder {
 /// `ProgramPart` collection will be the inner data. Since modern
 /// js allows for both `Module`s as well as `Script`s, these will be
 /// the two `enum` variants.
-pub struct Parser {
+pub struct Parser<CH>
+where CH: CommentHandler + Sized
+{
     /// The current parsing context
     context: Context,
     /// The configuration provided by the user
@@ -314,6 +314,8 @@ pub struct Parser {
     /// To ease debugging this will be a String representation
     /// of the look_ahead token
     _look_ahead: String,
+
+    comment_handler: CH
 }
 /// The start/end index of a line
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
@@ -388,7 +390,8 @@ fn get_lines(text: &str) -> Vec<Line> {
     });
     ret
 }
-impl Parser {
+
+impl Parser<DefaultCommentHandler> {
     /// Create a new parser with the provided
     /// javascript
     /// This will default to parsing in the
@@ -400,25 +403,28 @@ impl Parser {
         let s = Scanner::new(text);
         let config = Config::default();
         let context = Context::default();
-        Self::_new(s, lines, config, context)
+        Self::_new(s, lines, config, context, DefaultCommentHandler)
     }
+}
 
+impl<CH> Parser<CH>
+where CH: CommentHandler + Sized
+{
     /// Internal constructor for completing the builder pattern
-    pub fn build(tolerant: bool, comments: bool, is_module: bool, scanner: Scanner, lines: Vec<Line>) -> Res<Self> {
+    pub fn build(tolerant: bool, is_module: bool, scanner: Scanner, lines: Vec<Line>, comment_handler: CH) -> Res<Self> {
         let config = Config {
             tolerant,
-            comments,
             ..Default::default()
         };
         let context = Context {
             is_module,
             ..Default::default()
         };
-        Self::_new(scanner, lines, config, context)
+        Self::_new(scanner, lines, config, context, comment_handler)
     }
     /// Internal constructor to allow for both builder pattern
     /// and `new` construction
-    fn _new(scanner: Scanner, lines: Vec<Line>, config: Config, context: Context) -> Res<Self> {
+    fn _new(scanner: Scanner, lines: Vec<Line>, config: Config, context: Context, comment_handler: CH) -> Res<Self> {
         let look_ahead = Item {
                 token: Token::EoF,
                 span: Span {
@@ -437,6 +443,7 @@ impl Parser {
             _comments: vec![],
             current_position: node::Position::start(),
             _look_ahead: String::new(),
+            comment_handler,
         };
         let _ = ret.next_item()?;
         Ok(ret)
@@ -3779,9 +3786,7 @@ impl Parser {
             if let Some(look_ahead) = self.scanner.next() {
                 self._look_ahead = format!("{:?}", look_ahead.token);
                 if look_ahead.token.is_comment() {
-                    if self.config.comments {
-                        self._comments.push(look_ahead);
-                    }
+                    self.comment_handler.handle_comment(look_ahead);
                     continue;
                 }
                 let old_pos = self.get_item_position(&self.look_ahead);
@@ -4077,7 +4082,9 @@ impl Parser {
     }
 }
 
-impl Iterator for Parser {
+impl<CH> Iterator for Parser<CH>
+where CH: CommentHandler + Sized
+{
     type Item = Res<node::ProgramPart>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.look_ahead.token.is_eof() {
