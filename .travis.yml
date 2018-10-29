@@ -2,9 +2,7 @@ language: rust
 sudo: false
 matrix:
   include:
-    - rust:
-        - stable
-        - beta
+    - rust: stable
       install:
         - npm i
       cache:
