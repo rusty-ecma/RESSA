@@ -260,12 +260,12 @@ impl Builder {
     }
     /// An alternate to the `build` method. This will allow
     /// users to define their own comment handler
-    pub fn with_comment_handler<CH>(self, comment_handler: CH) -> Res<Parser<CH>>
+    pub fn with_comment_handler<CH>(&self, comment_handler: CH) -> Res<Parser<CH>>
     where
         CH: CommentHandler + Sized,
     {
         let lines = get_lines(&self.js);
-        let s = Scanner::new(self.js);
+        let s = Scanner::new(self.js.clone());
         Parser::build(self.tolerant, self.is_module, s, lines, comment_handler)
     }
 }
