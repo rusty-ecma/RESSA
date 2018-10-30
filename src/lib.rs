@@ -4118,21 +4118,22 @@ where
     /// performs a binary search of the list of lines to determine
     /// which line the item exists within and calculates the relative
     /// column
-    fn get_item_position(&self, item: &Item) -> Position {
+    pub(crate) fn get_item_position(&self, item: &Item) -> Position {
+        // This inner recursive function is required because we need
+        // to keep track of the index or the line number, the only
+        // way to get that would be to call .iter on the lines property
+        // which would perform a linear search, this allows for a binary
+        // search
         fn search(lines: &[Line], item: &Item, index: usize) -> (usize, Line) {
             let current_len = lines.len();
-            if current_len <= 2 {
-                if lines[0].end + 1 >= item.span.start {
-                    (index, lines[0])
-                } else {
-                    (index + 1, lines[1])
-                }
+            if current_len == 1 {
+                (index, lines[0])
             } else {
                 let half = current_len >> 1;
-                if lines[half].start + 1 >= item.span.start {
-                    search(&lines[..=half], item, index + half)
+                if lines[half-1].end > item.span.start {
+                    search(&lines[..half], item, index)
                 } else {
-                    search(&lines[half..], item, index)
+                    search(&lines[half..], item, index + half)
                 }
             }
         }
@@ -4261,10 +4262,53 @@ mod test {
         let lines = get_lines(ls);
         let expectation = vec![Line { start: 0, end: 6 }, Line { start: 7, end: 8 }];
         assert_eq!(lines, expectation);
-        println!("paragraph seperator");
+        println!("paragraph separator");
         let ps = "ps:0 0;";
         let lines = get_lines(ps);
         let expectation = vec![Line { start: 0, end: 6 }, Line { start: 7, end: 8 }];
         assert_eq!(lines, expectation);
+    }
+    #[test]
+    fn position_for_item() {
+        let js = "function thing() {
+    return 'stuff';
+}";
+        let item1 = Item {
+            span: Span {
+                start: 9,
+                end: 13,
+            },
+            token: Token::ident("thing"),
+        };
+        let position1 = Position {
+            line: 1,
+            column: 9,
+        };
+        let p = Parser::new(js).unwrap();
+        assert_eq!(p.get_item_position(&item1), position1);
+        let item2 = Item {
+            span: Span {
+                start: 30,
+                end: 36,
+            },
+            token: Token::single_quoted_string("stuff"),
+        };
+        let position2 = Position {
+            line: 2,
+            column: 11,
+        };
+        assert_eq!(p.get_item_position(&item2), position2);
+        let item3 = Item {
+            span: Span {
+                start: 39,
+                end: 40,
+            },
+            token: Token::punct("}"),
+        };
+        let position3 = Position {
+            line: 3,
+            column: 0,
+        };
+        assert_eq!(p.get_item_position(&item3), position3);
     }
 }
