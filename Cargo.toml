@@ -17,3 +17,10 @@ backtrace = "0"
 
 [features]
 major_libs = []
+
+[dev-dependencies]
+term-painter = "0.2.4"
+docopt = "1"
+walkdir = "2"
+serde_derive = "1"
+serde = "1"
