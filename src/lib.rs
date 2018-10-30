@@ -382,7 +382,7 @@ fn get_lines(text: &str) -> Vec<Line> {
     // This will capture the last line of the text
     ret.push(Line {
         start: line_start,
-        end: text.len() - 1,
+        end: text.len().saturating_sub(1),
     });
     ret
 }
