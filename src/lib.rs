@@ -779,6 +779,7 @@ where
             }
             let _ = self.next_item()?;
             let source = self.parse_module_specifier()?;
+            self.consume_semicolon()?;
             Ok(node::ModuleExport::All(source))
         } else if self.look_ahead.token.is_keyword() {
             if self.look_ahead.token.matches_keyword(Keyword::Let)
@@ -786,13 +787,16 @@ where
             {
                 let lex = self.parse_lexical_decl(false)?;
                 let decl = node::NamedExportDecl::Decl(lex);
+                self.consume_semicolon()?;
                 Ok(node::ModuleExport::Named(decl))
             } else if self.look_ahead.token.matches_keyword(Keyword::Var) {
+                let _ = self.next_item()?;
                 let var = node::Declaration::Variable(
                     node::VariableKind::Var,
                     self.parse_variable_decl_list(false)?,
                 );
                 let decl = node::NamedExportDecl::Decl(var);
+                self.consume_semicolon()?;
                 Ok(node::ModuleExport::Named(decl))
             } else if self.look_ahead.token.matches_keyword(Keyword::Class) {
                 let class = self.parse_class_decl(true)?;
