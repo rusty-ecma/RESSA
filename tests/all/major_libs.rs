@@ -26,6 +26,11 @@ fn vue() {
     let (normal, min) = get_js(Lib::Vue).expect("Unable to get vue js");
     run_test("vue", normal, min);
 }
+#[test]
+fn vue_esm() {
+    let js = ::std::fs::read_to_string("node_modules/vue/dist/vue.esm.browser.js").unwrap();
+    run_test("vue_module", js, String::new());
+}
 
 #[test]
 fn jquery() {
@@ -48,7 +53,8 @@ fn dexie() {
 fn run_test(name: &str, normal: String, min: String) {
     let _ = env_logger::try_init();
     let mut p = Parser::new(&normal).expect(&format!("Unable to create {} parser", name));
-    let _result = p.parse().expect(&format!("Unable to parse {}", name));
+    let result = p.parse().expect(&format!("Unable to parse {}", name));
+    println!("{:#?}", result);
     p = Parser::new(&min).expect(&format!("Unable to create react.min {}", name));
     let _result = p.parse().expect(&format!("Unable to parse {}.min", name));
 }
