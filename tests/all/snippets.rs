@@ -428,6 +428,39 @@ function Thing() {
     }
 }
 
+#[test]
+fn first_blog_post() {
+    let expect = ProgramPart::Decl(Declaration::Function(Function {
+        id: Some(String::from("print")),
+        params: vec![FunctionArg::Pattern(Pattern::Identifier(String::from(
+            "message",
+        )))],
+        body: vec![ProgramPart::Statement(Statement::Expr(Expression::Call(
+            CallExpression {
+                callee: Box::new(Expression::Member(MemberExpression {
+                    object: Box::new(Expression::Ident(String::from("console"))),
+                    property: Box::new(Expression::Ident(String::from("log"))),
+                    computed: false,
+                })),
+                arguments: vec![Expression::Ident(String::from("message"))],
+            },
+        )))],
+        generator: false,
+        is_async: false,
+    }));
+    let js = "function print(message) {
+    console.log(message)
+}";
+    execute(js, Program::Script(vec![expect]));
+}
+
+#[test]
+fn obj_pattern() {
+    let js = "console.log({a: 'thing', b() {console.log('b')}});";
+    let out = parse(js);
+    println!("{:?}", out);
+}
+
 fn execute(js: &str, expectation: Program) {
     let s = parse(js);
     assert_eq!(s, expectation);
