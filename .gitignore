@@ -11,3 +11,5 @@ node_modules
 .vscode
 !bencher.js
 package-lock.json
+bencher.js
+benchmark.md
