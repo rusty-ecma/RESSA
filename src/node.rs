@@ -39,9 +39,16 @@ pub enum Item {
     Class(Class),
 }
 
+/// A fully parsed javascript program.
+///
+/// It is essentially a collection of `ProgramPart`s
+/// with a flag denoting if the representation is
+/// a ES6 Module or a Script.
 #[derive(PartialEq, Debug)]
 pub enum Program {
+    /// An ES6 Module
     Module(Vec<ProgramPart>),
+    /// Not an ES6 Module
     Script(Vec<ProgramPart>),
 }
 
@@ -54,11 +61,15 @@ impl Program {
         Program::Script(parts)
     }
 }
-
+/// A single part of a Javascript program.
+/// This will be either a Directive, Declaration or a Statement
 #[derive(PartialEq, Debug, Clone)]
 pub enum ProgramPart {
+    /// A Directive like `'use strict';`
     Directive(Directive),
+    /// A variable, function or module declaration
     Decl(Declaration),
+    /// Any other kind of statement
     Statement(Statement),
 }
 
@@ -104,6 +115,9 @@ impl ProgramPart {
     }
 }
 
+/// A module declaration, This would only be available
+/// in an ES Module, it would be either an import or
+/// export at the top level
 #[derive(PartialEq, Debug, Clone)]
 pub enum ModuleDecl {
     Import(ModuleImport),
@@ -193,6 +207,12 @@ impl ModuleDecl {
     }
 }
 
+/// A declaration that imports exported
+/// members of another module
+///
+/// ```js
+/// import {Thing} from './stuff.js';
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct ModuleImport {
     pub specifiers: Vec<ImportSpecifier>,
@@ -204,11 +224,30 @@ impl ModuleImport {
         Self { specifiers, source }
     }
 }
-
+/// The name of the thing being imported
 #[derive(PartialEq, Debug, Clone)]
 pub enum ImportSpecifier {
+    /// A specifier in curly braces, this might
+    /// have a local alias
+    ///
+    /// ```js
+    /// import {Thing} from './stuff.js';
+    /// import {People as Persons} from './places.js';
+    /// ```
     Normal(Identifier, Option<Identifier>),
+    /// A specifier that has been exported with the
+    /// default keyword, this should not be wrapped in
+    /// curly braces.
+    /// ```js
+    /// import DefaultThing from './stuff/js';
+    /// ```
     Default(Identifier),
+    /// Import all exported members from a module
+    /// in a namespace.
+    ///
+    /// ```js
+    /// import * as Moment from 'moment.js';
+    /// ```
     Namespace(Identifier),
 }
 
