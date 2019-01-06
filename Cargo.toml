@@ -1,6 +1,6 @@
 [package]
 name = "ressa"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Robert Masen <r@robertmasen.pizza>"]
 repository = "https://github.com/FreeMasen/RESP"
 description = "An ECMAscript parser"
