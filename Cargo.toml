@@ -16,7 +16,9 @@ env_logger = "0.5.13"
 backtrace = "0"
 
 [features]
+default = []
 major_libs = []
+debug_look_ahead = []
 
 [dev-dependencies]
 term-painter = "0.2.4"

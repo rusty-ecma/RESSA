@@ -118,14 +118,14 @@ struct Context {
 
 impl Default for Config {
     fn default() -> Self {
-        trace!(target: "resp:debug", "default config");
+        trace!("default config");
         Self { tolerant: false }
     }
 }
 
 impl Default for Context {
     fn default() -> Self {
-        trace!(target: "resp:debug", "default context",);
+        trace!("default context",);
         Self {
             is_module: false,
             await: false,
@@ -308,7 +308,8 @@ where
     /// The current position we are parsing
     current_position: node::Position,
     /// To ease debugging this will be a String representation
-    /// of the look_ahead token
+    /// of the look_ahead token, it will be an empty string
+    /// unless you are using the `debug_look_ahead` feature
     _look_ahead: String,
 
     comment_handler: CH,
@@ -489,7 +490,7 @@ where
     /// }
     /// ```
     pub fn parse(&mut self) -> Res<node::Program> {
-        debug!(target: "resp:debug", "parse_script {}", self.context.allow_yield);
+        debug!("parse_script");
         let mut body = vec![];
         while let Some(part) = self.next() {
             match part {
@@ -505,7 +506,7 @@ where
     }
     /// Parse all of the directives into a single prologue
     fn parse_directive_prologues(&mut self) -> Res<Vec<node::ProgramPart>> {
-        debug!(target: "resp:debug", "parse_directive_prologues {}", self.context.allow_yield);
+        debug!("parse_directive_prologues");
         let mut ret = vec![];
         loop {
             if !self.look_ahead.token.is_string() {
@@ -527,7 +528,7 @@ where
     }
     /// Parse a single directive
     fn parse_directive(&mut self) -> Res<Option<node::Directive>> {
-        debug!(target: "resp:debug", "parse_directive {}", self.context.allow_yield);
+        debug!("parse_directive");
         if self.look_ahead.token.matches_string_content("use strict") {
             let dir = self.next_item()?;
             let ret = match dir.token {
@@ -553,7 +554,7 @@ where
     /// statement or declaration (import/export/function/const/let/class)
     /// otherwise we move on to `Parser::parse_statement`
     fn parse_statement_list_item(&mut self) -> Res<node::ProgramPart> {
-        debug!(target: "resp:debug", "parse_statement_list_item_script {}", self.context.allow_yield);
+        debug!("parse_statement_list_item_script");
         self.context.is_assignment_target = true;
         self.context.is_binding_element = true;
         let tok = self.look_ahead.token.clone();
@@ -870,7 +871,7 @@ where
     }
 
     fn parse_statement(&mut self) -> Res<node::Statement> {
-        debug!(target: "resp:debug", "parse_statement {}", self.context.allow_yield);
+        debug!("parse_statement");
         let lh = self.look_ahead.token.clone();
         let stmt = match lh {
             Token::Boolean(_)
@@ -931,7 +932,7 @@ where
     }
 
     fn parse_with_stmt(&mut self) -> Res<node::WithStatement> {
-        debug!(target: "resp:debug", "parse_with_stmt {}", self.context.allow_yield);
+        debug!("parse_with_stmt");
         if self.context.strict {
             self.tolerate_error(Error::NonStrictFeatureInStrictContext(
                 self.current_position,
@@ -959,7 +960,7 @@ where
     }
 
     fn parse_while_stmt(&mut self) -> Res<node::WhileStatement> {
-        debug!(target: "resp:debug", "parse_while_stmt {}", self.context.allow_yield);
+        debug!("parse_while_stmt");
         self.expect_keyword(Keyword::While)?;
         self.expect_punct(Punct::OpenParen)?;
         let test = self.parse_expression()?;
@@ -982,7 +983,7 @@ where
     }
 
     fn parse_var_stmt(&mut self) -> Res<node::Statement> {
-        debug!(target: "resp:debug", "parse_var_stmt {}", self.context.allow_yield);
+        debug!("parse_var_stmt");
         self.expect_keyword(Keyword::Var)?;
         let decls = self.parse_var_decl_list(false)?;
         let stmt = node::Statement::Var(decls);
@@ -1019,7 +1020,7 @@ where
     }
 
     fn parse_try_stmt(&mut self) -> Res<node::TryStatement> {
-        debug!(target: "resp:debug", "parse_try_stmt {}", self.context.allow_yield);
+        debug!("parse_try_stmt");
         self.expect_keyword(Keyword::Try)?;
         let block = self.parse_block()?;
         let handler = if self.at_keyword(Keyword::Catch) {
@@ -1043,7 +1044,7 @@ where
     }
 
     fn parse_catch_clause(&mut self) -> Res<node::CatchClause> {
-        debug!(target: "resp:debug", "parse_catch_clause {}", self.context.allow_yield);
+        debug!("parse_catch_clause");
         self.expect_keyword(Keyword::Catch)?;
         self.expect_punct(Punct::OpenParen)?;
         if self.at_punct(Punct::CloseParen) {
@@ -1057,13 +1058,13 @@ where
     }
 
     fn parse_finally_clause(&mut self) -> Res<node::BlockStatement> {
-        debug!(target: "resp:debug", "parse_finally_clause {}", self.context.allow_yield);
+        debug!("parse_finally_clause");
         self.expect_keyword(Keyword::Finally)?;
         self.parse_block()
     }
 
     fn parse_throw_stmt(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_throw_stmt {}", self.context.allow_yield);
+        debug!("parse_throw_stmt");
         self.expect_keyword(Keyword::Throw)?;
         if self.context.has_line_term {
             //error: no new line allowed after throw
@@ -1074,7 +1075,7 @@ where
     }
 
     fn parse_switch_stmt(&mut self) -> Res<node::SwitchStatement> {
-        debug!(target: "resp:debug", "parse_switch_stmt {}", self.context.allow_yield);
+        debug!("parse_switch_stmt");
         self.expect_keyword(Keyword::Switch)?;
         self.expect_punct(Punct::OpenParen)?;
         let discriminant = self.parse_expression()?;
@@ -1107,7 +1108,7 @@ where
     }
 
     fn parse_switch_case(&mut self) -> Res<node::SwitchCase> {
-        debug!(target: "resp:debug", "parse_switch_case {}", self.context.allow_yield);
+        debug!("parse_switch_case");
         let test = if self.at_keyword(Keyword::Default) {
             self.expect_keyword(Keyword::Default)?;
             None
@@ -1130,7 +1131,7 @@ where
     }
 
     fn parse_return_stmt(&mut self) -> Res<Option<node::Expression>> {
-        debug!(target: "resp:debug", "parse_return_stmt {}", self.context.allow_yield);
+        debug!("parse_return_stmt");
         if !self.context.in_function_body {
             return self
                 .unexpected_token_error(&self.look_ahead, "cannot return in the global context");
@@ -1146,13 +1147,13 @@ where
         } else {
             None
         };
-        debug!(target: "resp:debug", "return statement: {:?} {}", ret, self.context.allow_yield);
+        debug!("return statement: {:?} {}", ret, self.context.allow_yield);
         self.consume_semicolon()?;
         Ok(ret)
     }
 
     fn parse_if_stmt(&mut self) -> Res<node::IfStatement> {
-        debug!(target: "resp:debug", "parse_if_stmt {}", self.context.allow_yield);
+        debug!("parse_if_stmt");
         self.expect_keyword(Keyword::If)?;
         self.expect_punct(Punct::OpenParen)?;
         let test = self.parse_expression()?;
@@ -1180,7 +1181,7 @@ where
     }
 
     fn parse_if_clause(&mut self) -> Res<node::Statement> {
-        debug!(target: "resp:debug", "parse_if_clause {}", self.context.allow_yield);
+        debug!("parse_if_clause");
         if self.context.strict && self.at_keyword(Keyword::Function) {
             if !self.config.tolerant {
                 return self.unexpected_token_error(&self.look_ahead, "");
@@ -1190,13 +1191,13 @@ where
     }
 
     fn parse_fn_stmt(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_fn_stmt {}", self.context.allow_yield);
+        debug!("parse_fn_stmt");
         let decl = self.parse_function_decl(true)?;
         Ok(node::Expression::Function(decl))
     }
 
     fn parse_for_stmt(&mut self) -> Res<node::Statement> {
-        debug!(target: "resp:debug", "parse_for_stmt {}", self.context.allow_yield);
+        debug!("parse_for_stmt");
 
         self.expect_keyword(Keyword::For)?;
         let is_await = if self.at_keyword(Keyword::Await) {
@@ -1350,7 +1351,7 @@ where
     }
 
     fn parse_for_loop(&mut self, _kind: node::VariableKind) -> Res<node::ForStatement> {
-        debug!(target: "resp:debug", "parse_for_loop {}", self.context.allow_yield);
+        debug!("parse_for_loop");
         let init = if self.at_punct(Punct::SemiColon) {
             None
         } else {
@@ -1361,7 +1362,7 @@ where
     }
 
     fn parse_for_loop_cont(&mut self, init: Option<node::LoopInit>) -> Res<node::ForStatement> {
-        debug!(target: "resp:debug", "parse_for_loop_cont {}", self.context.allow_yield);
+        debug!("parse_for_loop_cont");
         self.expect_punct(Punct::SemiColon)?;
         let test = if self.at_punct(Punct::SemiColon) {
             None
@@ -1384,7 +1385,7 @@ where
     }
 
     fn parse_for_in_loop(&mut self, left: node::LoopLeft) -> Res<node::ForInStatement> {
-        debug!(target: "resp:debug", "parse_for_in_loop {}", self.context.allow_yield);
+        debug!("parse_for_in_loop");
         let _ = self.next_item()?;
         let right = self.parse_expression()?;
         let body = self.parse_loop_body()?;
@@ -1400,7 +1401,7 @@ where
         left: node::LoopLeft,
         is_await: bool,
     ) -> Res<node::ForOfStatement> {
-        debug!(target: "resp:debug", "parse_for_of_loop {}", self.context.allow_yield);
+        debug!("parse_for_of_loop");
         let _ = self.next_item()?;
         let right = self.parse_assignment_expr()?;
         let body = self.parse_loop_body()?;
@@ -1413,7 +1414,7 @@ where
     }
 
     fn parse_loop_body(&mut self) -> Res<node::Statement> {
-        debug!(target: "resp:debug", "parse_loop_body {}", self.context.allow_yield);
+        debug!("parse_loop_body");
         self.expect_punct(Punct::CloseParen)?;
         let prev_iter = self.context.in_iteration;
         self.context.in_iteration = true;
@@ -1425,7 +1426,7 @@ where
     }
 
     fn parse_do_while_stmt(&mut self) -> Res<node::DoWhileStatement> {
-        debug!(target: "resp:debug", "parse_do_while_stmt {}", self.context.allow_yield);
+        debug!("parse_do_while_stmt");
         self.expect_keyword(Keyword::Do)?;
         let prev_iter = self.context.in_iteration;
         self.context.in_iteration = true;
@@ -1442,17 +1443,17 @@ where
     }
 
     fn parse_break_stmt(&mut self) -> Res<Option<node::Identifier>> {
-        debug!(target: "resp:debug", "parse_break_stmt {}", self.context.allow_yield);
+        debug!("parse_break_stmt");
         self.parse_optionally_labeled_statement(Keyword::Break)
     }
 
     fn parse_continue_stmt(&mut self) -> Res<Option<node::Identifier>> {
-        debug!(target: "resp:debug", "parse_continue_stmt {}", self.context.allow_yield);
+        debug!("parse_continue_stmt");
         self.parse_optionally_labeled_statement(Keyword::Continue)
     }
 
     fn parse_optionally_labeled_statement(&mut self, k: Keyword) -> Res<Option<node::Identifier>> {
-        debug!(target: "resp:debug", "parse_optionally_labeled_statement {}", self.context.allow_yield);
+        debug!("parse_optionally_labeled_statement");
         self.expect_keyword(k)?;
         let ret = if self.look_ahead.token.is_ident() && !self.context.has_line_term {
             let id = self.parse_var_ident(false)?;
@@ -1471,14 +1472,14 @@ where
     }
 
     fn parse_debugger_stmt(&mut self) -> Res<node::Statement> {
-        debug!(target: "resp:debug", "parse_debugger_stmt {}", self.context.allow_yield);
+        debug!("parse_debugger_stmt");
         self.expect_keyword(Keyword::Debugger)?;
         self.consume_semicolon()?;
         Ok(node::Statement::Debugger)
     }
 
     fn parse_labelled_statement(&mut self) -> Res<node::Statement> {
-        debug!(target: "resp:debug", "parse_labelled_statement, {:?}", self.look_ahead.token);
+        debug!("parse_labelled_statement, {:?}", self.look_ahead.token);
         let ret = self.parse_expression()?;
         if ret.is_ident() && self.at_punct(Punct::Colon) {
             let _colon = self.next_item()?;
@@ -1523,14 +1524,14 @@ where
     }
 
     fn parse_expression_statement(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_expression_statement {}", self.context.allow_yield);
+        debug!("parse_expression_statement");
         let ret = self.parse_expression()?;
         self.consume_semicolon()?;
         Ok(ret)
     }
 
     fn parse_expression(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_expression {}", self.context.allow_yield);
+        debug!("parse_expression");
         let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
         let ret = self.parse_assignment_expr()?;
         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
@@ -1552,7 +1553,7 @@ where
     }
 
     fn parse_block(&mut self) -> Res<node::BlockStatement> {
-        debug!(target: "resp:debug", "parse_block {}", self.context.allow_yield);
+        debug!("parse_block");
         self.expect_punct(Punct::OpenBrace)?;
         let mut ret = vec![];
         loop {
@@ -1573,9 +1574,9 @@ where
     }
 
     fn parse_lexical_decl(&mut self, in_for: bool) -> Res<node::Declaration> {
-        debug!(target: "resp:debug", "parse_lexical_decl {}", self.context.allow_yield);
+        debug!("parse_lexical_decl");
         let next = self.next_item()?;
-        debug!(target: "resp:debug", "next: {:?} {}", next, self.context.allow_yield);
+        debug!("next: {:?} {}", next, self.context.allow_yield);
         let kind = match &next.token {
             &Token::Keyword(ref k) => match k {
                 Keyword::Let => node::VariableKind::Let,
@@ -1594,7 +1595,7 @@ where
         kind: node::VariableKind,
         in_for: bool,
     ) -> Res<Vec<node::VariableDecl>> {
-        debug!(target: "resp:debug", "parse_binding_list {}", self.context.allow_yield);
+        debug!("parse_binding_list");
         let mut ret = vec![self.parse_lexical_binding(kind, in_for)?];
         while self.at_punct(Punct::Comma) {
             let _comma = self.next_item()?;
@@ -1640,7 +1641,7 @@ where
         kind: node::VariableKind,
         in_for: bool,
     ) -> Res<node::VariableDecl> {
-        debug!(target: "resp:debug", "parse_lexical_binding {}", self.context.allow_yield);
+        debug!("parse_lexical_binding");
         let (_, id) = self.parse_pattern(Some(kind), &mut vec![])?;
         if self.context.strict && id.is_restricted() {
             return self.expected_token_error(&self.look_ahead, &["not eval", "not arguments"]);
@@ -1672,7 +1673,7 @@ where
     }
 
     fn parse_function_decl(&mut self, opt_ident: bool) -> Res<node::Function> {
-        debug!(target: "resp:debug", "parse_function_decl {}", self.context.allow_yield);
+        debug!("parse_function_decl");
         let is_async = if self.at_contextual_keyword("async") {
             let _ = self.next_item()?;
             true
@@ -1744,7 +1745,7 @@ where
     }
 
     fn parse_function_source_el(&mut self) -> Res<node::FunctionBody> {
-        debug!(target: "resp:debug", "parse_function_source_el {}", self.context.allow_yield);
+        debug!("parse_function_source_el");
         self.expect_punct(Punct::OpenBrace)?;
         let mut body = self.parse_directive_prologues()?;
         let prev_label = self.context.label_set.clone();
@@ -1770,7 +1771,7 @@ where
     }
 
     fn parse_class_decl(&mut self, opt_ident: bool) -> Res<node::Class> {
-        debug!(target: "resp:debug", "parse_class_decl {}", self.context.allow_yield);
+        debug!("parse_class_decl");
         let prev_strict = self.context.strict;
         self.context.strict = true;
         self.expect_keyword(Keyword::Class)?;
@@ -1799,7 +1800,7 @@ where
     }
 
     fn parse_class_body(&mut self) -> Res<Vec<node::Property>> {
-        debug!(target: "resp:debug", "parse_class_body {}", self.context.allow_yield);
+        debug!("parse_class_body");
         let mut ret = vec![];
         let mut has_ctor = false;
         self.expect_punct(Punct::OpenBrace)?;
@@ -1817,7 +1818,7 @@ where
     }
 
     fn parse_class_el(&mut self, has_ctor: bool) -> Res<(bool, node::Property)> {
-        debug!(target: "resp:debug", "parse_class_el");
+        debug!("parse_class_el");
         let mut token = self.look_ahead.token.clone();
         let mut has_ctor = has_ctor;
         let mut key: Option<node::PropertyKey> = None;
@@ -1966,7 +1967,7 @@ where
     }
 
     fn parse_async_property_method(&mut self) -> Res<node::PropertyValue> {
-        debug!(target: "resp:debug", "parse_property_method_async_fn {}", self.context.allow_yield);
+        debug!("parse_property_method_async_fn");
         let prev_yield = self.context.allow_yield;
         let prev_await = self.context.await;
         self.context.allow_yield = false;
@@ -1986,7 +1987,7 @@ where
     }
 
     fn parse_property_method(&mut self) -> Res<node::PropertyValue> {
-        debug!(target: "resp:debug", "parse_property_method {}", self.context.allow_yield);
+        debug!("parse_property_method");
         let prev_yield = self.context.allow_yield;
         self.context.allow_yield = false;
         let params = self.parse_formal_params()?;
@@ -2003,7 +2004,7 @@ where
     }
 
     fn parse_generator_method(&mut self) -> Res<node::PropertyValue> {
-        debug!(target: "resp:debug", "pares_generator_method {}", self.context.allow_yield);
+        debug!("pares_generator_method");
         let prev_yield = self.context.allow_yield;
         self.context.allow_yield = true;
         let params = self.parse_formal_params()?;
@@ -2021,7 +2022,7 @@ where
     }
 
     fn parse_getter_method(&mut self) -> Res<node::PropertyValue> {
-        debug!(target: "resp:debug", "parse_getter_method {}", self.context.allow_yield);
+        debug!("parse_getter_method");
         let is_gen = false;
         let prev_yield = self.context.allow_yield;
         let start = self.look_ahead.clone();
@@ -2047,7 +2048,7 @@ where
         simple: bool,
         found_restricted: bool,
     ) -> Res<Vec<node::ProgramPart>> {
-        debug!(target: "resp:debug", "parse_method_body {}", self.context.allow_yield);
+        debug!("parse_method_body");
         self.context.is_assignment_target = false;
         self.context.is_binding_element = false;
         let prev_strict = self.context.strict;
@@ -2066,7 +2067,7 @@ where
     }
 
     fn parse_setter_method(&mut self) -> Res<node::PropertyValue> {
-        debug!(target: "resp:debug", "parse_setter_method {}", self.context.allow_yield);
+        debug!("parse_setter_method");
         let prev_allow = self.context.allow_yield;
         self.context.allow_yield = true;
         let start = self.look_ahead.clone();
@@ -2095,7 +2096,7 @@ where
         simple: bool,
         found_restricted: bool,
     ) -> Res<node::FunctionBody> {
-        debug!(target: "resp:debug", "parse_property_method_fn {}", self.context.allow_yield);
+        debug!("parse_property_method_fn");
         self.context.is_assignment_target = false;
         self.context.is_binding_element = false;
         let prev_strict = self.context.strict;
@@ -2118,7 +2119,7 @@ where
     }
 
     fn qualified_prop_name(tok: &Token) -> bool {
-        debug!(target: "resp:debug", "qualified_prop_name",);
+        debug!("qualified_prop_name",);
         tok.is_ident()
             || tok.is_keyword()
             || tok.is_literal()
@@ -2126,7 +2127,7 @@ where
     }
 
     fn parse_object_property_key(&mut self) -> Res<node::PropertyKey> {
-        debug!(target: "resp:debug", "parse_object_property_key {}", self.context.allow_yield);
+        debug!("parse_object_property_key");
         let item = self.next_item()?;
         if item.token.is_string() || item.token.is_numeric() {
             if item.token.is_oct_literal() {
@@ -2177,7 +2178,7 @@ where
     }
 
     fn parse_primary_expression(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_primary_expression {}", self.context.allow_yield);
+        debug!("parse_primary_expression");
         if self.look_ahead.token.is_ident() {
             if (self.context.is_module || self.context.await) && self.at_keyword(Keyword::Await) {
                 if !self.config.tolerant {
@@ -2293,7 +2294,7 @@ where
     }
 
     fn parse_group_expr(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_group_expr {}", self.context.allow_yield);
+        debug!("parse_group_expr");
         self.expect_punct(Punct::OpenParen)?;
         if self.at_punct(Punct::CloseParen) {
             let _ = self.next_item()?;
@@ -2387,7 +2388,7 @@ where
     }
 
     fn parse_array_init(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_array_init {}", self.context.allow_yield);
+        debug!("parse_array_init");
         self.expect_punct(Punct::OpenBracket)?;
         let mut elements = vec![];
         while !self.at_punct(Punct::CloseBracket) {
@@ -2415,7 +2416,7 @@ where
         Ok(node::Expression::Array(elements))
     }
     fn parse_obj_init(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_obj_init {}", self.context.allow_yield);
+        debug!("parse_obj_init");
         self.expect_punct(Punct::OpenBrace)?;
         let mut props = vec![];
         let mut has_proto = false;
@@ -2445,7 +2446,7 @@ where
     }
 
     fn parse_obj_prop(&mut self, has_proto: bool) -> Res<(bool, node::ObjectProperty)> {
-        debug!(target: "resp:debug", "parse_obj_prop {}", self.context.allow_yield);
+        debug!("parse_obj_prop");
         let start = self.look_ahead.clone();
         let mut has_proto = has_proto;
         let (key, is_async, computed) = if let Token::Ident(ref id) = start.token {
@@ -2582,7 +2583,7 @@ where
     }
 
     fn parse_template_literal(&mut self) -> Res<node::TemplateLiteral> {
-        debug!(target: "resp:debug", "parse_template_literal {}", self.context.allow_yield);
+        debug!("parse_template_literal");
         if !self.look_ahead.is_template_head() {
             return self
                 .expected_token_error(&self.look_ahead, &["template head", "template no sub"]);
@@ -2605,7 +2606,7 @@ where
     }
 
     fn parse_template_element(&mut self) -> Res<node::TemplateElement> {
-        debug!(target: "resp:debug", "parse_template_element {}", self.context.allow_yield);
+        debug!("parse_template_element");
         if let Token::Template(t) = self.next_item()?.token {
             let (raw, cooked, tail) = match t {
                 Template::Head(cooked) => (format!("`{}${{", cooked), cooked, false),
@@ -2620,7 +2621,7 @@ where
     }
 
     fn parse_function_expr(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_function_expr");
+        debug!("parse_function_expr");
         let is_async = self.at_contextual_keyword("async");
         if is_async {
             let _ = self.next_item()?;
@@ -2682,7 +2683,7 @@ where
     }
 
     fn parse_fn_name(&mut self, is_gen: bool) -> Res<node::Identifier> {
-        debug!(target: "resp:debug", "parse_fn_name {}", self.context.allow_yield);
+        debug!("parse_fn_name");
         if self.context.strict && !is_gen && self.at_keyword(Keyword::Yield) {
             self.parse_ident_name()
         } else {
@@ -2691,7 +2692,7 @@ where
     }
 
     fn parse_ident_name(&mut self) -> Res<node::Identifier> {
-        debug!(target: "resp:debug", "parse_ident_name {}", self.context.allow_yield);
+        debug!("parse_ident_name");
         let ident = self.next_item()?;
         match ident.token {
             Token::Ident(i) => Ok(i.to_string()),
@@ -2703,7 +2704,7 @@ where
     }
 
     fn parse_var_ident(&mut self, is_var: bool) -> Res<node::Identifier> {
-        debug!(target: "resp:debug", "parse_var_ident {}", self.context.allow_yield);
+        debug!("parse_var_ident");
         let ident = self.next_item()?;
         if ident.token.matches_keyword(Keyword::Yield) {
             if self.context.strict || !self.context.allow_yield {
@@ -2729,7 +2730,7 @@ where
     }
 
     fn parse_formal_params(&mut self) -> Res<FormalParams> {
-        debug!(target: "resp:debug", "parse_formal_params {}", self.context.allow_yield);
+        debug!("parse_formal_params");
         self.expect_punct(Punct::OpenParen)?;
         let mut args = vec![];
         let mut simple: bool = true;
@@ -2760,7 +2761,7 @@ where
     }
 
     fn parse_formal_param(&mut self, simple: bool) -> Res<(bool, bool, node::FunctionArg)> {
-        debug!(target: "resp:debug", "parse_formal_param {}", self.context.allow_yield);
+        debug!("parse_formal_param");
         let mut params: Vec<Item> = Vec::new();
         let (found_restricted, param) = if self.at_punct(Punct::Spread) {
             let (found_restricted, pat) = self.parse_rest_element(&mut params)?;
@@ -2774,7 +2775,7 @@ where
     }
 
     fn parse_rest_element(&mut self, params: &mut Vec<Item>) -> Res<(bool, node::Pattern)> {
-        debug!(target: "resp:debug", "parse_rest_element {}", self.context.allow_yield);
+        debug!("parse_rest_element");
         self.expect_punct(Punct::Spread)?;
         let (restricted, arg) = self.parse_pattern(None, params)?;
         if self.at_punct(Punct::Assign) {
@@ -2787,13 +2788,13 @@ where
     }
 
     fn parse_binding_rest_el(&mut self, params: &mut Vec<Item>) -> Res<(bool, node::Pattern)> {
-        debug!(target: "resp:debug", "parse_binding_rest_el {}", self.context.allow_yield);
+        debug!("parse_binding_rest_el");
         self.expect_punct(Punct::Spread)?;
         self.parse_pattern(None, params)
     }
 
     fn parse_pattern_with_default(&mut self, params: &mut Vec<Item>) -> Res<(bool, node::Pattern)> {
-        debug!(target: "resp:debug", "parse_pattern_with_default {}", self.context.allow_yield);
+        debug!("parse_pattern_with_default");
         let (is_restricted, ret) = self.parse_pattern(None, params)?;
         if self.at_punct(Punct::Assign) {
             let _assign = self.next_item()?;
@@ -2819,7 +2820,7 @@ where
         kind: Option<node::VariableKind>,
         params: &mut Vec<Item>,
     ) -> Res<(bool, node::Pattern)> {
-        debug!(target: "resp:debug", "parse_pattern {}", self.context.allow_yield);
+        debug!("parse_pattern");
         if self.at_punct(Punct::OpenBracket) {
             let kind = kind.unwrap_or(node::VariableKind::Var);
             self.parse_array_pattern(params, kind)
@@ -2851,7 +2852,7 @@ where
         params: &mut Vec<Item>,
         _kind: node::VariableKind,
     ) -> Res<(bool, node::Pattern)> {
-        debug!(target: "resp:debug", "parse_array_pattern {}", self.context.allow_yield);
+        debug!("parse_array_pattern");
         self.expect_punct(Punct::OpenBracket)?;
         let mut elements = vec![];
         while !self.at_punct(Punct::CloseBracket) {
@@ -2877,7 +2878,7 @@ where
     }
 
     fn parse_object_pattern(&mut self) -> Res<(bool, node::Pattern)> {
-        debug!(target: "resp:debug", "parse_object_pattern {}", self.context.allow_yield);
+        debug!("parse_object_pattern");
         self.expect_punct(Punct::OpenBrace)?;
         let mut body = vec![];
         while !self.at_punct(Punct::CloseBrace) {
@@ -2896,7 +2897,7 @@ where
     }
 
     fn parse_rest_prop(&mut self) -> Res<node::ObjectPatternPart> {
-        debug!(target: "resp:debug", "parse_rest_prop {}", self.context.allow_yield);
+        debug!("parse_rest_prop");
         self.expect_punct(Punct::Spread)?;
         let (_, arg) = self.parse_pattern(None, &mut vec![])?;
         if self.at_punct(Punct::Assign) {
@@ -2911,7 +2912,7 @@ where
     }
 
     fn parse_property_pattern(&mut self) -> Res<node::ObjectPatternPart> {
-        debug!(target: "resp:debug", "parse_property_pattern {}", self.context.allow_yield);
+        debug!("parse_property_pattern");
         let mut computed = false;
         let mut short_hand = false;
         let method = false;
@@ -2950,7 +2951,7 @@ where
     }
 
     fn parse_assignment_expr(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_assignment_expr {}", self.context.allow_yield);
+        debug!("parse_assignment_expr");
         if !self.context.allow_yield && self.at_keyword(Keyword::Yield) {
             return self.parse_yield_expr();
         } else {
@@ -2967,7 +2968,7 @@ where
                 let arg = node::FunctionArg::Pattern(arg);
                 current = node::Expression::ArrowParamPlaceHolder(vec![arg], true);
             }
-            debug!(target: "resp:debug", "current expression: {:?} {}", current, self.context.allow_yield);
+            debug!("current expression: {:?} {}", current, self.context.allow_yield);
             if current.is_arrow_param_placeholder() || self.at_punct(Punct::FatArrow) {
                 self.context.is_assignment_target = false;
                 self.context.is_binding_element = false;
@@ -3152,7 +3153,7 @@ where
     }
 
     fn reinterpret_expr_as_pat(&self, ex: node::Expression) -> Res<node::Pattern> {
-        debug!(target: "resp:debug", "reinterpret_expr_as_pat {}", self.context.allow_yield);
+        debug!("reinterpret_expr_as_pat");
         match ex {
             node::Expression::Array(a) => {
                 let mut patts = vec![];
@@ -3201,7 +3202,7 @@ where
     }
 
     fn parse_yield_expr(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_yield_expr {}", self.context.allow_yield);
+        debug!("parse_yield_expr");
         self.expect_keyword(Keyword::Yield)?;
         let mut arg: Option<Box<node::Expression>> = None;
         let mut delegate = false;
@@ -3225,7 +3226,7 @@ where
     }
 
     fn parse_conditional_expr(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_conditional_expr {}", self.context.allow_yield);
+        debug!("parse_conditional_expr");
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let expr = self.parse_binary_expression()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
@@ -3256,40 +3257,40 @@ where
     }
 
     fn parse_binary_expression(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_binary_expression {}", self.context.allow_yield);
+        debug!("parse_binary_expression");
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let mut current = self.parse_exponentiation_expression()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
         let token = self.look_ahead.clone();
         let mut prec = self.bin_precedence(&token.token);
         if prec > 0 {
-            debug!(target: "resp:debug", "prec: {} > 0 {}", prec, self.context.allow_yield);
+            debug!("prec: {} > 0 {}", prec, self.context.allow_yield);
             self.next_item()?;
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let mut left = current.clone();
-            debug!(target: "resp:debug", "left: {:#?} {}", left, self.context.allow_yield);
+            debug!("left: {:#?} {}", left, self.context.allow_yield);
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let mut right = self.parse_exponentiation_expression()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-            debug!(target: "resp:debug", "right: {:#?} {}", right, self.context.allow_yield);
+            debug!("right: {:#?} {}", right, self.context.allow_yield);
             let mut stack = vec![left.clone(), right.clone()];
             let mut ops = vec![token.token.clone()];
             let mut precs = vec![prec];
             loop {
                 prec = self.bin_precedence(&self.look_ahead.token);
-                debug!(target: "resp:debug", "prec: {} > 0 {}", prec, self.context.allow_yield);
+                debug!("prec: {} > 0 {}", prec, self.context.allow_yield);
                 if prec <= 0 {
                     break;
                 }
-                debug!(target: "resp:debug", "shifting, stack: {}, ops: {}, last_prec: {} {}", stack.len(), ops.len(), precs[precs.len() - 1], self.context.allow_yield);
+                debug!("shifting, stack: {}, ops: {}, last_prec: {} {}", stack.len(), ops.len(), precs[precs.len() - 1], self.context.allow_yield);
                 while stack.len() > 1 && ops.len() > 0 && prec <= precs[precs.len() - 1] {
                     right = stack
                         .pop()
                         .ok_or(self.op_error("invalid binary operation, no right expr in stack"))?;
-                    debug!(target: "resp:debug", "right: {:#?} {}", right, self.context.allow_yield);
+                    debug!("right: {:#?} {}", right, self.context.allow_yield);
                     let op = ops
                         .pop()
                         .ok_or(self.op_error("invalid binary operation, too few operators"))?;
@@ -3297,7 +3298,7 @@ where
                     left = stack
                         .pop()
                         .ok_or(self.op_error("invalid binary operation, no left expr in stack"))?;
-                    debug!(target: "resp:debug", "left: {:#?} {}", left, self.context.allow_yield);
+                    debug!("left: {:#?} {}", left, self.context.allow_yield);
                     if op.matches_punct(Punct::LogicalAnd) || op.matches_punct(Punct::LogicalOr) {
                         stack.push(node::Expression::Logical(node::LogicalExpression {
                             operator: node::LogicalOperator::from_token(&op)
@@ -3357,7 +3358,7 @@ where
     }
 
     fn parse_exponentiation_expression(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_exponentiation_expression {}", self.context.allow_yield);
+        debug!("parse_exponentiation_expression");
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let expr = self.parse_unary_expression()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
@@ -3380,7 +3381,7 @@ where
     }
 
     fn parse_unary_expression(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_unary_expression {}", self.context.allow_yield);
+        debug!("parse_unary_expression");
         if self.at_punct(Punct::Plus)
             || self.at_punct(Punct::Minus)
             || self.at_punct(Punct::BitwiseNot)
@@ -3415,14 +3416,14 @@ where
     }
 
     fn parse_await_expr(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_await_expr {}", self.context.allow_yield);
+        debug!("parse_await_expr");
         let _await = self.next_item()?;
         let arg = self.parse_unary_expression()?;
         Ok(node::Expression::Await(Box::new(arg)))
     }
 
     fn parse_update_expr(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_update_expr {}", self.context.allow_yield);
+        debug!("parse_update_expr");
         let start = self.look_ahead.clone();
         if self.at_punct(Punct::Increment) || self.at_punct(Punct::Decrement) {
             let op = self.next_item()?;
@@ -3568,7 +3569,7 @@ where
     }
 
     fn parse_left_hand_side_expr_allow_call(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_left_hand_side_expr_allow_call {}", self.context.allow_yield);
+        debug!("parse_left_hand_side_expr_allow_call");
         let start_pos = self.get_item_position(&self.look_ahead);
         let is_async = self.at_contextual_keyword("async");
         let prev_in = self.context.allow_in;
@@ -3658,7 +3659,7 @@ where
     }
     /// Parse the arguments of an async function
     fn parse_async_args(&mut self) -> Res<Vec<node::Expression>> {
-        debug!(target: "resp:debug", "parse_async_args {}", self.context.allow_yield);
+        debug!("parse_async_args");
         self.expect_punct(Punct::OpenParen)?;
         let mut ret = vec![];
         if !self.at_punct(Punct::CloseParen) {
@@ -3687,7 +3688,7 @@ where
     /// Parse an argument of an async function
     /// note: not sure this is needed
     fn parse_async_arg(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_async_arg {}", self.context.allow_yield);
+        debug!("parse_async_arg");
         let expr = self.parse_assignment_expr()?;
         self.context.first_covert_initialized_name_error = None;
         Ok(expr)
@@ -3696,7 +3697,7 @@ where
     /// if parsing with tolerance we can tolerate
     /// a non-existent comma
     fn expect_comma_sep(&mut self) -> Res<()> {
-        debug!(target: "resp:debug", "expect_comma_sep {}", self.context.allow_yield);
+        debug!("expect_comma_sep");
         if self.config.tolerant {
             if self.at_punct(Punct::Comma) {
                 let _ = self.next_item()?;
@@ -3715,7 +3716,7 @@ where
 
     /// Parse an expression preceded by the `...` operator
     fn parse_spread_element(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_spread_element {}", self.context.allow_yield);
+        debug!("parse_spread_element");
         self.expect_punct(Punct::Spread)?;
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let arg = self.parse_assignment_expr()?;
@@ -3724,7 +3725,7 @@ where
     }
     /// Parse function arguments, expecting to open with `(` and close with `)`
     fn parse_args(&mut self) -> Res<Vec<node::Expression>> {
-        debug!(target: "resp:debug", "parse_args {}", self.context.allow_yield);
+        debug!("parse_args");
         self.expect_punct(Punct::OpenParen)?;
         let mut args = vec![];
         if !self.at_punct(Punct::CloseParen) {
@@ -3754,7 +3755,7 @@ where
     /// or `new.target`. The later is only valid in a function
     /// body
     fn parse_new_expr(&mut self) -> Res<node::Expression> {
-        debug!(target: "resp:debug", "parse_new_expr {}", self.context.allow_yield);
+        debug!("parse_new_expr");
         self.expect_keyword(Keyword::New)?;
         if self.at_punct(Punct::Period) {
             let _ = self.next_item()?;
@@ -3849,7 +3850,7 @@ where
     /// Get the context state in order to isolate this state from the
     /// following operation
     fn isolate_cover_grammar(&mut self) -> (bool, bool, Option<Item>) {
-        debug!(target: "resp:debug", "isolate_cover_grammar {}", self.context.allow_yield);
+        debug!("isolate_cover_grammar");
         let ret = self.get_cover_grammar_state();
         self.context.is_binding_element = true;
         self.context.is_assignment_target = true;
@@ -3881,7 +3882,7 @@ where
     /// Capture the context state for a binding_element, assignment and
     /// first_covert_initialized_name
     fn inherit_cover_grammar(&mut self) -> (bool, bool, Option<Item>) {
-        trace!(target: "resp:debug", "inherit_cover_grammar");
+        trace!("inherit_cover_grammar");
         let ret = self.get_cover_grammar_state();
         self.context.is_binding_element = true;
         self.context.is_assignment_target = true;
@@ -3896,7 +3897,9 @@ where
         loop {
             self.context.has_line_term = self.scanner.pending_new_line;
             if let Some(look_ahead) = self.scanner.next() {
-                self._look_ahead = format!("{:?}", look_ahead.token);
+                if cfg!(feature = "debug_look_ahead") {
+                    self._look_ahead = format!("{:?}", look_ahead.token);
+                }
                 if look_ahead.token.is_comment() {
                     self.comment_handler.handle_comment(look_ahead);
                     continue;
@@ -3954,7 +3957,7 @@ where
     }
 
     fn at_import_call(&mut self) -> bool {
-        debug!(target: "resp:debug", "at_import_call {}", self.context.allow_yield);
+        debug!("at_import_call");
         if self.at_keyword(Keyword::Import) {
             let state = self.scanner.get_state();
             self.scanner.skip_comments();
