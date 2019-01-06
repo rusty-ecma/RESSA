@@ -1,11 +1,13 @@
 use ress;
 
 #[derive(PartialEq, Debug)]
+#[doc(hidden)]
 pub struct Node {
     pub position: Position,
     pub item: Item,
 }
 #[derive(PartialEq, Debug, Clone, Copy)]
+/// A position in a file
 pub struct Position {
     pub line: usize,
     pub column: usize,
@@ -24,6 +26,7 @@ impl Position {
 }
 
 #[derive(PartialEq, Debug)]
+#[doc(hidden)]
 pub enum Item {
     Program(Program),
     Function(Function),
@@ -272,7 +275,7 @@ impl ImportSpecifier {
         ImportSpecifier::Namespace(ident.to_string())
     }
 }
-
+/// Something exported from this module
 #[derive(PartialEq, Debug, Clone)]
 pub enum ModuleExport {
     /// ```js
@@ -297,18 +300,32 @@ pub enum ModuleExport {
     /// ```
     All(Literal),
 }
-
+/// An export that has a name
+/// ```js
+/// export function thing() {}
+/// export {stuff} from 'place';
 #[derive(PartialEq, Debug, Clone)]
 pub enum NamedExportDecl {
     Decl(Declaration),
     Specifier(Vec<ExportSpecifier>, Option<Literal>),
 }
-
+/// A default export
+/// ```js
+/// export default class Thing {}
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub enum DefaultExportDecl {
     Decl(Declaration),
     Expr(Expression),
 }
+/// The name of the thing being exported
+/// this might include an alias
+/// ```js
+/// //no-alias
+/// export {Thing} from 'place';
+/// //aliased
+/// export {Stuff as NewThing} from 'place'
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct ExportSpecifier {
     pub local: Identifier,
@@ -330,16 +347,39 @@ impl ExportSpecifier {
         }
     }
 }
-
+/// The declaration of a variable, function, class, import or export
 #[derive(PartialEq, Debug, Clone)]
 pub enum Declaration {
+    /// A variable declaration
+    /// ```js
+    /// var x, b;
+    /// let y, a = 0;
+    /// const q = 100
+    /// ```
     Variable(VariableKind, Vec<VariableDecl>),
+    /// A function declaration
+    /// ```js
+    /// function thing() {}
+    /// ```
     Function(Function),
+    /// A class declaration
+    /// ```js
+    /// class Thing {}
+    /// ```
     Class(Class),
+    /// An import declaration
+    /// ```js
+    /// import * as moment from 'moment';
+    /// import Thing, {thing} from 'stuff';
+    /// ```
     Import(Box<ModuleImport>),
+    /// An export declaration
+    /// ```
+    /// export function thing() {}
+    /// ```
     Export(Box<ModuleExport>),
 }
-
+/// The identifier and optional value of a variable declaration
 #[derive(PartialEq, Debug, Clone)]
 pub struct VariableDecl {
     pub id: Pattern,
@@ -411,7 +451,7 @@ impl VariableDecl {
         Self { id, init }
     }
 }
-
+/// The kind of variable being defined (`var`/`let`/`const`)
 #[derive(PartialEq, Clone, Debug, Copy)]
 pub enum VariableKind {
     Var,
@@ -428,27 +468,171 @@ impl ToString for VariableKind {
         }
     }
 }
-
+/// A slightly more granular part of an es program than ProgramPart
 #[derive(PartialEq, Debug, Clone)]
 pub enum Statement {
+    /// Any expression
     Expr(Expression),
+    /// A collection of program parts wrapped in curly braces
     Block(BlockStatement),
+    /// A single semi-colon
     Empty,
+    /// The contextual keyword `debugger`
     Debugger,
+    /// A with statement, this puts one object at the top of
+    /// the identifier search tree.
+    /// > note: this cannot be used in a strict context
+    /// ```js
+    /// function random() {
+    ///     return 0;
+    /// }
+    /// let rand;
+    /// with (Math) {
+    ///     rand = floor(random() * 100) + 1;
+    /// }
+    /// //rand !== 0
+    /// ```
     With(WithStatement),
+    /// A return statement
+    /// ```js
+    /// function thing() {
+    ///     return 'stuff';
+    /// }
+    /// function stuff() {
+    ///     return;
+    /// }
     Return(Option<Expression>),
+    /// A labeled statement
+    /// ```js
+    /// label: {
+    ///     break label;
+    /// }
+    /// ```
     Labeled(LabeledStatement),
+    /// A break statement
+    /// ```js
+    /// label: {
+    ///     break label;
+    /// }
+    /// while (true) {
+    ///     break;
+    /// }
+    /// ```
     Break(Option<Identifier>),
+    /// A short circuit continuation of a loop
+    /// ```js
+    /// label: while (true) {
+    ///     if (Math.floor(Math.random() * 100) > 50) {
+    ///         continue;
+    ///     } else {
+    ///         console.log('too low')
+    ///     }
+    /// }
+    /// ```
     Continue(Option<Identifier>),
+    /// An if statement
+    /// ```js
+    /// if (1 < 2) {
+    ///     console.log('Always true');
+    /// } else {
+    ///     console.log('Never true');
+    /// }
+    /// ```
     If(IfStatement),
+    /// A switch statement
+    /// ```js
+    /// switch (Math.floor(Math.random()) * 10) {
+    ///     case 1:
+    ///
+    ///     break;
+    ///     case 2:
+    ///     case 3:
+    ///     case 4:
+    ///         return false;
+    ///     default:
+    ///         return true;
+    /// }
+    /// ```
     Switch(SwitchStatement),
+    /// A statement that throws an error
+    /// ```js
+    /// function error() {
+    ///     throw 'hahahaha';
+    /// }
+    ///
+    /// function newError() {
+    ///     throw new Error('hohoho');
+    /// }
+    /// ```
     Throw(Expression),
+    /// A try/catch block
+    /// ```js
+    /// try {
+    ///
+    /// } catch (e) {
+    ///
+    /// } finally {
+    ///
+    /// }
+    /// ```
     Try(TryStatement),
+    /// A while loop
+    /// ```js
+    /// while (false) {
+    ///
+    /// }
+    /// var i = 0;
+    /// while (i < 100) {
+    ///     if (Math.floor(Math.random() * 100) > 50) {
+    ///         i--;
+    ///     } else {
+    ///         i += 5;
+    ///     }
+    /// }
+    /// ```
     While(WhileStatement),
+    /// A while loop that executes its body first
+    /// ```js
+    /// do {
+    ///     console.log('at least once')
+    /// } while (Math.floor(Math.random() * 100) < 75)
+    /// ```
     DoWhile(DoWhileStatement),
+    /// A "c-style" for loop
+    /// ```js
+    /// for (var i = 0; i < 100; i++) console.log(i);
+    /// for (;;) {
+    ///     console.log('forever!');
+    /// }
+    /// ```
     For(ForStatement),
+    /// A for in statement, this kind of for statement
+    /// will extract each key from an indexable thing
+    /// ```js
+    /// for (var i in [2,3,4,5,6]) {
+    ///     console.log(i);
+    /// }
+    /// //prints 0, 1, 2, 3, 4
+    /// for (var k in {a: 'b', c: 'd'}) {
+    ///     console.log(k);
+    /// }
+    /// //prints a, b
+    /// ```
     ForIn(ForInStatement),
+    /// A for of statement, this kind of for statement
+    /// will extract the value from a generator or iterator
+    /// ```js
+    /// for (var k of [2, 3, 4, 5, 6]) {
+    ///     console.log(k);
+    /// }
+    /// //prints 2, 3, 4, 5, 6
+    /// ```
     ForOf(ForOfStatement),
+    /// A var statement
+    /// ```js
+    /// var x;
+    /// var x, y = 'huh?';
+    /// ```
     Var(Vec<VariableDecl>),
 }
 
@@ -463,7 +647,19 @@ impl Statement {
         Statement::If(IfStatement::new(test, consequent, alt))
     }
 }
-
+/// A with statement, this puts one object at the top of
+/// the identifier search tree.
+/// > note: this cannot be used in a strict context
+/// ```js
+/// function random() {
+///     return 0;
+/// }
+/// let rand;
+/// with (Math) {
+///     rand = floor(random() * 100) + 1;
+/// }
+/// //rand !== 0
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct WithStatement {
     pub object: Expression,
@@ -478,7 +674,15 @@ impl WithStatement {
         }
     }
 }
-
+/// A break statement
+/// ```js
+/// label: {
+///     break label;
+/// }
+/// while (true) {
+///     break;
+/// }
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct LabeledStatement {
     pub label: Identifier,
@@ -493,7 +697,14 @@ impl LabeledStatement {
         }
     }
 }
-
+/// An if statement
+/// ```js
+/// if (1 < 2) {
+///     console.log('Always true');
+/// } else {
+///     console.log('Never true');
+/// }
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct IfStatement {
     pub test: Expression,
@@ -513,27 +724,63 @@ impl IfStatement {
         }
     }
 }
-
+/// A switch statement
+/// ```js
+/// switch (Math.floor(Math.random()) * 10) {
+///     case 1:
+///
+///     break;
+///     case 2:
+///     case 3:
+///     case 4:
+///         return false;
+///     default:
+///         return true;
+/// }
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct SwitchStatement {
     pub discriminant: Expression,
     pub cases: Vec<SwitchCase>,
 }
-
+/// A collection of program parts wrapped in curly braces
 pub type BlockStatement = Vec<ProgramPart>;
+/// A try/catch block
+/// ```js
+/// try {
+///
+/// } catch (e) {
+///
+/// } finally {
+///
+/// }
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct TryStatement {
     pub block: BlockStatement,
     pub handler: Option<CatchClause>,
     pub finalizer: Option<BlockStatement>,
 }
-
+/// The error handling part of a `TryStatement`
 #[derive(PartialEq, Debug, Clone)]
 pub struct CatchClause {
     pub param: Pattern,
     pub body: BlockStatement,
 }
-
+/// A while loop
+/// ```js
+/// while (false) {
+///
+/// }
+/// var i = 0;
+/// while (i < 100) {
+///     if (Math.floor(Math.random() * 100) > 50) {
+///         i--;
+///     } else {
+///         i += 5;
+///     }
+/// }
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct WhileStatement {
     pub test: Expression,
@@ -548,7 +795,12 @@ impl WhileStatement {
         }
     }
 }
-
+/// A while loop that executes its body first
+/// ```js
+/// do {
+///     console.log('at least once')
+/// } while (Math.floor(Math.random() * 100) < 75)
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct DoWhileStatement {
     pub test: Expression,
@@ -563,7 +815,13 @@ impl DoWhileStatement {
         }
     }
 }
-
+/// A "c-style" for loop
+/// ```js
+/// for (var i = 0; i < 100; i++) console.log(i);
+/// for (;;) {
+///     console.log('forever!');
+/// }
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct ForStatement {
     pub init: Option<LoopInit>,
@@ -595,13 +853,27 @@ impl ForStatement {
         Self::new(None, None, None, body)
     }
 }
-
+/// The left most triple of a for loops parenthetical
+/// ```js
+///  //  vvvvvvvvv
+/// for (var i = 0;i < 100; i++)
 #[derive(PartialEq, Debug, Clone)]
 pub enum LoopInit {
     Variable(Vec<VariableDecl>),
     Expr(Expression),
 }
-
+/// A for in statement, this kind of for statement
+/// will extract each key from an indexable thing
+/// ```js
+/// for (var i in [2,3,4,5,6]) {
+///     console.log(i);
+/// }
+/// //prints 0, 1, 2, 3, 4
+/// for (var k in {a: 'b', c: 'd'}) {
+///     console.log(k);
+/// }
+/// //prints a, b
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct ForInStatement {
     pub left: LoopLeft,
@@ -618,7 +890,14 @@ impl ForInStatement {
         }
     }
 }
-
+/// A for of statement, this kind of for statement
+/// will extract the value from a generator or iterator
+/// ```js
+/// for (var k of [2, 3, 4, 5, 6]) {
+///     console.log(k);
+/// }
+/// //prints 2, 3, 4, 5, 6
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct ForOfStatement {
     pub left: LoopLeft,
@@ -637,14 +916,25 @@ impl ForOfStatement {
         }
     }
 }
-
+/// The values on the left hand side of the keyword
+/// in a for in or for of loop
 #[derive(PartialEq, Debug, Clone)]
 pub enum LoopLeft {
     Variable(VariableDecl),
     Pattern(Pattern),
 }
+/// A variable, class, or function name
 pub type Identifier = String;
-
+/// A function, this will be part of either a function
+/// declaration (ID is required) or a function expression
+/// (ID is optional)
+/// ```js
+/// //function declaration
+/// function thing() {}
+/// //function expressions
+/// var x = function() {}
+/// let y = function q() {}
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct Function {
     pub id: Option<String>,
@@ -653,6 +943,7 @@ pub struct Function {
     pub generator: bool,
     pub is_async: bool,
 }
+/// A single function argument from a function signature
 #[derive(PartialEq, Debug, Clone)]
 pub enum FunctionArg {
     Expr(Expression),
@@ -724,9 +1015,10 @@ impl FunctionArg {
         FunctionArg::Pattern(Pattern::ident(name))
     }
 }
-
+/// The block statement that makes up the function's body
 pub type FunctionBody = Vec<ProgramPart>;
-
+/// pretty much always `'use strict'`, this can appear at the
+/// top of a file or function
 #[derive(PartialEq, Debug, Clone)]
 pub struct Directive {
     pub expression: Literal,
@@ -743,14 +1035,31 @@ impl Directive {
         }
     }
 }
-
+/// A literal value
 #[derive(PartialEq, Debug, Clone)]
 pub enum Literal {
+    /// `null`
     Null,
+    /// `"string"`
+    /// `'string'`
     String(String),
+    /// `0`
+    /// `0.0`
+    /// `.0`
+    /// `0.0e1`
+    /// `.0E1`
+    /// `0xf`
+    /// `0o7`
+    /// `0b1`
     Number(String),
+    /// `true`
+    /// `false`
     Boolean(bool),
+    /// `/.+/g`
     RegEx(RegEx),
+    /// ```js
+    /// `I have ${0} apples`
+    /// ```
     Template(TemplateLiteral),
 }
 
@@ -804,7 +1113,7 @@ impl Literal {
         }
     }
 }
-
+/// A regular expression literal
 #[derive(PartialEq, Debug, Clone)]
 pub struct RegEx {
     pub pattern: String,
@@ -836,39 +1145,94 @@ impl RegEx {
         }
     }
 }
-
+/// A single case part of a switch statement
 #[derive(PartialEq, Debug, Clone)]
 pub struct SwitchCase {
     pub test: Option<Expression>,
     pub consequent: Vec<ProgramPart>,
 }
-
+/// A slightly more granular program part that a statement
 #[derive(PartialEq, Debug, Clone)]
 pub enum Expression {
+    /// `this`
     ThisExpression,
+    /// `super`
     SuperExpression,
+    /// `[0,,]`
     Array(ArrayExpression),
+    /// `{}`
     Object(ObjectExpression),
+    /// see `Function`
     Function(Function),
+    /// An operation that has one argument
+    /// ```js
+    /// typeof 'a';
+    /// +9;
+    /// ```
     Unary(UnaryExpression),
+    /// Increment or decrement
+    /// ```js
+    /// 1++
+    /// --2
+    /// ```
     Update(UpdateExpression),
+    /// An operation that has two arguments
     Binary(BinaryExpression),
+    /// Assignment or update assignment
+    /// ```js
+    /// a = 0
+    /// b += 1
+    /// ```
     Assignment(AssignmentExpression),
+    /// A specialized `BinaryExpression` for logical evaluation
+    /// ```js
+    /// true && true
+    /// false || true
+    /// ```
     Logical(LogicalExpression),
+    /// Accessing the member of a value
+    /// ```js
+    /// b['thing'];
+    /// c.stuff;
+    /// ```
     Member(MemberExpression),
+    /// A ternery expression
+    /// ```js
+    /// var a = true ? 'stuff' : 'things';
+    /// ```
     Conditional(ConditionalExpression),
+    /// Calling a function or method
     Call(CallExpression),
+    /// Calling a constructor
     New(NewExpression),
+    /// Any sequence of expressions seperated with a comma
     Sequence(SequenceExpression),
+    /// `...` followed by another `Expression`
     Spread(Box<Expression>),
+    /// An arrow function
+    /// ```js
+    /// () => console.log();
+    /// x => {
+    ///     return x;
+    /// }
+    /// ```
     ArrowFunction(ArrowFunctionExpression),
+    /// yield a value from inside of a generator function
     Yield(YieldExpression),
+    /// A class expression see `Class`
     Class(Class),
+    /// currently just `new.target`
     MetaProperty(MetaProperty),
+    /// The `await` keyword followed by another `Expression`
     Await(Box<Expression>),
+    /// An identifier
     Ident(Identifier),
+    /// Used for resolving possible sequence exressions
+    /// that are arrow parameters
     ArrowParamPlaceHolder(Vec<FunctionArg>, bool),
+    /// A literal value, see `Literal`
     Literal(Literal),
+    /// A template literal preceded by a tag function identifier
     TaggedTemplate(TaggedTemplateExpression),
 }
 
@@ -981,9 +1345,11 @@ impl Expression {
         Expression::Yield(YieldExpression::new(None, delegate))
     }
 }
-
+/// `[a, b, c]`
 pub type ArrayExpression = Vec<Option<Expression>>;
+/// `{a: 'b', c, ...d}`
 pub type ObjectExpression = Vec<ObjectProperty>;
+/// A single part of an object literal
 #[derive(PartialEq, Debug, Clone)]
 pub enum ObjectProperty {
     Property(Property),
@@ -1003,6 +1369,8 @@ impl ObjectProperty {
         ObjectProperty::Property(Property::number(key, value))
     }
 }
+
+/// A single part of an object literal or class
 #[derive(PartialEq, Debug, Clone)]
 pub struct Property {
     pub key: PropertyKey,
@@ -1036,7 +1404,7 @@ impl Property {
         }
     }
 }
-
+/// An object literal or class property identifier
 #[derive(PartialEq, Debug, Clone)]
 pub enum PropertyKey {
     Literal(Literal),
@@ -1073,7 +1441,7 @@ impl PropertyKey {
         }
     }
 }
-
+/// The value of an object literal or class property
 #[derive(PartialEq, Debug, Clone)]
 pub enum PropertyValue {
     Expr(Expression),
@@ -1106,14 +1474,22 @@ impl Property {
         }
     }
 }
+/// A flag for determining what kind of property
 #[derive(PartialEq, Debug, Clone)]
 pub enum PropertyKind {
+    /// A property with a value
     Init,
+    /// A method with the get keyword
     Get,
+    /// A method with the set keyword
     Set,
+    /// A constructor
     Ctor,
+    /// A standard method
     Method,
 }
+/// All of the different ways you can declare an identifier
+/// and/or value
 #[derive(PartialEq, Debug, Clone)]
 pub enum Pattern {
     Identifier(Identifier),
@@ -1167,8 +1543,9 @@ impl Pattern {
         Pattern::RestElement(Box::new(arg))
     }
 }
-
+/// similar to an `ObjectExpression`
 pub type ObjectPattern = Vec<ObjectPatternPart>;
+/// A single part of an ObjectPattern
 #[derive(PartialEq, Debug, Clone)]
 pub enum ObjectPatternPart {
     Assignment(Property),
@@ -1188,7 +1565,7 @@ impl ObjectPatternPart {
         ObjectPatternPart::Assignment(Property::number(key, value))
     }
 }
-
+/// An assignment as a pattern
 #[derive(PartialEq, Debug, Clone)]
 pub struct AssignmentPattern {
     pub left: Box<Pattern>,
@@ -1203,7 +1580,7 @@ impl AssignmentPattern {
         }
     }
 }
-
+/// An operation that takes one argument
 #[derive(PartialEq, Debug, Clone)]
 pub struct UnaryExpression {
     pub operator: UnaryOperator,
@@ -1228,7 +1605,8 @@ impl UnaryExpression {
         self.argument.is_ident()
     }
 }
-
+/// The allowed operators for an expression
+/// to be `Unary`
 #[derive(PartialEq, Debug, Clone)]
 pub enum UnaryOperator {
     Minus,
@@ -1260,7 +1638,7 @@ impl UnaryOperator {
         }
     }
 }
-
+/// Increment or decrementing a value
 #[derive(PartialEq, Debug, Clone)]
 pub struct UpdateExpression {
     pub operator: UpdateOperator,
@@ -1277,13 +1655,13 @@ impl UpdateExpression {
         }
     }
 }
-
+/// `++` or `--`
 #[derive(PartialEq, Debug, Clone)]
 pub enum UpdateOperator {
     Increment,
     Decrement,
 }
-
+/// An operation that requires 2 arguments
 #[derive(PartialEq, Debug, Clone)]
 pub struct BinaryExpression {
     pub operator: BinaryOperator,
@@ -1300,7 +1678,7 @@ impl BinaryExpression {
         }
     }
 }
-
+/// The available operations for `Binary` expressions
 #[derive(PartialEq, Debug, Clone)]
 pub enum BinaryOperator {
     Equal,
@@ -1361,7 +1739,7 @@ impl BinaryOperator {
         }
     }
 }
-
+/// An assignment or update + assignment operation
 #[derive(PartialEq, Debug, Clone)]
 pub struct AssignmentExpression {
     pub operator: AssignmentOperator,
@@ -1378,7 +1756,7 @@ impl AssignmentExpression {
         }
     }
 }
-
+/// The value being assigned to
 #[derive(PartialEq, Debug, Clone)]
 pub enum AssignmentLeft {
     Pattern(Pattern),
@@ -1390,7 +1768,7 @@ impl AssignmentLeft {
         AssignmentLeft::Expr(Box::new(value))
     }
 }
-
+/// The available operators for assignment expressions
 #[derive(PartialEq, Debug, Clone)]
 pub enum AssignmentOperator {
     Equal,
@@ -1430,7 +1808,11 @@ impl AssignmentOperator {
         }
     }
 }
-
+/// A specialized `BinaryExpression` for logical evaluation
+/// ```js
+/// true && true
+/// false || true
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct LogicalExpression {
     pub operator: LogicalOperator,
@@ -1447,7 +1829,7 @@ impl LogicalExpression {
         }
     }
 }
-
+/// The available logical operators
 #[derive(PartialEq, Debug, Clone)]
 pub enum LogicalOperator {
     Or,
@@ -1466,7 +1848,11 @@ impl LogicalOperator {
         }
     }
 }
-
+/// Accessing the member of a value
+/// ```js
+/// b['thing'];
+/// c.stuff;
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct MemberExpression {
     pub object: Box<Expression>,
@@ -1483,7 +1869,10 @@ impl MemberExpression {
         }
     }
 }
-
+/// A ternery expression
+/// ```js
+/// var a = true ? 'stuff' : 'things';
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct ConditionalExpression {
     pub test: Box<Expression>,
@@ -1500,7 +1889,10 @@ impl ConditionalExpression {
         }
     }
 }
-
+/// Calling a function or method
+/// ```
+/// Math.random()
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct CallExpression {
     pub callee: Box<Expression>,
@@ -1515,7 +1907,10 @@ impl CallExpression {
         }
     }
 }
-
+/// Calling a constructor
+/// ```js
+/// new Uint8Array(32);
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct NewExpression {
     pub callee: Box<Expression>,
@@ -1530,9 +1925,15 @@ impl NewExpression {
         }
     }
 }
-
+/// A collection of `Expressions` seperated by commas
 pub type SequenceExpression = Vec<Expression>;
-
+/// An arrow function
+/// ```js
+/// let x = () => y;
+/// let q = x => {
+///     return x + 1;
+/// }
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct ArrowFunctionExpression {
     pub id: Option<String>,
@@ -1542,7 +1943,7 @@ pub struct ArrowFunctionExpression {
     pub generator: bool,
     pub is_async: bool,
 }
-
+/// The body portion of an arrow function can be either an expression or a block of statements
 #[derive(PartialEq, Debug, Clone)]
 pub enum ArrowFunctionBody {
     FunctionBody(FunctionBody),
@@ -1554,7 +1955,14 @@ impl ArrowFunctionBody {
         ArrowFunctionBody::Expr(Box::new(value))
     }
 }
-
+/// yield a value from inside of a generator function
+/// ```js
+/// function *gen() {
+///     while ((new Date() / 1000) < Number.MAX_VALUE) {
+///         yield new Date() / 1000;
+///     }
+/// }
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct YieldExpression {
     pub argument: Option<Box<Expression>>,
@@ -1572,7 +1980,8 @@ impl YieldExpression {
         }
     }
 }
-
+/// A Tempalte literal preceded by a function identifier
+/// see [MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#Tagged_templates) for more details
 #[derive(PartialEq, Debug, Clone)]
 pub struct TaggedTemplateExpression {
     pub tag: Box<Expression>,
@@ -1587,20 +1996,50 @@ impl TaggedTemplateExpression {
         }
     }
 }
-
+/// A template string literal
+/// ```js
+/// `I own ${0} birds`;
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct TemplateLiteral {
     pub quasis: Vec<TemplateElement>,
     pub expressions: Vec<Expression>,
 }
-
+/// The text part of a `TemplateLiteral`
 #[derive(PartialEq, Debug, Clone)]
 pub struct TemplateElement {
     pub tail: bool,
+    /// The non-quoted version
     pub cooked: String,
+    /// The quoted version
     pub raw: String,
 }
-
+/// A way to declare object templates
+/// ```js
+/// class Thing {
+///     constructor() {
+///         this._a = 0;
+///     }
+///     stuff() {
+///         return 'stuff'
+///     }
+///     set a(value) {
+///         if (value > 100) {
+///             this._a = 0;
+///         } else {
+///             this._a = value;
+///         }
+///     }
+///     get a() {
+///         return this._a;
+///     }
+/// }
+/// let y = class {
+///     constructor() {
+///         this.a = 100;
+///     }
+/// }
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct Class {
     pub id: Option<Identifier>,
@@ -1639,7 +2078,7 @@ impl Class {
         }
     }
 }
-
+#[doc(hidden)]
 #[derive(PartialEq, Debug, Clone)]
 pub struct MethodDef {
     pub key: Expression,
@@ -1702,13 +2141,23 @@ impl MethodDef {
 }
 
 #[derive(PartialEq, Debug, Clone)]
+#[doc(hidden)]
 pub enum MethodKind {
     Constructor,
     Method,
     Get,
     Set,
 }
-
+/// pretty much just `new.target`
+/// ```js
+/// function Thing(one, two) {
+///     if (!new.target) {
+///         return new Thing(one, two);
+///     }
+///     this.one = one;
+///     this.two = two;
+/// }
+/// ```
 #[derive(PartialEq, Debug, Clone)]
 pub struct MetaProperty {
     pub meta: Identifier,
