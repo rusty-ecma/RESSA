@@ -1660,7 +1660,7 @@ where
             } else {
                 None
             }
-        } else if in_for || self.at_punct(Punct::Assign) {
+        } else if (!in_for && !id.is_ident()) || self.at_punct(Punct::Assign) {
             self.expect_punct(Punct::Assign)?;
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let init = self.parse_assignment_expr()?;
@@ -3931,7 +3931,7 @@ where
     /// if it does
     fn expect_punct(&mut self, p: Punct) -> Res<()> {
         let next = self.next_item()?;
-        if !next.token.matches_punct_str(&p.to_string()) {
+        if !next.token.matches_punct(p) {
             return self.expected_token_error(&next, &[&format!("{:?}", p)]);
         }
         Ok(())
@@ -3941,7 +3941,7 @@ where
     /// if it does
     fn expect_keyword(&mut self, k: Keyword) -> Res<()> {
         let next = self.next_item()?;
-        if !next.token.matches_keyword_str(&k.to_string()) {
+        if !next.token.matches_keyword(k) {
             return self.expected_token_error(&next, &[&format!("{:?}", k)]);
         }
         Ok(())

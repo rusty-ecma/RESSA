@@ -374,7 +374,7 @@ pub enum Declaration {
     /// ```
     Import(Box<ModuleImport>),
     /// An export declaration
-    /// ```
+    /// ```js
     /// export function thing() {}
     /// ```
     Export(Box<ModuleExport>),
@@ -1890,7 +1890,7 @@ impl ConditionalExpression {
     }
 }
 /// Calling a function or method
-/// ```
+/// ```js
 /// Math.random()
 /// ```
 #[derive(PartialEq, Debug, Clone)]

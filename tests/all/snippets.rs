@@ -462,8 +462,32 @@ fn obj_pattern() {
 }
 
 #[test]
+fn loop_decl_error() {
+    let js = "function dependArray (value) {
+  for (let e, i = 0, l = value.length; i < l; i++) {
+    e = value[i];
+    e && e.__ob__ && e.__ob__.dep.depend();
+    if (Array.isArray(e)) {
+      dependArray(e);
+    }
+  }
+}";
+    let mut p = ressa::Builder::new().module(true).js(js).build().unwrap();
+    let _ = p.parse().unwrap();
+}
+
+#[test]
+fn template_tail_error() {
+    let _ = env_logger::try_init();
+    let js = "function getRawDirName (dir) {
+  return dir.rawName || `${dir.name}.${Object.keys(dir.modifiers || {}).join('.')}`
+}";
+    let mut p = ressa::Builder::new().module(true).js(js).build().unwrap();
+    let _ = p.parse().unwrap();
+}
+
+#[test]
 fn comment_handler_test() {
-    use ressa::CommentHandler;
     use ress::Item;
     let js = "//things
     /* things */
