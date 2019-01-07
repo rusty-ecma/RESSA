@@ -461,6 +461,44 @@ fn obj_pattern() {
     println!("{:?}", out);
 }
 
+#[test]
+fn comment_handler_test() {
+    use ressa::CommentHandler;
+    use ress::Item;
+    let js = "//things
+    /* things */
+    <!-- things -->";
+    let mut i = 0;
+    let expectation = [
+        ress::Comment::new_single_line("things"),
+        ress::Comment::new_multi_line(" things "),
+        ress::Comment::new_html_no_tail(" things "),
+    ];
+    let mut p = ressa::Builder::new()
+                    .js(js)
+                    .with_comment_handler(|item: Item| {
+                        if let ress::Token::Comment(ref c) = item.token {
+                            assert_eq!(c, &expectation[i])
+                        }
+                        i += 1;
+                    }).unwrap();
+    p.parse().unwrap();
+}
+
+#[test]
+fn comment_handler_test_2() {
+    use ress::Item;
+    let js = "//things
+    /*things*/
+    <!--things-->";
+    let mut p = ressa::Builder::new()
+                    .js(js)
+                    .with_comment_handler(|item: Item| {
+                        assert!(item.matches_comment_str("things"));
+                    }).unwrap();
+    p.parse().unwrap();
+}
+
 fn execute(js: &str, expectation: Program) {
     let s = parse(js);
     assert_eq!(s, expectation);

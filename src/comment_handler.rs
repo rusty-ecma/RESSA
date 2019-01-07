@@ -15,3 +15,11 @@ pub struct DefaultCommentHandler;
 impl CommentHandler for DefaultCommentHandler {
     fn handle_comment(&mut self, _: Item) {}
 }
+
+impl<F> CommentHandler for F
+where F: FnMut(Item)
+{
+    fn handle_comment(&mut self, item: Item) {
+        self(item)
+    }
+}

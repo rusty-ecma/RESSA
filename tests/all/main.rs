@@ -1,6 +1,7 @@
 extern crate env_logger;
 extern crate log;
 extern crate ressa;
+extern crate ress;
 
 mod ecma262;
 mod major_libs;
