@@ -3408,7 +3408,7 @@ where
                 operator,
                 argument: Box::new(arg),
             }))
-        } else if self.context.await && self.at_contextual_keyword("await") {
+        } else if self.context.await && self.at_keyword(Keyword::Await) {
             self.parse_await_expr()
         } else {
             self.parse_update_expr()
