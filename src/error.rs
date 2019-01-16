@@ -11,6 +11,7 @@ pub enum Error {
     InvalidGetterParams(Position),
     InvalidSetterParams(Position),
     NonStrictFeatureInStrictContext(Position, String),
+    Other(Box<::std::error::Error>),
 }
 
 impl Display for Error {
@@ -25,6 +26,7 @@ impl Display for Error {
             Error::InvalidGetterParams(ref pos) => write!(f, "Found a getter method that takes arguments at {}, getter methods cannot take arguments", pos),
             Error::InvalidSetterParams(ref pos) => write!(f, "Found a setter method that takes more or less than 1 argument at {}, setter methods must take only one argument", pos),
             Error::NonStrictFeatureInStrictContext(ref pos, ref name) => write!(f, "Attempting to use non-strict feature {} in a strict context at {}", name, pos),
+            Error::Other(ref e) => write!(f, "{}", e),
         }
     }
 }
@@ -32,5 +34,11 @@ impl Display for Error {
 impl Error {
     pub fn unable_to_reinterpret(pos: Position, from: &str, to: &str) -> Self {
         Error::UnableToReinterpret(pos, from.to_owned(), to.to_owned())
+    }
+}
+
+impl From<::std::io::Error> for Error {
+    fn from(other: ::std::io::Error) -> Self {
+        Error::Other(Box::new(other))
     }
 }

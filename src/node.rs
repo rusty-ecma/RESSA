@@ -415,7 +415,7 @@ impl VariableDecl {
                 .iter()
                 .map(|name| {
                     ObjectPatternPart::Assignment(Property {
-                        key: PropertyKey::Ident(name.to_string()),
+                        key: PropertyKey::Expr(Expression::ident(&name.to_string())),
                         value: PropertyValue::None,
                         kind: PropertyKind::Init,
                         method: false,
@@ -435,7 +435,7 @@ impl VariableDecl {
             .iter()
             .map(|name| {
                 ObjectPatternPart::Assignment(Property {
-                    key: PropertyKey::Ident(name.to_string()),
+                    key: PropertyKey::Expr(Expression::ident(&name.to_string())),
                     value: PropertyValue::None,
                     kind: PropertyKind::Init,
                     computed: false,
@@ -764,7 +764,7 @@ pub struct TryStatement {
 /// The error handling part of a `TryStatement`
 #[derive(PartialEq, Debug, Clone)]
 pub struct CatchClause {
-    pub param: Pattern,
+    pub param: Option<Pattern>,
     pub body: BlockStatement,
 }
 /// A while loop
@@ -1384,7 +1384,7 @@ pub struct Property {
 impl Property {
     pub fn string(key: &str, value: &str) -> Self {
         Self {
-            key: PropertyKey::Ident(key.to_string()),
+            key: PropertyKey::Expr(Expression::ident(&key.to_string())),
             value: PropertyValue::Expr(Expression::string(value)),
             kind: PropertyKind::Init,
             method: false,
@@ -1395,7 +1395,7 @@ impl Property {
 
     pub fn number(key: &str, value: &str) -> Self {
         Self {
-            key: PropertyKey::Ident(key.to_string()),
+            key: PropertyKey::Expr(Expression::ident(&key.to_string())),
             value: PropertyValue::Expr(Expression::number(value)),
             kind: PropertyKind::Init,
             method: false,
@@ -1408,7 +1408,7 @@ impl Property {
 #[derive(PartialEq, Debug, Clone)]
 pub enum PropertyKey {
     Literal(Literal),
-    Ident(Identifier),
+    Expr(Expression),
     Pattern(Pattern),
 }
 
@@ -1419,7 +1419,10 @@ impl PropertyKey {
                 Literal::String(ref s) => s == other,
                 _ => false,
             },
-            PropertyKey::Ident(ref i) => i == other,
+            PropertyKey::Expr(ref e) => match e {
+                Expression::Ident(ref i) => i == other,
+                _ => false,
+            },
             PropertyKey::Pattern(ref p) => match p {
                 Pattern::Identifier(ref i) => i == other,
                 _ => false,
@@ -1433,7 +1436,10 @@ impl PropertyKey {
                 Literal::String(ref s) => s == "static",
                 _ => false,
             },
-            PropertyKey::Ident(ref s) => s == "static",
+            PropertyKey::Expr(ref e) => match e {
+                Expression::Ident(ref s) => s == "static",
+                _ => false,
+            },
             PropertyKey::Pattern(ref p) => match p {
                 Pattern::Identifier(ref s) => s == "static",
                 _ => false,
@@ -1494,9 +1500,14 @@ pub enum PropertyKind {
 pub enum Pattern {
     Identifier(Identifier),
     Object(ObjectPattern),
-    Array(Vec<Option<Pattern>>),
+    Array(Vec<Option<ArrayPatternPart>>),
     RestElement(Box<Pattern>),
     Assignment(AssignmentPattern),
+}
+#[derive(PartialEq, Debug, Clone)]
+pub enum ArrayPatternPart {
+    Patt(Pattern),
+    Expr(Expression)
 }
 
 impl Pattern {

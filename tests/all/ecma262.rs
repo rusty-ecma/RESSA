@@ -6,6 +6,7 @@ use ressa::{node::ProgramPart, Builder, Parser};
 #[test]
 fn es5() {
     let _ = env_logger::try_init();
+    info!("ES5");
     let path = Lib::Everything(EverythingVersion::Es5).path();
     let js = get_js_file(&path).expect(&format!("Faield to get {:?}", path));
     let _res: Vec<ProgramPart> = Parser::new(&js)
@@ -19,6 +20,7 @@ fn es5() {
 #[test]
 fn es2015_script() {
     let _ = env_logger::try_init();
+    info!("ES2015 Script");
     let path = Lib::Everything(EverythingVersion::Es2015Script).path();
     let js = get_js_file(&path).expect(&format!("Faield to get {:?}", path));
     let mut p = Parser::new(&js).expect("Failed to create parser");
@@ -31,6 +33,7 @@ fn es2015_script() {
 
 #[test]
 fn es2015_module() {
+    info!("ES2015 Module");
     let _ = env_logger::try_init();
     let path = Lib::Everything(EverythingVersion::Es2015Module).path();
     let js = get_js_file(&path).expect(&format!("Faield to get {:?}", path));

@@ -13,3 +13,4 @@ node_modules
 package-lock.json
 bencher.js
 benchmark.md
+moz-central

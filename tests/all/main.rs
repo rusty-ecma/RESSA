@@ -1,11 +1,22 @@
 extern crate env_logger;
+#[macro_use]
 extern crate log;
 extern crate ressa;
 extern crate ress;
+#[cfg(feature = "moz_central")]
+extern crate reqwest;
+#[cfg(feature = "moz_central")]
+extern crate flate2;
+#[cfg(feature = "moz_central")]
+extern crate tar;
+#[cfg(feature = "moz_central")]
+extern crate rayon;
 
 mod ecma262;
 mod major_libs;
 mod snippets;
+#[cfg(feature = "moz_central")]
+mod spider_monkey;
 
 use std::{fs::read_to_string, io::Error};
 

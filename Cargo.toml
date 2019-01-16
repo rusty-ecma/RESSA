@@ -1,6 +1,6 @@
 [package]
 name = "ressa"
-version = "0.2.4"
+version = "0.3.0"
 authors = ["Robert Masen <r@robertmasen.pizza>"]
 repository = "https://github.com/FreeMasen/RESP"
 description = "An ECMAscript parser"
@@ -10,15 +10,20 @@ keywords = ["JavaScript", "parsing", "JS", "ES", "ECMA"]
 categories = ["parsing", "text-processing", "web-programming"]
 
 [dependencies]
-ress = "0.5.1"
-log = "0.4.5"
-env_logger = "0.5.13"
+ress = "0.6"
+log = "0.4"
+env_logger = "0.6"
 backtrace = "0"
+reqwest = { version = "0.9", optional = true}
+flate2 = { version = "1", optional = true}
+tar = { version = "0.4", optional = true}
+rayon = { version = "", optional = true}
 
 [features]
 default = []
 major_libs = []
 debug_look_ahead = []
+moz_central = ["reqwest", "flate2", "tar", "rayon"]
 
 [dev-dependencies]
 term-painter = "0.2.4"

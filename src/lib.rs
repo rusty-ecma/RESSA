@@ -59,7 +59,7 @@ pub mod node;
 
 pub use comment_handler::CommentHandler;
 use comment_handler::DefaultCommentHandler;
-use error::Error;
+pub use error::Error;
 use node::Position;
 use std::{collections::HashSet, mem::replace};
 
@@ -512,41 +512,32 @@ where
             if !self.look_ahead.token.is_string() {
                 break;
             }
-            if let Some(dir) = self.parse_directive()? {
-                if dir.directive == "use strict" {
-                    if !self.context.allow_strict_directive {
-                        return self.expected_token_error(&self.look_ahead, &[]);
-                    }
-                    self.context.strict = true;
-                }
-                ret.push(node::ProgramPart::Directive(dir));
-            } else {
-                break;
-            }
+            ret.push(self.parse_directive()?);
         }
         Ok(ret)
     }
     /// Parse a single directive
-    fn parse_directive(&mut self) -> Res<Option<node::Directive>> {
+    fn parse_directive(&mut self) -> Res<node::ProgramPart> {
         debug!("parse_directive");
-        if self.look_ahead.token.matches_string_content("use strict") {
-            let dir = self.next_item()?;
-            let ret = match dir.token {
-                Token::String(s) => {
-                    let quoted = s.to_string();
-                    let directive = s.no_quote();
-                    let expression = node::Literal::String(quoted);
-                    Ok(Some(node::Directive {
-                        expression,
-                        directive,
-                    }))
+        let orig = self.look_ahead.clone();
+        let expr = self.parse_expression()?;
+        if let node::Expression::Literal(lit) = expr {
+            if let node::Literal::String(s) = lit {
+                if !self.context.allow_strict_directive && s == "use strict" {
+                    return self.unexpected_token_error(&orig, "use strict in an invalid location");
                 }
-                _ => unreachable!(),
-            };
-            self.consume_semicolon()?;
-            ret
+                return Ok(node::ProgramPart::Directive(
+                    node::Directive {
+                        expression: node::Literal::String(s),
+                        directive: orig.token.to_string(),
+                    }
+                ))
+            } else {
+                return Ok(node::ProgramPart::Statement(node::Statement::Expr(
+                    node::Expression::Literal(lit))))
+            }
         } else {
-            Ok(None)
+            Ok(node::ProgramPart::Statement(node::Statement::Expr(expr)))
         }
     }
     /// This is where we will begin our recursive decent. First
@@ -1046,13 +1037,18 @@ where
     fn parse_catch_clause(&mut self) -> Res<node::CatchClause> {
         debug!("parse_catch_clause");
         self.expect_keyword(Keyword::Catch)?;
-        self.expect_punct(Punct::OpenParen)?;
-        if self.at_punct(Punct::CloseParen) {
-            //error variable named required
-        }
-        let mut params = vec![];
-        let (_, param) = self.parse_pattern(None, &mut params)?;
-        self.expect_punct(Punct::CloseParen)?;
+        let param = if self.at_punct(Punct::OpenParen) {
+            self.expect_punct(Punct::OpenParen)?;
+            if self.at_punct(Punct::CloseParen) {
+                //error variable named required
+            }
+            let mut params = vec![];
+            let (_, param) = self.parse_pattern(None, &mut params)?;
+            self.expect_punct(Punct::CloseParen)?;
+            Some(param)
+        } else {
+            None
+        };
         let body = self.parse_block()?;
         Ok(node::CatchClause { param, body })
     }
@@ -1775,12 +1771,21 @@ where
         let prev_strict = self.context.strict;
         self.context.strict = true;
         self.expect_keyword(Keyword::Class)?;
+        let mut super_class = if self.at_contextual_keyword("extends") {
+            let _ = self.next_item()?;
+            let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
+            let super_class = self.parse_left_hand_side_expr()?;
+            self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+            Some(Box::new(super_class))
+        } else {
+            None
+        };
         let id = if opt_ident && !self.look_ahead.token.is_ident() {
             None
         } else {
             Some(self.parse_var_ident(false)?)
         };
-        let super_class = if self.at_contextual_keyword("extends") {
+        super_class = if super_class.is_none() && self.at_contextual_keyword("extends") {
             let _ = self.next_item()?;
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let super_class = self.parse_left_hand_side_expr()?;
@@ -2142,7 +2147,7 @@ where
             || item.token.is_keyword()
         {
             let id = item.token.to_string();
-            Ok(node::PropertyKey::Ident(id))
+            Ok(node::PropertyKey::Expr(node::Expression::ident(&id)))
         } else if item.token.matches_punct(Punct::OpenBracket) {
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let key = self.parse_assignment_expr()?;
@@ -2156,8 +2161,7 @@ where
                     }
                 }
             } else {
-                let id = self.reinterpret_expr_as_pat(key)?;
-                node::PropertyKey::Pattern(id)
+                node::PropertyKey::Expr(key)
             };
             self.expect_punct(Punct::CloseBracket)?;
             Ok(id)
@@ -2249,6 +2253,9 @@ where
                 && ((self.context.allow_yield && self.at_keyword(Keyword::Yield))
                     || self.at_keyword(Keyword::Let))
             {
+                let ident = self.parse_ident_name()?;
+                Ok(node::Expression::Ident(ident))
+            } else if !self.context.strict && self.look_ahead.is_strict_reserved() {
                 let ident = self.parse_ident_name()?;
                 Ok(node::Expression::Ident(ident))
             } else {
@@ -2461,7 +2468,7 @@ where
             let key = if is_async {
                 self.parse_object_property_key()?
             } else {
-                node::PropertyKey::Ident(id.to_string())
+                node::PropertyKey::Expr(node::Expression::ident(&id.to_string()))
             };
             (Some(key), is_async, computed)
         } else if self.at_punct(Punct::Asterisk) {
@@ -2862,11 +2869,11 @@ where
             } else {
                 if self.at_punct(Punct::Spread) {
                     let (_, el) = self.parse_binding_rest_el(params)?;
-                    elements.push(Some(el));
+                    elements.push(Some(node::ArrayPatternPart::Patt(el)));
                     break;
                 } else {
                     let (_, el) = self.parse_pattern_with_default(params)?;
-                    elements.push(Some(el));
+                    elements.push(Some(node::ArrayPatternPart::Patt(el)));
                 }
                 if !self.at_punct(Punct::CloseBracket) {
                     self.expect_punct(Punct::Comma)?;
@@ -2917,7 +2924,7 @@ where
         let mut short_hand = false;
         let method = false;
         let (key, value) = if self.look_ahead.token.is_ident() {
-            let key = node::PropertyKey::Ident(self.parse_var_ident(false)?);
+            let key = node::PropertyKey::Expr(node::Expression::Ident(self.parse_var_ident(false)?));
             let value = if self.at_punct(Punct::Assign) {
                 self.expect_punct(Punct::Assign)?;
                 short_hand = true;
@@ -3156,16 +3163,12 @@ where
         debug!("reinterpret_expr_as_pat");
         match ex {
             node::Expression::Array(a) => {
-                let mut patts = vec![];
-                for expr in a {
-                    if let Some(e) = expr {
-                        let p = self.reinterpret_expr_as_pat(e)?;
-                        patts.push(Some(p));
-                    } else {
-                        patts.push(None)
-                    }
-                }
-                Ok(node::Pattern::Array(patts))
+                let parts = a.into_iter().map(|e| if let Some(e) = e {
+                                                Some(node::ArrayPatternPart::Expr(e))
+                                    } else {
+                                        None
+                                    }).collect();
+                Ok(node::Pattern::Array(parts))
             }
             node::Expression::Spread(s) => Ok(node::Pattern::RestElement(Box::new(
                 self.reinterpret_expr_as_pat(*s)?,
@@ -3362,7 +3365,7 @@ where
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let expr = self.parse_unary_expression()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
-        if expr.is_unary() && self.at_punct(Punct::Exponent) {
+        if self.at_punct(Punct::Exponent) {
             let _stars = self.next_item()?;
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
@@ -4184,6 +4187,8 @@ where
     }
     fn tolerate_error(&self, err: Error) -> Result<(), Error> {
         if !self.config.tolerant {
+            let bt = backtrace::Backtrace::new();
+            error!("{:?}", bt);
             Err(err)
         } else {
             Ok(())
@@ -4201,8 +4206,13 @@ where
 
     fn next_part(&mut self) -> Res<node::ProgramPart> {
         if !self.context.past_prolog {
-            if let Some(dir) = self.parse_directive()? {
-                return Ok(node::ProgramPart::Directive(dir));
+            if self.look_ahead.is_string() {
+                let next_part = self.parse_directive()?;
+                self.context.past_prolog = match &next_part {
+                    node::ProgramPart::Directive(_) => false,
+                    _ => true,
+                };
+                return Ok(next_part);
             } else {
                 self.context.past_prolog = true;
             }

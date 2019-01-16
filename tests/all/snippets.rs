@@ -523,6 +523,50 @@ fn comment_handler_test_2() {
     p.parse().unwrap();
 }
 
+#[test]
+fn class_expr() {
+    let _ = env_logger::try_init();
+    let js = r#"for(let {a = new class extends Array { constructor(b = (a = eval("()=>super()"))){} }} of [[]]);"#;
+    println!("{:#?}", parse(js));
+}
+
+#[test]
+fn class_expr_pattern() {
+    let _ = env_logger::try_init();
+    let js = "for ([class get {} ().iterator] of []);";
+    println!("{:#?}", parse(js));
+}
+
+#[test]
+fn expr_to_pat() {
+    let _ = env_logger::try_init();
+    let js = "let x = { [Symbol.species]: function(length) { return; } }";
+    println!("{:#?}", parse(js));
+}
+
+#[test]
+fn non_strict_mode_keywords() {
+    let _ = env_logger::try_init();
+    let js = "var f = package => 0;";
+    println!("{:#?}", parse(js));
+}
+
+#[test]
+fn obj_literal_in_binary_op() {
+    let _ = env_logger::try_init();
+    let js = r#""" + {toString: Date.prototype.toJSON};"#;
+    println!("{:#?}", parse(js));
+}
+
+#[test]
+fn template_middle() {
+    let _ = env_logger::try_init();
+    let js = r#"let bitval = `(${prefix}.const ${format(val, i)})`"#;
+    println!("{:#?}", parse(js));
+}
+
+
+
 fn execute(js: &str, expectation: Program) {
     let s = parse(js);
     assert_eq!(s, expectation);
