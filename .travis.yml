@@ -9,10 +9,11 @@ matrix:
         - directories:
           - node_modules
           - /home/travis/.cargo
+          - moz-central
       before_cache:
         - rm -rf /home/travis/.cargo/registry
       script:
-        - cargo test
+        - cargo test --features moz_central
       after_script:
       stages:
         after_script:
