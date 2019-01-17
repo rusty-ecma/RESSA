@@ -15,7 +15,9 @@ fn moz_central() {
     }
     walk(&moz_central_path);
     unsafe {
-        println!("checked {} files and {} failed {:0.2}%", COUNT, FAILURES, (FAILURES as f32 / COUNT as f32) * 100f32);
+        if FAILURES > 0 {
+            panic!("Some spider_monkey tests failed to parse");
+        }
     }
 }
 
@@ -48,10 +50,9 @@ fn walk(path: &Path) {
                             eprintln!("Parse Failure {}\n\t{}", e, loc);
                             if let Ok(op) = ::std::process::Command::new("./node_modules/.bin/esparse").arg(path).output() {
                                 if !op.status.success() {
-                                    eprintln!("new whitelist item:\n\t{}", path.display());
+                                    eprintln!("possible new whitelist item:\n\t{}", path.display());
                                 }
                             }
-
                             unsafe { FAILURES += 1 }
                         }
                     }
