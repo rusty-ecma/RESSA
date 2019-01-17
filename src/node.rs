@@ -422,7 +422,8 @@ impl VariableDecl {
                         short_hand: true,
                         computed: false,
                     })
-                }).collect(),
+                })
+                .collect(),
         );
         Self {
             id,
@@ -442,7 +443,8 @@ impl VariableDecl {
                     method: false,
                     short_hand: true,
                 })
-            }).collect();
+            })
+            .collect();
         props.push(ObjectPatternPart::Rest(Box::new(Pattern::RestElement(
             Box::new(Pattern::ident(rest)),
         ))));
@@ -920,6 +922,7 @@ impl ForOfStatement {
 /// in a for in or for of loop
 #[derive(PartialEq, Debug, Clone)]
 pub enum LoopLeft {
+    Expr(Expression),
     Variable(VariableDecl),
     Pattern(Pattern),
 }
@@ -1507,7 +1510,7 @@ pub enum Pattern {
 #[derive(PartialEq, Debug, Clone)]
 pub enum ArrayPatternPart {
     Patt(Pattern),
-    Expr(Expression)
+    Expr(Expression),
 }
 
 impl Pattern {

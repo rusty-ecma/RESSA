@@ -28,7 +28,7 @@ fn vue() {
 }
 #[test]
 fn vue_esm() {
-    let js = ::std::fs::read_to_string("node_modules/vue/dist/vue.esm.browser.js").unwrap();
+    let js = ::std::fs::read_to_string("node_modules/vue/dist/vue.esm.js").unwrap();
     run_test("vue_module", js, String::new());
 }
 

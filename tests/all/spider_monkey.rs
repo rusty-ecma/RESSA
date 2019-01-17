@@ -81,6 +81,7 @@ fn run(file: &Path) -> Result<(), Error> {
     || file.ends_with("auto-regress/bug521163.js")
     || file.ends_with("auto-regress/bug1448582-5.js")
     || file.ends_with("tests/backup-point-bug1315634.js")
+    || file.ends_with("auto-regress/bug650574.js")
     || file.ends_with("baseline/setcall.js") {
         return Ok(())
     }

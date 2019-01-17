@@ -499,13 +499,14 @@ fn comment_handler_test() {
         ress::Comment::new_html_no_tail(" things "),
     ];
     let mut p = ressa::Builder::new()
-                    .js(js)
-                    .with_comment_handler(|item: Item| {
-                        if let ress::Token::Comment(ref c) = item.token {
-                            assert_eq!(c, &expectation[i])
-                        }
-                        i += 1;
-                    }).unwrap();
+        .js(js)
+        .with_comment_handler(|item: Item| {
+            if let ress::Token::Comment(ref c) = item.token {
+                assert_eq!(c, &expectation[i])
+            }
+            i += 1;
+        })
+        .unwrap();
     p.parse().unwrap();
 }
 
@@ -516,10 +517,11 @@ fn comment_handler_test_2() {
     /*things*/
     <!--things-->";
     let mut p = ressa::Builder::new()
-                    .js(js)
-                    .with_comment_handler(|item: Item| {
-                        assert!(item.matches_comment_str("things"));
-                    }).unwrap();
+        .js(js)
+        .with_comment_handler(|item: Item| {
+            assert!(item.matches_comment_str("things"));
+        })
+        .unwrap();
     p.parse().unwrap();
 }
 
@@ -565,7 +567,82 @@ fn template_middle() {
     println!("{:#?}", parse(js));
 }
 
+#[test]
+fn loop_left_expr() {
+    let _ = env_logger::try_init();
+    let js = r#"for (t[t++] in object);"#;
+    println!("{:#?}", parse(js));
+}
+#[test]
+fn for_loop_nonsense() {
+    let _ = env_logger::try_init();
+    let js = "for (var i = 1000; i-- > 0; ) {
+    expr = `(f32.neg ${expr})`;
+}";
+    println!("{:#?}", parse(js));
+}
 
+#[test]
+fn function_param_pattern() {
+    let _ = env_logger::try_init();
+    let js = r#"function f(x, await = () => Array.isArray(revocable.proxy), ...get) {
+    dbg.getNewestFrame().older.eval("print(a)");
+}"#;
+    println!("{:#?}", parse(js));
+}
+
+#[test]
+fn more_for_loop_nonsense() {
+    let _ = env_logger::try_init();
+    let js = "for (f().x of [])
+    s += '.';";
+    println!("{:#?}", parse(js));
+}
+
+#[test]
+fn deeply_nested_template() {
+    let _ = env_logger::try_init();
+    let js = r#"`
+ (func ${name} (param $barrierValue i32) (result i32)
+   (local $n i32)
+   (local $tmp ${prefix})
+   (set_local $n (i32.const ${ITERATIONS}))
+   (loop $outer
+    (if (get_local $n)
+        (block
+         ${isMaster ? `;; Init
+(${prefix}.atomic.store${tag} ${loc} (${prefix}.const ${distribute(initial)}))` : ``}
+         ${barrier}
+
+${(() => {
+    let s = `;; Do\n`;
+    for (let i=0; i < NUMVALS; i++) {
+        let bitval = `(${prefix}.const ${format(val, i)})`
+        // The load must be atomic though it would be better if it were relaxed,
+        // we would avoid fences in that case.
+        if (op.match(/cmpxchg/)) {
+            s += `(loop $doit
+                   (set_local $tmp (${prefix}.atomic.load${tag} ${loc}))
+                   (br_if $doit (i32.eqz
+                                 (${prefix}.eq
+                                  (get_local $tmp)
+                                  (${op} ${loc} (get_local $tmp) (${prefix}.or (get_local $tmp) ${bitval}))))))
+            `;
+        } else {
+            s += `(drop (${op} ${loc} ${bitval}))
+            `;
+       }
+     }
+    return s
+})()}
+         (loop $wait_done
+          (br_if $wait_done (${prefix}.ne (${prefix}.atomic.load${tag} ${loc}) (${prefix}.const ${distribute(expected)}))))
+         ${barrier}
+         (set_local $n (i32.sub (get_local $n) (i32.const 1)))
+         (br $outer))))
+  (get_local $barrierValue))`"#;
+    println!("{:#?}", parse(js));
+}
 
 fn execute(js: &str, expectation: Program) {
     let s = parse(js);

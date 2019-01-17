@@ -378,7 +378,8 @@ fn get_lines(text: &str) -> Vec<Line> {
             // want to move the full width of the current byte
             byte_position += c.len_utf8();
             ret
-        }).collect();
+        })
+        .collect();
     // Since we shouldn't have only a new line char at EOF,
     // This will capture the last line of the text
     ret.push(Line {
@@ -526,15 +527,12 @@ where
                 if !self.context.allow_strict_directive && s == "use strict" {
                     return self.unexpected_token_error(&orig, "use strict in an invalid location");
                 }
-                return Ok(node::ProgramPart::Directive(
-                    node::Directive {
-                        expression: node::Literal::String(s),
-                        directive: orig.token.to_string(),
-                    }
-                ))
+                self.consume_semicolon()?;
+                return Ok(node::ProgramPart::Directive(node::Directive::new(&s)));
             } else {
                 return Ok(node::ProgramPart::Statement(node::Statement::Expr(
-                    node::Expression::Literal(lit))))
+                    node::Expression::Literal(lit),
+                )));
             }
         } else {
             Ok(node::ProgramPart::Statement(node::Statement::Expr(expr)))
@@ -1311,8 +1309,7 @@ where
             self.context.allow_in = prev_in;
             if self.at_keyword(Keyword::In) {
                 let _ = self.next_item()?;
-                let pat = self.reinterpret_expr_as_pat(init)?;
-                let left = node::LoopLeft::Pattern(pat);
+                let left = node::LoopLeft::Expr(init);
                 let right = self.parse_expression()?;
                 return Ok(node::Statement::ForIn(node::ForInStatement {
                     left,
@@ -1321,8 +1318,7 @@ where
                 }));
             } else if self.at_contextual_keyword("of") {
                 let _ = self.next_item()?;
-                let p = self.reinterpret_expr_as_pat(init)?;
-                let left = node::LoopLeft::Pattern(p);
+                let left = node::LoopLeft::Expr(init);
                 let right = self.parse_assignment_expr()?;
                 let body = self.parse_loop_body()?;
                 return Ok(node::Statement::ForOf(node::ForOfStatement::new(
@@ -1365,6 +1361,8 @@ where
         } else {
             Some(self.parse_expression()?)
         };
+        let _d = format!("{:?}", test);
+        debug!("{:#?}", test);
         self.expect_punct(Punct::SemiColon)?;
         let update = if self.at_punct(Punct::CloseParen) {
             None
@@ -2845,7 +2843,7 @@ where
                     node::VariableKind::Var => true,
                 }
             } else {
-                false
+                true
             };
             let ident = self.parse_var_ident(is_var)?;
             let restricted = &ident == "eval" || &ident == "arguments";
@@ -2924,7 +2922,8 @@ where
         let mut short_hand = false;
         let method = false;
         let (key, value) = if self.look_ahead.token.is_ident() {
-            let key = node::PropertyKey::Expr(node::Expression::Ident(self.parse_var_ident(false)?));
+            let key =
+                node::PropertyKey::Expr(node::Expression::Ident(self.parse_var_ident(false)?));
             let value = if self.at_punct(Punct::Assign) {
                 self.expect_punct(Punct::Assign)?;
                 short_hand = true;
@@ -2975,7 +2974,10 @@ where
                 let arg = node::FunctionArg::Pattern(arg);
                 current = node::Expression::ArrowParamPlaceHolder(vec![arg], true);
             }
-            debug!("current expression: {:?} {}", current, self.context.allow_yield);
+            debug!(
+                "current expression: {:?} {}",
+                current, self.context.allow_yield
+            );
             if current.is_arrow_param_placeholder() || self.at_punct(Punct::FatArrow) {
                 self.context.is_assignment_target = false;
                 self.context.is_binding_element = false;
@@ -3101,26 +3103,30 @@ where
                     match &p {
                         node::FunctionArg::Pattern(ref p) => match p {
                             node::Pattern::Assignment(ref a) => match &*a.right {
-                                node::Expression::Yield(ref y) => if y.argument.is_some() {
-                                    invalid_param = true;
-                                } else {
-                                    return node::FunctionArg::Pattern(node::Pattern::Identifier(
-                                        "yield".to_owned(),
-                                    ));
-                                },
+                                node::Expression::Yield(ref y) => {
+                                    if y.argument.is_some() {
+                                        invalid_param = true;
+                                    } else {
+                                        return node::FunctionArg::Pattern(
+                                            node::Pattern::Identifier("yield".to_owned()),
+                                        );
+                                    }
+                                }
                                 _ => (),
                             },
                             _ => (),
                         },
                         node::FunctionArg::Expr(ref e) => match e {
                             node::Expression::Assignment(ref a) => match &*a.right {
-                                node::Expression::Yield(ref y) => if y.argument.is_some() {
-                                    invalid_param = true;
-                                } else {
-                                    return node::FunctionArg::Expr(node::Expression::Ident(
-                                        "yield".to_owned(),
-                                    ));
-                                },
+                                node::Expression::Yield(ref y) => {
+                                    if y.argument.is_some() {
+                                        invalid_param = true;
+                                    } else {
+                                        return node::FunctionArg::Expr(node::Expression::Ident(
+                                            "yield".to_owned(),
+                                        ));
+                                    }
+                                }
                                 _ => (),
                             },
                             _ => (),
@@ -3133,7 +3139,8 @@ where
                 } else {
                     p
                 }
-            }).collect();
+            })
+            .collect();
         if invalid_param {
             return self.expected_token_error(
                 &self.look_ahead,
@@ -3163,11 +3170,16 @@ where
         debug!("reinterpret_expr_as_pat");
         match ex {
             node::Expression::Array(a) => {
-                let parts = a.into_iter().map(|e| if let Some(e) = e {
-                                                Some(node::ArrayPatternPart::Expr(e))
-                                    } else {
-                                        None
-                                    }).collect();
+                let parts = a
+                    .into_iter()
+                    .map(|e| {
+                        if let Some(e) = e {
+                            Some(node::ArrayPatternPart::Expr(e))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
                 Ok(node::Pattern::Array(parts))
             }
             node::Expression::Spread(s) => Ok(node::Pattern::RestElement(Box::new(
@@ -3288,7 +3300,13 @@ where
                 if prec <= 0 {
                     break;
                 }
-                debug!("shifting, stack: {}, ops: {}, last_prec: {} {}", stack.len(), ops.len(), precs[precs.len() - 1], self.context.allow_yield);
+                debug!(
+                    "shifting, stack: {}, ops: {}, last_prec: {} {}",
+                    stack.len(),
+                    ops.len(),
+                    precs[precs.len() - 1],
+                    self.context.allow_yield
+                );
                 while stack.len() > 1 && ops.len() > 0 && prec <= precs[precs.len() - 1] {
                     right = stack
                         .pop()
@@ -3444,12 +3462,14 @@ where
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             if self.context.strict && ex.is_ident() {
                 match &ex {
-                    &node::Expression::Ident(ref i) => if Self::is_restricted_word(i) {
-                        // TODO: double check this
-                        if !self.config.tolerant {
-                            return self.unexpected_token_error(&start, "restricted ident");
+                    &node::Expression::Ident(ref i) => {
+                        if Self::is_restricted_word(i) {
+                            // TODO: double check this
+                            if !self.config.tolerant {
+                                return self.unexpected_token_error(&start, "restricted ident");
+                            }
                         }
-                    },
+                    }
                     _ => (),
                 }
             }
@@ -3474,9 +3494,11 @@ where
                 if self.at_punct(Punct::Increment) || self.at_punct(Punct::Decrement) {
                     if self.context.strict {
                         match &expr {
-                            &node::Expression::Ident(ref i) => if Self::is_restricted_word(i) {
-                                return self.expected_token_error(&start, &[]);
-                            },
+                            &node::Expression::Ident(ref i) => {
+                                if Self::is_restricted_word(i) {
+                                    return self.expected_token_error(&start, &[]);
+                                }
+                            }
                             _ => (),
                         }
                     }
@@ -4140,7 +4162,7 @@ where
                 (index, lines[0])
             } else {
                 let half = current_len >> 1;
-                if lines[half-1].end > item.span.start {
+                if lines[half - 1].end > item.span.start {
                     search(&lines[..half], item, index)
                 } else {
                     search(&lines[half..], item, index + half)
@@ -4168,7 +4190,8 @@ where
                 } else {
                     format!("`{}`", s)
                 }
-            }).collect::<Vec<String>>()
+            })
+            .collect::<Vec<String>>()
             .join(", ");
         Err(Error::UnexpectedToken(
             pos,
@@ -4291,23 +4314,14 @@ mod test {
     return 'stuff';
 }";
         let item1 = Item {
-            span: Span {
-                start: 9,
-                end: 13,
-            },
+            span: Span { start: 9, end: 13 },
             token: Token::ident("thing"),
         };
-        let position1 = Position {
-            line: 1,
-            column: 9,
-        };
+        let position1 = Position { line: 1, column: 9 };
         let p = Parser::new(js).unwrap();
         assert_eq!(p.get_item_position(&item1), position1);
         let item2 = Item {
-            span: Span {
-                start: 30,
-                end: 36,
-            },
+            span: Span { start: 30, end: 36 },
             token: Token::single_quoted_string("stuff"),
         };
         let position2 = Position {
@@ -4316,16 +4330,10 @@ mod test {
         };
         assert_eq!(p.get_item_position(&item2), position2);
         let item3 = Item {
-            span: Span {
-                start: 39,
-                end: 40,
-            },
+            span: Span { start: 39, end: 40 },
             token: Token::punct("}"),
         };
-        let position3 = Position {
-            line: 3,
-            column: 0,
-        };
+        let position3 = Position { line: 3, column: 0 };
         assert_eq!(p.get_item_position(&item3), position3);
     }
 }
