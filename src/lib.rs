@@ -1432,6 +1432,9 @@ where
         self.expect_punct(Punct::OpenParen)?;
         let test = self.parse_expression()?;
         self.expect_punct(Punct::CloseParen)?;
+        if self.look_ahead.matches_punct(Punct::SemiColon) {
+            self.expect_punct(Punct::SemiColon)?;
+        }
         Ok(node::DoWhileStatement {
             test,
             body: Box::new(body),
