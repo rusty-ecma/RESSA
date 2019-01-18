@@ -643,6 +643,14 @@ ${(() => {
   (get_local $barrierValue))`"#;
     println!("{:#?}", parse(js));
 }
+#[test]
+fn ghost_semi_colon() {
+    let _ = env_logger::try_init();
+    let js = "function() {
+    'string' + 0;
+}";
+    println!("{:#?}", parse(js));
+}
 
 fn execute(js: &str, expectation: Program) {
     let s = parse(js);

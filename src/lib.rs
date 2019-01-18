@@ -535,7 +535,9 @@ where
                 )));
             }
         } else {
-            Ok(node::ProgramPart::Statement(node::Statement::Expr(expr)))
+            let stmt = node::ProgramPart::Statement(node::Statement::Expr(expr));
+            self.consume_semicolon()?;
+            Ok(stmt)
         }
     }
     /// This is where we will begin our recursive decent. First
@@ -4084,7 +4086,7 @@ where
             let _semi = self.next_item()?;
         } else if !self.context.has_line_term {
             if !self.look_ahead.token.is_eof() && !self.at_punct(Punct::CloseBrace) {
-                return self.expected_token_error(&self.look_ahead, &["eof", "}"]);
+                return self.expected_token_error(&self.look_ahead, &["`;`", "`eof`", "`}`"]);
             }
         }
         Ok(())
