@@ -333,7 +333,7 @@ fn builder_doc_snippet() {
     let p = Builder::new().module(false).js(js).build().unwrap();
     for part in p {
         let expecation = ProgramPart::Statement(Statement::For(ForStatement {
-            init: Some(LoopInit::Variable(vec![VariableDecl::with_value(
+            init: Some(LoopInit::Variable(VariableKind::Var, vec![VariableDecl::with_value(
                 "i",
                 Expression::number("0"),
             )])),
@@ -649,6 +649,20 @@ fn ghost_semi_colon() {
     let js = "function() {
     'string' + 0;
 }";
+    println!("{:#?}", parse(js));
+}
+
+#[test]
+fn spread_param_in_complicated_params() {
+    let _ = env_logger::try_init();
+    let js = "(...k) => {;};";
+    println!("{:#?}", parse(js));
+}
+
+#[test]
+fn assignment_in_complicated_params() {
+    let _ = env_logger::try_init();
+    let js = "({f, g: h, i = 0, i: j = 0}) => {;}";
     println!("{:#?}", parse(js));
 }
 

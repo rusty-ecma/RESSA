@@ -1215,6 +1215,7 @@ where
 
         if self.at_keyword(Keyword::Var) {
             let _ = self.next_item()?;
+            let kind = node::VariableKind::Var;
             let prev_in = self.context.allow_in;
             self.context.allow_in = false;
             let mut bindings = self.parse_variable_decl_list(true)?;
@@ -1226,20 +1227,20 @@ where
                     return self.expected_token_error(&self.look_ahead, &["variable decl"]);
                 };
                 if self.at_keyword(Keyword::In) {
-                    let left = node::LoopLeft::Variable(decl);
+                    let left = node::LoopLeft::Variable(kind, decl);
                     let stmt = self.parse_for_in_loop(left)?;
                     return Ok(node::Statement::ForIn(stmt));
                 } else if self.at_contextual_keyword("of") {
-                    let left = node::LoopLeft::Variable(decl);
+                    let left = node::LoopLeft::Variable(kind, decl);
                     let stmt = self.parse_for_of_loop(left, is_await)?;
                     return Ok(node::Statement::ForOf(stmt));
                 } else {
-                    let init = node::LoopInit::Variable(vec![decl]);
+                    let init = node::LoopInit::Variable(kind, vec![decl]);
                     let stmt = self.parse_for_loop_cont(Some(init))?;
                     return Ok(node::Statement::For(stmt));
                 }
             } else {
-                let init = node::LoopInit::Variable(bindings);
+                let init = node::LoopInit::Variable(kind, bindings);
                 let stmt = self.parse_for_loop_cont(Some(init))?;
                 return Ok(node::Statement::For(stmt));
             }
@@ -1256,10 +1257,7 @@ where
             if !self.context.strict && self.look_ahead.token.matches_keyword(Keyword::In) {
                 let _in = self.next_item()?;
                 //const or let becomes an ident
-                let left = node::LoopLeft::Variable(node::VariableDecl {
-                    id: node::Pattern::Identifier(kind.to_string()),
-                    init: None,
-                });
+                let left = node::LoopLeft::Expr(node::Expression::Ident(kind.to_string()));
                 let right = self.parse_expression()?;
                 Ok(node::Statement::ForIn(node::ForInStatement {
                     left,
@@ -1278,7 +1276,7 @@ where
                         return self.expected_token_error(&self.look_ahead, &["variable decl"]);
                     };
                     if decl.init.is_none() && self.at_keyword(Keyword::In) {
-                        let left = node::LoopLeft::Variable(decl);
+                        let left = node::LoopLeft::Variable(kind, decl);
                         let _in = self.next_item()?;
                         let right = self.parse_expression()?;
                         return Ok(node::Statement::ForIn(node::ForInStatement {
@@ -1287,17 +1285,17 @@ where
                             body: Box::new(self.parse_loop_body()?),
                         }));
                     } else if decl.init.is_none() && self.at_contextual_keyword("of") {
-                        let left = node::LoopLeft::Variable(decl);
+                        let left = node::LoopLeft::Variable(kind, decl);
                         return Ok(node::Statement::ForOf(
                             self.parse_for_of_loop(left, is_await)?,
                         ));
                     } else {
-                        let init = node::LoopInit::Variable(vec![decl]);
+                        let init = node::LoopInit::Variable(kind, vec![decl]);
                         let stmt = self.parse_for_loop_cont(Some(init))?;
                         return Ok(node::Statement::For(stmt));
                     }
                 } else {
-                    let init = node::LoopInit::Variable(decls);
+                    let init = node::LoopInit::Variable(kind, decls);
                     let stmt = self.parse_for_loop_cont(Some(init))?;
                     return Ok(node::Statement::For(stmt));
                 }
@@ -1344,13 +1342,13 @@ where
         }
     }
 
-    fn parse_for_loop(&mut self, _kind: node::VariableKind) -> Res<node::ForStatement> {
+    fn parse_for_loop(&mut self, kind: node::VariableKind) -> Res<node::ForStatement> {
         debug!("parse_for_loop");
         let init = if self.at_punct(Punct::SemiColon) {
             None
         } else {
             let list = self.parse_variable_decl_list(true)?;
-            Some(node::LoopInit::Variable(list))
+            Some(node::LoopInit::Variable(kind, list))
         };
         self.parse_for_loop_cont(init)
     }
@@ -2439,13 +2437,6 @@ where
                 has_proto = has_proto || found_proto;
                 prop
             };
-            debug!(
-                "pushing prop: {}",
-                match prop {
-                    node::ObjectProperty::Property(ref prop) => format!("{:?}", prop),
-                    node::ObjectProperty::Spread(ref s) => format!("{:?}", s),
-                }
-            );
             props.push(prop);
             if !self.at_punct(Punct::CloseBrace) {
                 self.expect_comma_sep()?;
@@ -2620,7 +2611,7 @@ where
         if let Token::Template(t) = self.next_item()?.token {
             let (raw, cooked, tail) = match t {
                 Template::Head(cooked) => (format!("`{}${{", cooked), cooked, false),
-                Template::Middle(cooked) => (format!("}}{}{{", cooked), cooked, false),
+                Template::Middle(cooked) => (format!("}}{}${{", cooked), cooked, false),
                 Template::Tail(cooked) => (format!("}}{}`", cooked), cooked, true),
                 Template::NoSub(cooked) => (format!("`{}`", cooked), cooked, true),
             };
@@ -2788,13 +2779,14 @@ where
         debug!("parse_rest_element");
         self.expect_punct(Punct::Spread)?;
         let (restricted, arg) = self.parse_pattern(None, params)?;
+        let ret = node::Pattern::RestElement(Box::new(arg));
         if self.at_punct(Punct::Assign) {
             return self.expected_token_error(&self.look_ahead, &["not assignment"]);
         }
         if !self.at_punct(Punct::CloseParen) {
             return self.expected_token_error(&self.look_ahead, &[")"]);
         }
-        Ok((restricted, arg))
+        Ok((restricted, ret))
     }
 
     fn parse_binding_rest_el(&mut self, params: &mut Vec<Item>) -> Res<(bool, node::Pattern)> {
@@ -3172,7 +3164,7 @@ where
     }
 
     fn reinterpret_expr_as_pat(&self, ex: node::Expression) -> Res<node::Pattern> {
-        debug!("reinterpret_expr_as_pat");
+        debug!("reinterpret_expr_as_pat {:#?}");
         match ex {
             node::Expression::Array(a) => {
                 let parts = a

@@ -93,7 +93,7 @@ fn run(file: &Path) -> Result<(), Error> {
         return Ok(());
     }
     if contents.starts_with("// |jit-test| module") {
-        return Ok(()); //FIXME: update this to parse as module
+        return Ok(()); //these all contain restricted word import as an ident
     }
     for part in Parser::new(&contents)? {
         let _part = part?;

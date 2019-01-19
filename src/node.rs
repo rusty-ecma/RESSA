@@ -861,7 +861,7 @@ impl ForStatement {
 /// for (var i = 0;i < 100; i++)
 #[derive(PartialEq, Debug, Clone)]
 pub enum LoopInit {
-    Variable(Vec<VariableDecl>),
+    Variable(VariableKind, Vec<VariableDecl>),
     Expr(Expression),
 }
 /// A for in statement, this kind of for statement
@@ -923,7 +923,7 @@ impl ForOfStatement {
 #[derive(PartialEq, Debug, Clone)]
 pub enum LoopLeft {
     Expr(Expression),
-    Variable(VariableDecl),
+    Variable(VariableKind, VariableDecl),
     Pattern(Pattern),
 }
 /// A variable, class, or function name
