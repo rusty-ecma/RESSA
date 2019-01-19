@@ -165,6 +165,7 @@ impl Default for Context {
 ///                 ForStatement {
 ///                     init: Some(
 ///                         LoopInit::Variable(
+///                             VariableKind::Var,
 ///                             vec![VariableDecl::with_value("i", Expression::number("0"))]
 ///                         )
 ///                     ),
