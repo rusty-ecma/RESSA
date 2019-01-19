@@ -3164,7 +3164,7 @@ where
     }
 
     fn reinterpret_expr_as_pat(&self, ex: node::Expression) -> Res<node::Pattern> {
-        debug!("reinterpret_expr_as_pat {:#?}");
+        debug!("reinterpret_expr_as_pat");
         match ex {
             node::Expression::Array(a) => {
                 let parts = a
