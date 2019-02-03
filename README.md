@@ -1,3 +1,7 @@
+[![travis](https://img.shields.io/travis/FreeMasen/RESSA.svg)](https://travis-ci.org/FreeMasen/RESSA)
+[![appveyor](https://img.shields.io/appveyor/ci/FreeMasen/RESSA.svg)](https://ci.appveyor.com/project/FreeMasen/RESSA)
+[![crates.io](https://img.shields.io/crates/v/ressa.svg)](https://crates.io/crates/ressa)
+[![last commit master](https://img.shields.io/github/last-commit/FreeMasen/RESSA.svg)](https://github.com/FreeMasen/RESSA/commits/master)
 # RESSA
 > Rust EcmaScript Syntax Analyzer
 
