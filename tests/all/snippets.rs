@@ -487,6 +487,16 @@ fn template_tail_error() {
 }
 
 #[test]
+fn ref_template() {
+    let _ = env_logger::try_init();
+    let js = r#"`\0\n\x0A\u000A\u{A}`"#;
+    let p = ressa::Builder::new().module(true).js(js).build().unwrap();
+    for part in p {
+        println!("{:#?}", part.unwrap());
+    }
+}
+
+#[test]
 fn comment_handler_test() {
     use ress::Item;
     let js = "//things
@@ -494,9 +504,9 @@ fn comment_handler_test() {
     <!-- things -->";
     let mut i = 0;
     let expectation = [
-        ress::Comment::new_single_line("things"),
-        ress::Comment::new_multi_line(" things "),
-        ress::Comment::new_html_no_tail(" things "),
+        ress::Comment::new_single_line("//things"),
+        ress::Comment::new_multi_line("/* things */"),
+        ress::Comment::new_html_no_tail("<!-- things -->"),
     ];
     let mut p = ressa::Builder::new()
         .js(js)
@@ -505,21 +515,6 @@ fn comment_handler_test() {
                 assert_eq!(c, &expectation[i])
             }
             i += 1;
-        })
-        .unwrap();
-    p.parse().unwrap();
-}
-
-#[test]
-fn comment_handler_test_2() {
-    use ress::Item;
-    let js = "//things
-    /*things*/
-    <!--things-->";
-    let mut p = ressa::Builder::new()
-        .js(js)
-        .with_comment_handler(|item: Item| {
-            assert!(item.matches_comment_str("things"));
         })
         .unwrap();
     p.parse().unwrap();
@@ -663,6 +658,55 @@ fn spread_param_in_complicated_params() {
 fn assignment_in_complicated_params() {
     let _ = env_logger::try_init();
     let js = "({f, g: h, i = 0, i: j = 0}) => {;}";
+    println!("{:#?}", parse(js));
+}
+
+#[test]
+fn less_than() {
+    let _ = env_logger::try_init();
+    let js = "0>>0; 0>>>0;
+
+0<0;";
+    println!("{:#?}", parse(js));
+}
+#[test]
+fn ref_regex() {
+    let _ = env_logger::try_init();
+    let js = r#"var
+	r20 = /%20/g,
+	rhash = /#.*$/,
+	rantiCache = /([?&])_=[^&]*/,
+	rheaders = /^(.*?):[ \t]*([^\r\n]*)$/mg,
+
+	// #7653, #8125, #8152: local protocol detection
+	rlocalProtocol = /^(?:about|app|app-storage|.+-extension|file|res|widget):$/,
+	rnoContent = /^(?:GET|HEAD)$/,
+	rprotocol = /^\/\//,
+
+	/* Prefilters
+	 * 1) They are useful to introduce custom dataTypes (see ajax/jsonp.js for an example)
+	 * 2) These are called:
+	 *    - BEFORE asking for a transport
+	 *    - AFTER param serialization (s.data is a string if s.processData is true)
+	 * 3) key is the dataType
+	 * 4) the catchall symbol "*" can be used
+	 * 5) execution will start with transport dataType and THEN continue down to "*" if needed
+	 */
+	prefilters = {},
+
+	/* Transports bindings
+	 * 1) key is the dataType
+	 * 2) the catchall symbol "*" can be used
+	 * 3) selection will start with transport dataType and THEN go to "*" if needed
+	 */
+	transports = {},
+
+	// Avoid comment-prolog char sequence (#10098); must appease lint and evade compression
+	allTypes = "*/".concat( "*" ),
+
+	// Anchor tag for parsing the document origin
+	originAnchor = document.createElement( "a" );
+	originAnchor.href = location.href;"#;
     println!("{:#?}", parse(js));
 }
 

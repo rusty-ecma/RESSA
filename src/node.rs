@@ -1633,16 +1633,16 @@ pub enum UnaryOperator {
 }
 
 impl UnaryOperator {
-    pub fn from_token(token: &ress::Token) -> Option<Self> {
+    pub fn from_token(token: &ress::refs::RefToken) -> Option<Self> {
         match token {
-            ress::Token::Punct(ref p) => match p {
+            ress::refs::RefToken::Punct(ref p) => match p {
                 ress::Punct::Minus => Some(UnaryOperator::Minus),
                 ress::Punct::Plus => Some(UnaryOperator::Plus),
                 ress::Punct::Not => Some(UnaryOperator::Not),
                 ress::Punct::BitwiseNot => Some(UnaryOperator::Tilde),
                 _ => None,
             },
-            ress::Token::Keyword(ref k) => match k {
+            ress::refs::RefToken::Keyword(ref k) => match k {
                 ress::Keyword::TypeOf => Some(UnaryOperator::TypeOf),
                 ress::Keyword::Void => Some(UnaryOperator::Void),
                 ress::Keyword::Delete => Some(UnaryOperator::Delete),
@@ -1720,14 +1720,14 @@ pub enum BinaryOperator {
 }
 
 impl BinaryOperator {
-    pub fn from_token(token: &ress::Token) -> Option<Self> {
+    pub fn from_token(token: &ress::refs::RefToken) -> Option<Self> {
         match token {
-            ress::Token::Keyword(ref key) => match key {
+            ress::refs::RefToken::Keyword(ref key) => match key {
                 ress::Keyword::InstanceOf => Some(BinaryOperator::InstanceOf),
                 ress::Keyword::In => Some(BinaryOperator::In),
                 _ => None,
             },
-            ress::Token::Punct(ref p) => match p {
+            ress::refs::RefToken::Punct(ref p) => match p {
                 ress::Punct::Equal => Some(BinaryOperator::Equal),
                 ress::Punct::NotEqual => Some(BinaryOperator::NotEqual),
                 ress::Punct::StrictEquals => Some(BinaryOperator::StrictEqual),
@@ -1851,9 +1851,9 @@ pub enum LogicalOperator {
 }
 
 impl LogicalOperator {
-    pub fn from_token(token: &ress::Token) -> Option<Self> {
+    pub fn from_token(token: &ress::refs::RefToken) -> Option<Self> {
         match token {
-            ress::Token::Punct(ref p) => match p {
+            ress::refs::RefToken::Punct(ref p) => match p {
                 ress::Punct::LogicalAnd => Some(LogicalOperator::And),
                 ress::Punct::LogicalOr => Some(LogicalOperator::Or),
                 _ => None,

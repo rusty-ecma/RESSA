@@ -10,7 +10,7 @@ keywords = ["JavaScript", "parsing", "JS", "ES", "ECMA"]
 categories = ["parsing", "text-processing", "web-programming"]
 
 [dependencies]
-ress = "0.6.2"
+ress = { path = "../ress" }
 log = "0.4"
 env_logger = "0.6"
 backtrace = "0"
