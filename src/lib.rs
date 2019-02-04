@@ -51,7 +51,13 @@ extern crate log;
 extern crate backtrace;
 extern crate env_logger;
 
-use ress::{Item, Keyword, Punct, Scanner, Span, Template, Token};
+use ress::{
+    refs::{
+        RefScanner as Scanner,
+        RefItem as Item,
+        RefToken as Token,
+    },
+    Keyword, Punct, Span};
 
 mod comment_handler;
 mod error;
@@ -775,14 +781,14 @@ where
             self.consume_semicolon()?;
             Ok(node::ModuleExport::All(source))
         } else if self.look_ahead.token.is_keyword() {
-            if self.look_ahead.token.matches_keyword(Keyword::Let)
-                || self.look_ahead.token.matches_keyword(Keyword::Const)
+            if self.look_ahead.token.matches_keyword(&Keyword::Let)
+                || self.look_ahead.token.matches_keyword(&Keyword::Const)
             {
                 let lex = self.parse_lexical_decl(false)?;
                 let decl = node::NamedExportDecl::Decl(lex);
                 self.consume_semicolon()?;
                 Ok(node::ModuleExport::Named(decl))
-            } else if self.look_ahead.token.matches_keyword(Keyword::Var) {
+            } else if self.look_ahead.token.matches_keyword(&Keyword::Var) {
                 let _ = self.next_item()?;
                 let var = node::Declaration::Variable(
                     node::VariableKind::Var,
@@ -791,12 +797,12 @@ where
                 let decl = node::NamedExportDecl::Decl(var);
                 self.consume_semicolon()?;
                 Ok(node::ModuleExport::Named(decl))
-            } else if self.look_ahead.token.matches_keyword(Keyword::Class) {
+            } else if self.look_ahead.token.matches_keyword(&Keyword::Class) {
                 let class = self.parse_class_decl(true)?;
                 let decl = node::Declaration::Class(class);
                 let decl = node::NamedExportDecl::Decl(decl);
                 Ok(node::ModuleExport::Named(decl))
-            } else if self.look_ahead.token.matches_keyword(Keyword::Function) {
+            } else if self.look_ahead.token.matches_keyword(&Keyword::Function) {
                 let func = self.parse_function_decl(true)?;
                 let decl = node::Declaration::Function(func);
                 let decl = node::NamedExportDecl::Decl(decl);
@@ -856,7 +862,7 @@ where
     fn parse_module_specifier(&mut self) -> Res<node::Literal> {
         let item = self.next_item()?;
         match &item.token {
-            Token::String(ref s) => Ok(node::Literal::String(s.to_string())),
+            Token::String(_) => Ok(node::Literal::String(self.get_string(&item.span))),
 
             _ => self.expected_token_error(&item, &["[string]"]),
         }
@@ -870,7 +876,7 @@ where
             | Token::Null
             | Token::Numeric(_)
             | Token::String(_)
-            | Token::RegEx(_)
+            | Token::RegEx
             | Token::Template(_) => {
                 let expr = self.parse_expression_statement()?;
                 node::Statement::Expr(expr)
@@ -893,7 +899,7 @@ where
                     node::Statement::Expr(expr)
                 }
             },
-            Token::Ident(_) => {
+            Token::Ident => {
                 if self.at_async_function() {
                     let f = self.parse_function_decl(true)?;
                     node::Statement::Expr(node::Expression::Function(f))
@@ -1255,7 +1261,7 @@ where
                 },
                 _ => return self.expected_token_error(&kind, &["const", "let"]),
             };
-            if !self.context.strict && self.look_ahead.token.matches_keyword(Keyword::In) {
+            if !self.context.strict && self.look_ahead.token.matches_keyword(&Keyword::In) {
                 let _in = self.next_item()?;
                 //const or let becomes an ident
                 let left = node::LoopLeft::Expr(node::Expression::Ident(kind.to_string()));
@@ -1431,7 +1437,7 @@ where
         self.expect_punct(Punct::OpenParen)?;
         let test = self.parse_expression()?;
         self.expect_punct(Punct::CloseParen)?;
-        if self.look_ahead.matches_punct(Punct::SemiColon) {
+        if self.look_ahead.token.matches_punct(&Punct::SemiColon) {
             self.expect_punct(Punct::SemiColon)?;
         }
         Ok(node::DoWhileStatement {
@@ -1860,9 +1866,9 @@ where
                 && !self.context.has_line_term
                 && self.at_contextual_keyword("async")
             {
-                if !self.look_ahead.token.matches_punct(Punct::Colon)
-                    && !self.look_ahead.token.matches_punct(Punct::OpenParen)
-                    && !self.look_ahead.token.matches_punct(Punct::Asterisk)
+                if !self.look_ahead.token.matches_punct(&Punct::Colon)
+                    && !self.look_ahead.token.matches_punct(&Punct::OpenParen)
+                    && !self.look_ahead.token.matches_punct(&Punct::Asterisk)
                 {
                     return self.expected_token_error(&self.look_ahead, &[":", "(", "*"]);
                 }
@@ -1872,7 +1878,7 @@ where
         let mut kind: Option<node::PropertyKind> = None;
         let mut method = false;
 
-        let look_ahead_prop_key = Self::qualified_prop_name(&self.look_ahead);
+        let look_ahead_prop_key = Self::qualified_prop_name(&self.look_ahead.token);
         if token.is_ident() {
             let (at_get, at_set) = if let Some(ref k) = key {
                 (
@@ -1895,7 +1901,7 @@ where
                 key = Some(self.parse_object_property_key()?);
                 value = Some(self.parse_setter_method()?);
             }
-        } else if token.matches_punct(Punct::Asterisk) && look_ahead_prop_key {
+        } else if token.matches_punct(&Punct::Asterisk) && look_ahead_prop_key {
             kind = Some(node::PropertyKind::Init);
             computed = self.at_punct(Punct::OpenBracket);
             key = Some(self.parse_object_property_key()?);
@@ -2130,27 +2136,30 @@ where
         tok.is_ident()
             || tok.is_keyword()
             || tok.is_literal()
-            || tok.matches_punct(Punct::OpenBracket)
+            || tok.matches_punct(&Punct::OpenBracket)
     }
 
     fn parse_object_property_key(&mut self) -> Res<node::PropertyKey> {
         debug!("parse_object_property_key");
         let item = self.next_item()?;
-        if item.token.is_string() || item.token.is_numeric() {
-            if item.token.is_oct_literal() {
-                //FIXME: possible tolerable error
-            }
-            let id = node::Literal::from_token(&item.token)
-                .ok_or(self.reinterpret_error("number or string", "literal"))?;
+        if item.token.is_string() || item.token.is_number() {
+            // if item.token.is_oct_literal() {
+            //     //FIXME: possible tolerable error
+            // }
+            let id = match &item.token {
+                Token::String(_) => node::Literal::String(self.get_string(&item.span)),
+                Token::Numeric(_) => node::Literal::Number(self.get_string(&item.span)),
+                _ => return Err(self.reinterpret_error("number or string", "literal")),
+            };
             Ok(node::PropertyKey::Literal(id))
         } else if item.token.is_ident()
-            || item.token.is_boolean()
+            || item.token.is_bool()
             || item.token.is_null()
             || item.token.is_keyword()
         {
-            let id = item.token.to_string();
+            let id = self.get_string(&item.span);
             Ok(node::PropertyKey::Expr(node::Expression::ident(&id)))
-        } else if item.token.matches_punct(Punct::OpenBracket) {
+        } else if item.token.matches_punct(&Punct::OpenBracket) {
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let key = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
@@ -2198,22 +2207,22 @@ where
                 self.parse_function_expr()
             } else {
                 let ident = self.next_item()?;
-                Ok(node::Expression::Ident(ident.token.to_string()))
+                Ok(node::Expression::Ident(self.get_string(&ident.span)))
             }
-        } else if self.look_ahead.token.is_numeric() || self.look_ahead.token.is_string() {
-            if self.context.strict && self.look_ahead.token.is_oct_literal() {
-                //FIXME: possible tolerable error
-            }
+        } else if self.look_ahead.token.is_number() || self.look_ahead.token.is_string() {
+            // if self.context.strict && self.look_ahead.token.is_oct_literal() {
+            //     //FIXME: possible tolerable error
+            // }
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let item = self.next_item()?;
             let lit = match item.token {
-                Token::Numeric(num) => node::Literal::Number(num.to_string()),
-                Token::String(s) => node::Literal::String(s.to_string()),
+                Token::Numeric(_) => node::Literal::Number(self.scanner.stream[item.span.start..item.span.end].to_string()),
+                Token::String(_) => node::Literal::String(self.scanner.stream[item.span.start..item.span.end].to_string()),
                 _ => unreachable!(),
             };
             Ok(node::Expression::Literal(lit))
-        } else if self.look_ahead.token.is_boolean() {
+        } else if self.look_ahead.token.is_bool() {
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let item = self.next_item()?;
@@ -2222,7 +2231,7 @@ where
                 _ => unreachable!(),
             };
             Ok(node::Expression::Literal(lit))
-        } else if self.look_ahead.token.is_template() {
+        } else if self.look_ahead.is_template() {
             let lit = self.parse_template_literal()?;
             Ok(node::Expression::Literal(node::Literal::Template(lit)))
         } else if self.look_ahead.token.is_punct() {
@@ -2243,9 +2252,15 @@ where
             self.context.is_binding_element = false;
             let regex = self.next_item()?;
             let lit = match regex.token {
-                Token::RegEx(ex) => node::RegEx {
-                    pattern: ex.body,
-                    flags: ex.flags.unwrap_or(String::new()),
+                Token::RegEx => {
+                    let raw = &self.scanner.stream[regex.span.start..regex.span.end];
+                    let end = raw.rfind('/').ok_or_else(|| Error::UnexpectedToken(self.get_item_position(&regex), "malformed regex".to_string()))?;
+                    let pattern = raw[1..end].to_string();
+                    let flags = raw[end+1..].to_string();
+                    node::RegEx {
+                        pattern,
+                        flags,
+                    }
                 },
                 _ => unreachable!(),
             };
@@ -2257,7 +2272,7 @@ where
             {
                 let ident = self.parse_ident_name()?;
                 Ok(node::Expression::Ident(ident))
-            } else if !self.context.strict && self.look_ahead.is_strict_reserved() {
+            } else if !self.context.strict && self.look_ahead.token.is_strict_reserved() {
                 let ident = self.parse_ident_name()?;
                 Ok(node::Expression::Ident(ident))
             } else {
@@ -2451,8 +2466,8 @@ where
         debug!("parse_obj_prop");
         let start = self.look_ahead.clone();
         let mut has_proto = has_proto;
-        let (key, is_async, computed) = if let Token::Ident(ref id) = start.token {
-            let mut id = id.clone();
+        let (key, is_async, computed) = if let Token::Ident = start.token {
+            let mut id = self.scanner.stream[start.span.start..start.span.end].to_string();
             let _ = self.next_item()?;
             let computed = self.at_punct(Punct::OpenBracket);
             let is_async = self.context.has_line_term
@@ -2475,7 +2490,7 @@ where
             (Some(key), false, computed)
         };
         let at_qualified = self.at_qualified_prop_key();
-        let prop = if start.token.matches_ident_str("get") && at_qualified && !is_async {
+        let prop = if &self.scanner.stream[start.span.start..start.span.end] == "get" && at_qualified && !is_async {
             node::ObjectProperty::Property(node::Property {
                 computed: self.at_punct(Punct::OpenBracket),
                 key: self.parse_object_property_key()?,
@@ -2484,7 +2499,7 @@ where
                 method: false,
                 short_hand: false,
             })
-        } else if start.token.matches_ident_str("set") && at_qualified && !is_async {
+        } else if &self.scanner.stream[start.span.start..start.span.end] == "set" && at_qualified && !is_async {
             node::ObjectProperty::Property(node::Property {
                 computed: self.at_punct(Punct::OpenBracket),
                 key: self.parse_object_property_key()?,
@@ -2493,7 +2508,7 @@ where
                 method: false,
                 short_hand: false,
             })
-        } else if start.token.matches_punct(Punct::Asterisk) && at_qualified {
+        } else if start.token.matches_punct(&Punct::Asterisk) && at_qualified {
             node::ObjectProperty::Property(node::Property {
                 computed: self.at_punct(Punct::OpenBracket),
                 key: self.parse_object_property_key()?,
@@ -2580,13 +2595,13 @@ where
     fn at_possible_ident(&self) -> bool {
         self.look_ahead.token.is_ident()
             || self.look_ahead.token.is_keyword()
-            || self.look_ahead.token.is_boolean()
+            || self.look_ahead.token.is_bool()
             || self.look_ahead.token.is_null()
     }
 
     fn parse_template_literal(&mut self) -> Res<node::TemplateLiteral> {
         debug!("parse_template_literal");
-        if !self.look_ahead.is_template_head() {
+        if !self.look_ahead.token.is_template_head() {
             return self
                 .expected_token_error(&self.look_ahead, &["template head", "template no sub"]);
         }
@@ -2609,12 +2624,14 @@ where
 
     fn parse_template_element(&mut self) -> Res<node::TemplateElement> {
         debug!("parse_template_element");
-        if let Token::Template(t) = self.next_item()?.token {
-            let (raw, cooked, tail) = match t {
-                Template::Head(cooked) => (format!("`{}${{", cooked), cooked, false),
-                Template::Middle(cooked) => (format!("}}{}${{", cooked), cooked, false),
-                Template::Tail(cooked) => (format!("}}{}`", cooked), cooked, true),
-                Template::NoSub(cooked) => (format!("`{}`", cooked), cooked, true),
+        let item = self.next_item()?;
+        if let Token::Template(t) = item.token {
+            let raw = self.get_string(&item.span);
+            let (cooked, tail) = match t {
+                ress::refs::tokens::Template::Head => (raw[1..raw.len() - 2].to_string(), false),
+                ress::refs::tokens::Template::Body => (raw[1..raw.len() - 2].to_string(), false),
+                ress::refs::tokens::Template::Tail => (raw[1..raw.len() - 1].to_string(), true),
+                ress::refs::tokens::Template::NoSub => (raw[1..raw.len() - 1].to_string(), true),
             };
             Ok(node::TemplateElement { raw, cooked, tail })
         } else {
@@ -2697,9 +2714,9 @@ where
         debug!("parse_ident_name");
         let ident = self.next_item()?;
         match ident.token {
-            Token::Ident(i) => Ok(i.to_string()),
+            Token::Ident => Ok(self.scanner.stream[ident.span.start..ident.span.end].to_string()),
             Token::Keyword(k) => Ok(k.to_string()),
-            Token::Boolean(b) => Ok(b.into()),
+            Token::Boolean(b) => Ok(b.to_string()),
             Token::Null => Ok("null".to_string()),
             _ => self.expected_token_error(&ident, &["identifier name"]),
         }
@@ -2708,7 +2725,7 @@ where
     fn parse_var_ident(&mut self, is_var: bool) -> Res<node::Identifier> {
         debug!("parse_var_ident");
         let ident = self.next_item()?;
-        if ident.token.matches_keyword(Keyword::Yield) {
+        if ident.token.matches_keyword(&Keyword::Yield) {
             if self.context.strict || !self.context.allow_yield {
                 return self.expected_token_error(&ident, &["variable identifier"]);
             }
@@ -2716,16 +2733,16 @@ where
             if self.context.strict && ident.token.is_strict_reserved() {
                 return self.expected_token_error(&ident, &["variable identifier"]);
             }
-            if self.context.strict || ident.token.matches_keyword(Keyword::Let) || !is_var {
+            if self.context.strict || ident.token.matches_keyword(&Keyword::Let) || !is_var {
                 return self.expected_token_error(&ident, &["variable identifier"]);
             }
         } else if (self.context.is_module || self.context.await)
-            && ident.token.matches_ident_str("await")
+            && &self.scanner.stream[ident.span.start..ident.span.end] == "await"
         {
             return self.expected_token_error(&ident, &["variable identifier"]);
         }
         match &ident.token {
-            &Token::Ident(ref i) => Ok(i.to_string()),
+            &Token::Ident => Ok(self.scanner.stream[ident.span.start..ident.span.end].to_string()),
             &Token::Keyword(ref k) => Ok(k.to_string()),
             _ => self.expected_token_error(&ident, &["variable identifier"]),
         }
@@ -2963,7 +2980,7 @@ where
             let mut current = self.parse_conditional_expr()?;
             let curr_line = self.get_item_position(&self.look_ahead).line;
             let start_line = self.get_item_position(&start).line;
-            if start.token.matches_ident_str("async")
+            if &self.scanner.stream[start.span.start..start.span.end] == "async"
                 && curr_line == start_line
                 && (self.look_ahead.token.is_ident() || self.at_keyword(Keyword::Yield))
             {
@@ -3318,7 +3335,7 @@ where
                         .pop()
                         .ok_or(self.op_error("invalid binary operation, no left expr in stack"))?;
                     debug!("left: {:#?} {}", left, self.context.allow_yield);
-                    if op.matches_punct(Punct::LogicalAnd) || op.matches_punct(Punct::LogicalOr) {
+                    if op.matches_punct(&Punct::LogicalAnd) || op.matches_punct(&Punct::LogicalOr) {
                         stack.push(node::Expression::Logical(node::LogicalExpression {
                             operator: node::LogicalOperator::from_token(&op)
                                 .ok_or(self.op_error("Unable to convert logical operator"))?,
@@ -3350,7 +3367,7 @@ where
                 let op = ops
                     .pop()
                     .ok_or(self.op_error("invalid binary operation, too few operators"))?;
-                if op.matches_punct(Punct::LogicalAnd) || op.matches_punct(Punct::LogicalOr) {
+                if op.matches_punct(&Punct::LogicalAnd) || op.matches_punct(&Punct::LogicalOr) {
                     let operator = node::LogicalOperator::from_token(&op)
                         .ok_or(self.op_error("Unable to convert logical operator"))?;
                     current = node::Expression::Logical(node::LogicalExpression {
@@ -3413,7 +3430,7 @@ where
             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
             let arg = self.parse_unary_expression()?;
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
-            if op.token.matches_keyword(Keyword::Delete) && self.context.strict && arg.is_ident() {
+            if op.token.matches_keyword(&Keyword::Delete) && self.context.strict && arg.is_ident() {
                 if !self.config.tolerant {
                     return self.unexpected_token_error(&op, "Cannot delete ident in strict mode");
                 }
@@ -3511,9 +3528,9 @@ where
                     self.context.is_binding_element = false;
                     let prefix = false;
                     let ret = node::UpdateExpression {
-                        operator: if op.token.matches_punct(Punct::Increment) {
+                        operator: if op.token.matches_punct(&Punct::Increment) {
                             node::UpdateOperator::Increment
-                        } else if op.token.matches_punct(Punct::Decrement) {
+                        } else if op.token.matches_punct(&Punct::Decrement) {
                             node::UpdateOperator::Decrement
                         } else {
                             return self.expected_token_error(&op, &["++", "--"]);
@@ -3570,7 +3587,7 @@ where
                     computed: false,
                 };
                 expr = node::Expression::Member(member);
-            } else if self.look_ahead.token.is_template() {
+            } else if self.look_ahead.is_template() {
                 let quasi = self.parse_template_literal()?;
                 expr = node::Expression::TaggedTemplate(node::TaggedTemplateExpression {
                     tag: Box::new(expr),
@@ -3782,7 +3799,7 @@ where
         self.expect_keyword(Keyword::New)?;
         if self.at_punct(Punct::Period) {
             let _ = self.next_item()?;
-            if self.look_ahead.token.matches_ident_str("target") && self.context.in_function_body {
+            if self.at_contextual_keyword("target") && self.context.in_function_body {
                 let property = self.parse_ident_name()?;
                 Ok(node::Expression::MetaProperty(node::MetaProperty {
                     meta: String::from("new"),
@@ -3923,8 +3940,18 @@ where
                 if cfg!(feature = "debug_look_ahead") {
                     self._look_ahead = format!("{:?}", look_ahead.token);
                 }
-                if look_ahead.token.is_comment() {
-                    self.comment_handler.handle_comment(look_ahead);
+                if let Token::Comment(ref kind) = &look_ahead.token {
+                    let c = self.scanner.stream[look_ahead.span.start..look_ahead.span.end].to_string();
+                    let kind = match kind {
+                        ress::refs::tokens::Comment::MultiLine => ress::CommentKind::Multi,
+                        ress::refs::tokens::Comment::SingleLine => ress::CommentKind::Single,
+                        ress::refs::tokens::Comment::Html => ress::CommentKind::Html,
+                    };
+                    let comment = ress::Comment::from_parts(c, kind, None);
+                    self.comment_handler.handle_comment(ress::Item {
+                        span: look_ahead.span,
+                        token: ress::tokens::Token::Comment(comment)
+                    });
                     continue;
                 }
                 let old_pos = self.get_item_position(&self.look_ahead);
@@ -3954,7 +3981,7 @@ where
     /// if it does
     fn expect_punct(&mut self, p: Punct) -> Res<()> {
         let next = self.next_item()?;
-        if !next.token.matches_punct(p) {
+        if !next.token.matches_punct(&p) {
             return self.expected_token_error(&next, &[&format!("{:?}", p)]);
         }
         Ok(())
@@ -3964,7 +3991,7 @@ where
     /// if it does
     fn expect_keyword(&mut self, k: Keyword) -> Res<()> {
         let next = self.next_item()?;
-        if !next.token.matches_keyword(k) {
+        if !next.token.matches_keyword(&k) {
             return self.expected_token_error(&next, &[&format!("{:?}", k)]);
         }
         Ok(())
@@ -3985,7 +4012,7 @@ where
             let state = self.scanner.get_state();
             self.scanner.skip_comments();
             let ret = if let Some(next) = self.scanner.next() {
-                next.token.matches_punct(Punct::OpenParen)
+                next.token.matches_punct(&Punct::OpenParen)
             } else {
                 false
             };
@@ -3998,7 +4025,7 @@ where
 
     fn at_qualified_prop_key(&self) -> bool {
         match &self.look_ahead.token {
-            Token::Ident(_)
+            Token::Ident
             | Token::String(_)
             | Token::Boolean(_)
             | Token::Numeric(_)
@@ -4018,10 +4045,10 @@ where
         self.scanner.skip_comments();
         let ret = if let Some(next) = self.scanner.next() {
             next.token.is_ident()
-                || next.token.matches_punct(Punct::OpenBracket)
-                || next.token.matches_punct(Punct::OpenBrace)
-                || next.token.matches_keyword(Keyword::Let)
-                || next.token.matches_keyword(Keyword::Yield)
+                || next.token.matches_punct(&Punct::OpenBracket)
+                || next.token.matches_punct(&Punct::OpenBrace)
+                || next.token.matches_keyword(&Keyword::Let)
+                || next.token.matches_keyword(&Keyword::Yield)
         } else {
             false
         };
@@ -4030,32 +4057,32 @@ where
     }
     /// Test for if the next token is a specific punct
     fn at_punct(&self, p: Punct) -> bool {
-        self.look_ahead.token.matches_punct(p)
+        self.look_ahead.token.matches_punct(&p)
     }
     /// Test for if the next token is a specific keyword
     fn at_keyword(&self, k: Keyword) -> bool {
-        self.look_ahead.token.matches_keyword(k)
+        self.look_ahead.token.matches_keyword(&k)
     }
     /// This test is for all the operators that might be part
     /// of an assignment statement
     fn at_assign(&self) -> bool {
-        self.look_ahead.token.matches_punct(Punct::Assign)
-            || self.look_ahead.token.matches_punct(Punct::MultiplyAssign)
-            || self.look_ahead.token.matches_punct(Punct::ExponentAssign)
-            || self.look_ahead.token.matches_punct(Punct::DivideAssign)
-            || self.look_ahead.token.matches_punct(Punct::ModuloAssign)
-            || self.look_ahead.token.matches_punct(Punct::AddAssign)
-            || self.look_ahead.token.matches_punct(Punct::SubtractAssign)
-            || self.look_ahead.token.matches_punct(Punct::LeftShiftAssign)
-            || self.look_ahead.token.matches_punct(Punct::RightShiftAssign)
+        self.look_ahead.token.matches_punct(&Punct::Assign)
+            || self.look_ahead.token.matches_punct(&Punct::MultiplyAssign)
+            || self.look_ahead.token.matches_punct(&Punct::ExponentAssign)
+            || self.look_ahead.token.matches_punct(&Punct::DivideAssign)
+            || self.look_ahead.token.matches_punct(&Punct::ModuloAssign)
+            || self.look_ahead.token.matches_punct(&Punct::AddAssign)
+            || self.look_ahead.token.matches_punct(&Punct::SubtractAssign)
+            || self.look_ahead.token.matches_punct(&Punct::LeftShiftAssign)
+            || self.look_ahead.token.matches_punct(&Punct::RightShiftAssign)
             || self
                 .look_ahead
                 .token
-                .matches_punct(Punct::UnsignedRightShiftAssign)
-            || self.look_ahead.token.matches_punct(Punct::AddAssign)
-            || self.look_ahead.token.matches_punct(Punct::BitwiseOrAssign)
-            || self.look_ahead.token.matches_punct(Punct::BitwiseXOrAssign)
-            || self.look_ahead.token.matches_punct(Punct::BitwiseAndAssign)
+                .matches_punct(&Punct::UnsignedRightShiftAssign)
+            || self.look_ahead.token.matches_punct(&Punct::AddAssign)
+            || self.look_ahead.token.matches_punct(&Punct::BitwiseOrAssign)
+            || self.look_ahead.token.matches_punct(&Punct::BitwiseXOrAssign)
+            || self.look_ahead.token.matches_punct(&Punct::BitwiseAndAssign)
     }
     /// The keyword `async` is conditional, that means to decided
     /// if we are actually at an async function we need to check the
@@ -4065,7 +4092,7 @@ where
             if let Some(peek) = self.scanner.look_ahead() {
                 let pos = self.get_item_position(&self.look_ahead);
                 let next_pos = self.get_item_position(&peek);
-                pos.line == next_pos.line && peek.token.matches_keyword(Keyword::Function)
+                pos.line == next_pos.line && peek.token.matches_keyword(&Keyword::Function)
             } else {
                 false
             }
@@ -4090,7 +4117,7 @@ where
     /// Tests if a token matches an &str that might represent
     /// a contextual keyword like `async`
     fn at_contextual_keyword(&self, s: &str) -> bool {
-        self.look_ahead.token.matches_ident_str(s)
+        &self.scanner.stream[self.look_ahead.span.start..self.look_ahead.span.end] == s
     }
     /// Sort of keywords `eval` and `arguments` have
     /// a special meaning and will cause problems
@@ -4118,32 +4145,36 @@ where
         let mut ret = true;
         let token = &self.look_ahead.token;
         if token.is_punct() {
-            ret = token.matches_punct(Punct::OpenBracket)
-                || token.matches_punct(Punct::OpenParen)
-                || token.matches_punct(Punct::OpenBracket)
-                || token.matches_punct(Punct::Plus)
-                || token.matches_punct(Punct::Minus)
-                || token.matches_punct(Punct::Not)
-                || token.matches_punct(Punct::BitwiseNot)
-                || token.matches_punct(Punct::Increment)
-                || token.matches_punct(Punct::Decrement)
+            ret = token.matches_punct(&Punct::OpenBracket)
+                || token.matches_punct(&Punct::OpenParen)
+                || token.matches_punct(&Punct::OpenBracket)
+                || token.matches_punct(&Punct::Plus)
+                || token.matches_punct(&Punct::Minus)
+                || token.matches_punct(&Punct::Not)
+                || token.matches_punct(&Punct::BitwiseNot)
+                || token.matches_punct(&Punct::Increment)
+                || token.matches_punct(&Punct::Decrement)
         }
         if token.is_keyword() {
-            ret = token.matches_keyword(Keyword::Class)
-                || token.matches_keyword(Keyword::Delete)
-                || token.matches_keyword(Keyword::Function)
-                || token.matches_keyword(Keyword::Let)
-                || token.matches_keyword(Keyword::New)
-                || token.matches_keyword(Keyword::Super)
-                || token.matches_keyword(Keyword::This)
-                || token.matches_keyword(Keyword::TypeOf)
-                || token.matches_keyword(Keyword::Void)
-                || token.matches_keyword(Keyword::Yield)
+            ret = token.matches_keyword(&Keyword::Class)
+                || token.matches_keyword(&Keyword::Delete)
+                || token.matches_keyword(&Keyword::Function)
+                || token.matches_keyword(&Keyword::Let)
+                || token.matches_keyword(&Keyword::New)
+                || token.matches_keyword(&Keyword::Super)
+                || token.matches_keyword(&Keyword::This)
+                || token.matches_keyword(&Keyword::TypeOf)
+                || token.matches_keyword(&Keyword::Void)
+                || token.matches_keyword(&Keyword::Yield)
         }
         if token.is_regex() {
             ret = true;
         }
         ret
+    }
+
+    fn get_string(&self, span: &Span) -> String {
+        self.scanner.stream[span.start..span.end].to_string()
     }
     /// performs a binary search of the list of lines to determine
     /// which line the item exists within and calculates the relative
@@ -4200,7 +4231,8 @@ where
         let bt = backtrace::Backtrace::new();
         error!("{:?}", bt);
         let pos = self.get_item_position(item);
-        let name = item.token.to_string();
+        
+        let name = self.scanner.stream[item.span.start..item.span.end].to_string();
         Err(Error::UnexpectedToken(
             pos,
             format!("Found unexpected token: {}; {}", name, msg),
@@ -4313,14 +4345,14 @@ mod test {
 }";
         let item1 = Item {
             span: Span { start: 9, end: 13 },
-            token: Token::ident("thing"),
+            token: Token::Ident,
         };
         let position1 = Position { line: 1, column: 9 };
         let p = Parser::new(js).unwrap();
         assert_eq!(p.get_item_position(&item1), position1);
         let item2 = Item {
             span: Span { start: 30, end: 36 },
-            token: Token::single_quoted_string("stuff"),
+            token: Token::String(ress::refs::tokens::StringLit::Double),
         };
         let position2 = Position {
             line: 2,
@@ -4329,7 +4361,7 @@ mod test {
         assert_eq!(p.get_item_position(&item2), position2);
         let item3 = Item {
             span: Span { start: 39, end: 40 },
-            token: Token::punct("}"),
+            token: Token::Punct(ress::Punct::CloseBrace)
         };
         let position3 = Position { line: 3, column: 0 };
         assert_eq!(p.get_item_position(&item3), position3);
