@@ -1,11 +1,5 @@
 use ress;
 
-#[derive(PartialEq, Debug)]
-#[doc(hidden)]
-pub struct Node {
-    pub position: Position,
-    pub item: Item,
-}
 #[derive(PartialEq, Debug, Clone, Copy)]
 /// A position in a file
 pub struct Position {
@@ -23,23 +17,6 @@ impl Position {
     pub fn start() -> Self {
         Self { line: 0, column: 0 }
     }
-}
-
-#[derive(PartialEq, Debug)]
-#[doc(hidden)]
-pub enum Item {
-    Program(Program),
-    Function(Function),
-    Statement(Statement),
-    SwitchCase(SwitchCase),
-    CatchClause(CatchClause),
-    VariableDecl(VariableDecl),
-    ModuleDecl(ModuleDecl),
-    Expr(Expression),
-    Property(Property),
-    Pattern(Pattern),
-    Super,
-    Class(Class),
 }
 
 /// A fully parsed javascript program.
