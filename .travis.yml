@@ -18,5 +18,11 @@ matrix:
       stages:
         after_script:
           - if branch in (master, next)
+      after_success: |
+        if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
+          cargo install cargo-tarpaulin &&
+          cargo tarpaulin --no-count --skip-clean --out Xml &&
+          bash <(curl -s https://codecov.io/bash)
+        fi
 notifications:
   email: never
