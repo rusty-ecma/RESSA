@@ -1207,7 +1207,7 @@ pub enum Expression {
     Await(Box<Expression>),
     /// An identifier
     Ident(Identifier),
-    /// Used for resolving possible sequence exressions
+    /// Used for resolving possible sequence expressions
     /// that are arrow parameters
     ArrowParamPlaceHolder(Vec<FunctionArg>, bool),
     /// A literal value, see `Literal`
