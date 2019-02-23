@@ -4,11 +4,11 @@ addons:
     apt:
         packages:
           - libssl-dev
+rust:
+  - stable
+  - nightly
 matrix:
   include:
-    - rust:
-        - stable
-        - nightly
       install:
         - npm i
       cache:
