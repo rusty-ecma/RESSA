@@ -19,7 +19,7 @@ extern crate test;
 
 use std::{fs::read_to_string, path::PathBuf};
 
-use ress::Scanner;
+use ress::refs::{RefScanner as Scanner, RefItem as Item};
 use ressa::Parser;
 use test::{black_box, Bencher};
 #[bench]
@@ -36,7 +36,7 @@ fn angular1_scanner_only(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::Angular) {
         b.iter(|| {
             let s = Scanner::new((&js).to_string());
-            let res: Vec<ress::Item> = s.collect();
+            let res: Vec<Item> = s.collect();
             black_box(res);
         });
     }
@@ -55,7 +55,7 @@ fn angular1_min_scanner_only(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::Angular) {
         b.iter(|| {
             let s = Scanner::new((&js).to_string());
-            let res: Vec<ress::Item> = s.collect();
+            let res: Vec<Item> = s.collect();
             black_box(res);
         });
     }
@@ -74,7 +74,7 @@ fn jquery_scanner_only(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::Jquery) {
         b.iter(|| {
             let s = Scanner::new((&js).to_string());
-            let res: Vec<ress::Item> = s.collect();
+            let res: Vec<Item> = s.collect();
             black_box(res);
         });
     }
@@ -93,7 +93,7 @@ fn jquery_min_scanner_only(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::Jquery) {
         b.iter(|| {
             let s = Scanner::new((&js).to_string());
-            let res: Vec<ress::Item> = s.collect();
+            let res: Vec<Item> = s.collect();
             black_box(res);
         });
     }
@@ -112,7 +112,7 @@ fn react_scanner_only(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::React) {
         b.iter(|| {
             let s = Scanner::new((&js).to_string());
-            let res: Vec<ress::Item> = s.collect();
+            let res: Vec<Item> = s.collect();
             black_box(res);
         });
     }
@@ -132,7 +132,7 @@ fn react_min_scanner_only(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::React) {
         b.iter(|| {
             let s = Scanner::new((&js).to_string());
-            let res: Vec<ress::Item> = s.collect();
+            let res: Vec<Item> = s.collect();
             black_box(res);
         });
     }
@@ -153,7 +153,7 @@ fn react_dom_scanner_only(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::ReactDom) {
         b.iter(|| {
             let s = Scanner::new((&js).to_string());
-            let res: Vec<ress::Item> = s.collect();
+            let res: Vec<Item> = s.collect();
             black_box(res);
         });
     }
@@ -174,7 +174,7 @@ fn react_dom_min_scanner_only(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::ReactDom) {
         b.iter(|| {
             let s = Scanner::new((&js).to_string());
-            let res: Vec<ress::Item> = s.collect();
+            let res: Vec<Item> = s.collect();
             black_box(res);
         });
     }
@@ -195,7 +195,7 @@ fn vue_scanner_only(b: &mut Bencher) {
     if let Ok(js) = get_js(Lib::Vue) {
         b.iter(|| {
             let s = Scanner::new((&js).to_string());
-            let res: Vec<ress::Item> = s.collect();
+            let res: Vec<Item> = s.collect();
             black_box(res);
         });
     }
@@ -216,7 +216,7 @@ fn vue_min_scanner_only(b: &mut Bencher) {
     if let Ok(js) = get_min_js(Lib::Vue) {
         b.iter(|| {
             let s = Scanner::new((&js).to_string());
-            let res: Vec<ress::Item> = s.collect();
+            let res: Vec<Item> = s.collect();
             black_box(res);
         });
     }

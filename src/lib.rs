@@ -314,6 +314,7 @@ where
     _comments: Vec<Item>,
     /// The current position we are parsing
     current_position: node::Position,
+    look_ahead_position: node::Position,
     /// To ease debugging this will be a String representation
     /// of the look_ahead token, it will be an empty string
     /// unless you are using the `debug_look_ahead` feature
@@ -457,6 +458,7 @@ where
             _tokens: vec![],
             _comments: vec![],
             current_position: node::Position::start(),
+            look_ahead_position: node::Position::start(),
             _look_ahead: String::new(),
             comment_handler,
         };
@@ -2038,10 +2040,10 @@ where
         debug!("parse_getter_method");
         let is_gen = false;
         let prev_yield = self.context.allow_yield;
-        let start = self.look_ahead.clone();
+        let start_position = self.look_ahead_position;
         let formal_params = self.parse_formal_params()?;
         if formal_params.params.len() > 0 {
-            self.tolerate_error(Error::InvalidGetterParams(self.get_item_position(&start)))?;
+            self.tolerate_error(Error::InvalidGetterParams(start_position))?;
         }
         let body = self.parse_method_body(formal_params.simple, formal_params.found_restricted)?;
         self.context.allow_yield = prev_yield;
@@ -2083,14 +2085,14 @@ where
         debug!("parse_setter_method");
         let prev_allow = self.context.allow_yield;
         self.context.allow_yield = true;
-        let start = self.look_ahead.clone();
+        let start_position = self.look_ahead_position;
         let params = self.parse_formal_params()?;
         self.context.allow_yield = prev_allow;
         if params.params.len() != 1 {
-            self.tolerate_error(Error::InvalidSetterParams(self.get_item_position(&start)))?;
+            self.tolerate_error(Error::InvalidSetterParams(start_position))?;
         } else if let Some(ref param) = params.params.get(0) {
             if param.is_rest() {
-                self.tolerate_error(Error::InvalidSetterParams(self.get_item_position(&start)))?;
+                self.tolerate_error(Error::InvalidSetterParams(start_position))?;
             }
         }
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
@@ -2115,14 +2117,13 @@ where
         let prev_strict = self.context.strict;
         let prev_allow = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
-        let start = self.look_ahead.clone();
+        let start_pos = self.look_ahead_position;
         let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
         let ret = self.parse_function_source_el()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
         if self.context.strict && found_restricted {
-            let pos = self.get_item_position(&start);
             self.tolerate_error(Error::NonStrictFeatureInStrictContext(
-                pos,
+                start_pos,
                 "restriced ident".to_string(),
             ))?;
         }
@@ -2254,7 +2255,7 @@ where
             let lit = match regex.token {
                 Token::RegEx => {
                     let raw = &self.scanner.stream[regex.span.start..regex.span.end];
-                    let end = raw.rfind('/').ok_or_else(|| Error::UnexpectedToken(self.get_item_position(&regex), "malformed regex".to_string()))?;
+                    let end = raw.rfind('/').ok_or_else(|| Error::UnexpectedToken(self.current_position, "malformed regex".to_string()))?;
                     let pattern = raw[1..end].to_string();
                     let flags = raw[end+1..].to_string();
                     node::RegEx {
@@ -2465,6 +2466,7 @@ where
     fn parse_obj_prop(&mut self, has_proto: bool) -> Res<(bool, node::ObjectProperty)> {
         debug!("parse_obj_prop");
         let start = self.look_ahead.clone();
+        let start_pos = self.look_ahead_position;
         let mut has_proto = has_proto;
         let (key, is_async, computed) = if let Token::Ident = start.token {
             let mut id = self.scanner.stream[start.span.start..start.span.end].to_string();
@@ -2523,9 +2525,8 @@ where
                 if self.at_punct(Punct::Colon) && !is_async {
                     if !computed && key.matches("__proto__") {
                         if has_proto {
-                            let pos = self.get_item_position(&start);
                             self.tolerate_error(Error::Redecl(
-                                pos,
+                                start_pos,
                                 "prototype can only be declared once".to_string(),
                             ))?;
                         }
@@ -2976,11 +2977,12 @@ where
         if !self.context.allow_yield && self.at_keyword(Keyword::Yield) {
             return self.parse_yield_expr();
         } else {
-            let start = self.look_ahead.clone();
+            let ress::Span { start, end } = self.look_ahead.span;
+            let start_pos = self.look_ahead_position;
             let mut current = self.parse_conditional_expr()?;
-            let curr_line = self.get_item_position(&self.look_ahead).line;
-            let start_line = self.get_item_position(&start).line;
-            if &self.scanner.stream[start.span.start..start.span.end] == "async"
+            let curr_line = self.look_ahead_position.line;
+            let start_line = start_pos.line;
+            if &self.scanner.stream[start..end] == "async"
                 && curr_line == start_line
                 && (self.look_ahead.token.is_ident() || self.at_keyword(Keyword::Yield))
             {
@@ -3610,7 +3612,7 @@ where
 
     fn parse_left_hand_side_expr_allow_call(&mut self) -> Res<node::Expression> {
         debug!("parse_left_hand_side_expr_allow_call");
-        let start_pos = self.get_item_position(&self.look_ahead);
+        let start_pos = self.look_ahead_position;
         let is_async = self.at_contextual_keyword("async");
         let prev_in = self.context.allow_in;
         self.context.allow_in = true;
@@ -3646,7 +3648,7 @@ where
                     computed: false,
                 })
             } else if self.at_punct(Punct::OpenParen) {
-                let current_pos = self.get_item_position(&self.look_ahead);
+                let current_pos = self.look_ahead_position;
                 let async_arrow = is_async && start_pos.line == current_pos.line;
                 self.context.is_binding_element = false;
                 self.context.is_assignment_target = false;
@@ -3954,8 +3956,7 @@ where
                     });
                     continue;
                 }
-                let old_pos = self.get_item_position(&self.look_ahead);
-                self.current_position = old_pos;
+                self.update_positions(look_ahead.span.start)?;
                 let ret = replace(&mut self.look_ahead, look_ahead);
                 return Ok(ret);
             } else {
@@ -3975,6 +3976,24 @@ where
                 }
             }
         }
+    }
+
+    fn update_positions(&mut self, next_look_ahead_start: usize) -> Res<()> {
+        let whitespace = &self.scanner.stream[self.look_ahead.span.end..next_look_ahead_start];
+        let old_look_ahead_pos = self.look_ahead_position;
+        if whitespace.len() == 0 {
+            self.look_ahead_position.column += 1;
+        } else {
+            let (new_line_counts, last_line) = whitespace.lines().enumerate().last().ok_or_else(|| Error::OperationError(self.current_position, String::from("Failed to calculate look_ahead position")))?;
+            self.look_ahead_position.line += new_line_counts;
+            self.look_ahead_position.column = if new_line_counts > 0 {
+                last_line.len()  
+            } else {
+                self.look_ahead_position.column + last_line.len()
+            };
+        }
+        self.current_position = old_look_ahead_pos;
+        Ok(())
     }
     /// Get the next token and validate that it matches
     /// the punct provided, discarding the result
@@ -4090,7 +4109,7 @@ where
     fn at_async_function(&mut self) -> bool {
         if self.at_contextual_keyword("async") {
             if let Some(peek) = self.scanner.look_ahead() {
-                let pos = self.get_item_position(&self.look_ahead);
+                let pos = self.look_ahead_position;
                 let next_pos = self.get_item_position(&peek);
                 pos.line == next_pos.line && peek.token.matches_keyword(&Keyword::Function)
             } else {
