@@ -1,8 +1,14 @@
 language: rust
 sudo: false
+addons:
+    apt:
+        packages:
+          - libssl-dev
 matrix:
   include:
-    - rust: stable
+    - rust: rust:
+        - stable
+        - nightly
       install:
         - npm i
       cache:
@@ -20,8 +26,8 @@ matrix:
           - if branch in (master, next)
       after_success: |
         if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
-          cargo install cargo-tarpaulin &&
-          cargo tarpaulin --no-count --skip-clean --out Xml &&
+          RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo +nightly install cargo-tarpaulin &&
+          cargo +nightly tarpaulin --no-count --skip-clean --out Xml &&
           bash <(curl -s https://codecov.io/bash)
         fi
 notifications:
