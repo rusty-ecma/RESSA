@@ -5,8 +5,6 @@ addons:
         packages:
           - libssl-dev
 matrix:
-  allow_failures:
-    - rust: nightly
   include:
     - rust:
         - stable
@@ -35,5 +33,7 @@ matrix:
           cargo +nightly tarpaulin --out Xml &&
           bash <(curl -s https://codecov.io/bash)
         fi
+  allow_failures:
+    - rust: nightly
 notifications:
   email: never
