@@ -7,32 +7,27 @@ addons:
 rust:
   - stable
   - nightly
+install:
+  - npm i
+cache:
+  - directories:
+    - node_modules
+    - /home/travis/.cargo
+    - moz-central
+before_cache:
+  - rm -rf /home/travis/.cargo/registry
+  - |
+    if [[ "$TRAVIS_RUST_VERSION" == nightly ]]; then
+      RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo +nightly install cargo-tarpaulin -f
+    fi
+script:
+  - cargo test --features moz_central
+after_success: |
+  if [[ "$TRAVIS_RUST_VERSION" == nightly ]]; then
+    cargo +nightly tarpaulin --out Xml &&
+    bash <(curl -s https://codecov.io/bash)
+  fi
 matrix:
-  include:
-      install:
-        - npm i
-      cache:
-        - directories:
-          - node_modules
-          - /home/travis/.cargo
-          - moz-central
-      before_cache:
-        - rm -rf /home/travis/.cargo/registry
-        - |
-          if [[ "$TRAVIS_RUST_VERSION" == nightly ]]; then
-            RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo +nightly install cargo-tarpaulin -f
-          fi
-      script:
-        - cargo test --features moz_central
-      after_script:
-      stages:
-        after_script:
-          - if branch in (master, next)
-      after_success: |
-        if [[ "$TRAVIS_RUST_VERSION" == nightly ]]; then
-          cargo +nightly tarpaulin --out Xml &&
-          bash <(curl -s https://codecov.io/bash)
-        fi
   allow_failures:
     - rust: nightly
 notifications:
