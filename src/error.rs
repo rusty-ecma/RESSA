@@ -1,4 +1,4 @@
-use node::Position;
+use crate::node::Position;
 use std::fmt::{Display, Formatter, Result};
 #[derive(Debug)]
 pub enum Error {

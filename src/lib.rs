@@ -63,10 +63,10 @@ mod comment_handler;
 mod error;
 pub mod node;
 
-pub use comment_handler::CommentHandler;
-use comment_handler::DefaultCommentHandler;
-pub use error::Error;
-use node::Position;
+pub use crate::comment_handler::CommentHandler;
+use crate::comment_handler::DefaultCommentHandler;
+pub use crate::error::Error;
+use crate::node::Position;
 use std::{collections::HashSet, mem::replace};
 
 /// The current configuration options.
@@ -92,7 +92,7 @@ struct Context {
     /// If `yield` is allowed as an identifier
     allow_yield: bool,
     /// If await is allowed as an identifier
-    await: bool,
+    r#await: bool,
     /// If we have found any possible naming errors
     /// which are not yet resolved
     first_covert_initialized_name_error: Option<Item>,
@@ -134,7 +134,7 @@ impl Default for Context {
         trace!("default context",);
         Self {
             is_module: false,
-            await: false,
+            r#await: false,
             allow_in: true,
             allow_strict_directive: true,
             allow_yield: true,
@@ -1717,9 +1717,9 @@ where
         } else {
             (None, None)
         };
-        let prev_await = self.context.await;
+        let prev_await = self.context.r#await;
         let prev_yield = self.context.allow_yield;
-        self.context.await = is_async;
+        self.context.r#await = is_async;
         self.context.allow_yield = !is_gen;
 
         let formal_params = self.parse_formal_params()?;
@@ -1739,7 +1739,7 @@ where
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow_strict;
-        self.context.await = prev_await;
+        self.context.r#await = prev_await;
         self.context.allow_yield = prev_yield;
         Ok(node::Function {
             id,
@@ -1984,13 +1984,13 @@ where
     fn parse_async_property_method(&mut self) -> Res<node::PropertyValue> {
         debug!("parse_property_method_async_fn");
         let prev_yield = self.context.allow_yield;
-        let prev_await = self.context.await;
+        let prev_await = self.context.r#await;
         self.context.allow_yield = false;
-        self.context.await = true;
+        self.context.r#await = true;
         let params = self.parse_formal_params()?;
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
-        self.context.await = prev_await;
+        self.context.r#await = prev_await;
         let func = node::Function {
             id: None,
             params: params.params,
@@ -2196,7 +2196,7 @@ where
     fn parse_primary_expression(&mut self) -> Res<node::Expression> {
         debug!("parse_primary_expression");
         if self.look_ahead.token.is_ident() {
-            if (self.context.is_module || self.context.await) && self.at_keyword(Keyword::Await) {
+            if (self.context.is_module || self.context.r#await) && self.at_keyword(Keyword::Await) {
                 if !self.config.tolerant {
                     return self.unexpected_token_error(
                         &self.look_ahead,
@@ -2651,9 +2651,9 @@ where
         if is_gen {
             let _ = self.next_item()?;
         }
-        let prev_await = self.context.await;
+        let prev_await = self.context.r#await;
         let prev_yield = self.context.allow_yield;
-        self.context.await = is_async;
+        self.context.r#await = is_async;
         self.context.allow_yield = !is_gen;
         let mut found_restricted = false;
         let id = if !self.at_punct(Punct::OpenParen) {
@@ -2691,7 +2691,7 @@ where
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_strict_dir;
         self.context.allow_yield = prev_yield;
-        self.context.await = prev_await;
+        self.context.r#await = prev_await;
         let func = node::Function {
             id,
             params: formal_params.params,
@@ -2737,7 +2737,7 @@ where
             if self.context.strict || ident.token.matches_keyword(&Keyword::Let) || !is_var {
                 return self.expected_token_error(&ident, &["variable identifier"]);
             }
-        } else if (self.context.is_module || self.context.await)
+        } else if (self.context.is_module || self.context.r#await)
             && &self.scanner.stream[ident.span.start..ident.span.end] == "await"
         {
             return self.expected_token_error(&ident, &["variable identifier"]);
@@ -3446,7 +3446,7 @@ where
                 operator,
                 argument: Box::new(arg),
             }))
-        } else if self.context.await && self.at_keyword(Keyword::Await) {
+        } else if self.context.r#await && self.at_keyword(Keyword::Await) {
             self.parse_await_expr()
         } else {
             self.parse_update_expr()
