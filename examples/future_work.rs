@@ -7,25 +7,12 @@ extern crate serde_derive;
 extern crate term_painter;
 extern crate walkdir;
 
-use std::{
-    fs::read_to_string,
-    path::PathBuf,
-};
+use std::{fs::read_to_string, path::PathBuf};
 
 use docopt::Docopt;
-use ress::{
-    Item,
-    Token,
-    Span,
-};
-use ressa::{
-    Builder,
-    CommentHandler,
-};
-use term_painter::{
-    ToStyle,
-    Color,
-};
+use ress::{Item, Span, Token};
+use ressa::{Builder, CommentHandler};
+use term_painter::{Color, ToStyle};
 use walkdir::WalkDir;
 
 static USAGE: &str = "
@@ -52,8 +39,8 @@ struct Args {
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
-                .and_then(|o| o.deserialize())
-                .unwrap_or_else(|e| e.exit());
+        .and_then(|o| o.deserialize())
+        .unwrap_or_else(|e| e.exit());
     if args.flag_dir.is_none() && args.flag_file.is_none() {
         println!("{}", USAGE);
         return;
@@ -73,7 +60,6 @@ fn main() {
     if let Some(f) = args.flag_file {
         parse_file(&f, !args.flag_no_color);
     }
-
 }
 
 fn parse_file(path: &PathBuf, color: bool) {
@@ -141,11 +127,16 @@ impl WorkHandler {
                 } else {
                     println!("{}: ({}) {}", "FIXME", line, msg);
                 }
-            },
+            }
             FutureWork::ToDo(span, msg) => {
                 let line = self.get_line_number(&span);
                 if self.color {
-                    println!(" {}: ({}) {}", Color::BrightCyan.bold().paint("TODO"), line, msg);
+                    println!(
+                        " {}: ({}) {}",
+                        Color::BrightCyan.bold().paint("TODO"),
+                        line,
+                        msg
+                    );
                 } else {
                     println!(" {}: ({}) {}", "TODO", line, msg);
                 }
@@ -160,7 +151,7 @@ impl WorkHandler {
                 index + 1
             } else {
                 let half = current_len >> 1;
-                if lines[half-1].1 + 1 >= span.start {
+                if lines[half - 1].1 + 1 >= span.start {
                     find_line(&lines[..half], index, span)
                 } else {
                     find_line(&lines[half..], index + half, span)
@@ -174,23 +165,24 @@ impl WorkHandler {
 impl CommentHandler for WorkHandler {
     fn handle_comment(&mut self, comment: Item) {
         match comment.token {
-            Token::Comment(c) =>
-            if c.is_multi_line() {
-                let mut counter = 0;
-                for line in c.content.lines() {
-                    let span = Span::new(comment.span.start + counter, comment.span.end);
-                    if let Some(work) = parse_line(span, line) {
+            Token::Comment(c) => {
+                if c.is_multi_line() {
+                    let mut counter = 0;
+                    for line in c.content.lines() {
+                        let span = Span::new(comment.span.start + counter, comment.span.end);
+                        if let Some(work) = parse_line(span, line) {
+                            self.counter += 1;
+                            self.report_work(work);
+                        }
+                        counter += line.len();
+                    }
+                } else {
+                    if let Some(work) = parse_line(comment.span, &c.content) {
                         self.counter += 1;
                         self.report_work(work);
                     }
-                    counter += line.len();
                 }
-            } else {
-                if let Some(work) = parse_line(comment.span, &c.content) {
-                    self.counter += 1;
-                    self.report_work(work);
-                }
-            },
+            }
             _ => (),
         }
     }
@@ -233,7 +225,7 @@ fn find_lines(text: &str) -> Vec<(usize, usize)> {
                         if next == "\r\n" {
                             None
                         } else {
-                            let ret = (line_start,byte_position);
+                            let ret = (line_start, byte_position);
                             line_start = byte_position + 1;
                             Some(ret)
                         }
@@ -242,7 +234,7 @@ fn find_lines(text: &str) -> Vec<(usize, usize)> {
                     }
                 }
                 '\n' => {
-                    let ret = (line_start,byte_position);
+                    let ret = (line_start, byte_position);
                     line_start = byte_position + 1;
                     Some(ret)
                 }
@@ -260,7 +252,8 @@ fn find_lines(text: &str) -> Vec<(usize, usize)> {
             // want to move the full width of the current byte
             byte_position += c.len_utf8();
             ret
-        }).collect();
+        })
+        .collect();
     // Since we shouldn't have only a new line char at EOF,
     // This will capture the last line of the text
     ret.push((line_start, text.len().saturating_sub(1)));

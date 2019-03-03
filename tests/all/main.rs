@@ -1,16 +1,16 @@
 extern crate env_logger;
 #[macro_use]
 extern crate log;
-extern crate ressa;
-extern crate ress;
-#[cfg(feature = "moz_central")]
-extern crate reqwest;
 #[cfg(feature = "moz_central")]
 extern crate flate2;
 #[cfg(feature = "moz_central")]
-extern crate tar;
-#[cfg(feature = "moz_central")]
 extern crate rayon;
+#[cfg(feature = "moz_central")]
+extern crate reqwest;
+extern crate ress;
+extern crate ressa;
+#[cfg(feature = "moz_central")]
+extern crate tar;
 
 mod ecma262;
 mod major_libs;

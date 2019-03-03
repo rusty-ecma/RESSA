@@ -8,9 +8,11 @@ license = "MIT"
 readme = "./README.md"
 keywords = ["JavaScript", "parsing", "JS", "ES", "ECMA"]
 categories = ["parsing", "text-processing", "web-programming"]
+edition = "2018"
 
 [dependencies]
 ress = "0.6.3"
+resast =  "0.2"
 log = "0.4"
 env_logger = "0.6"
 backtrace = "0"

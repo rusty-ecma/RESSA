@@ -1,7 +1,8 @@
 #![cfg(test)]
 use super::{get_js_file, EverythingVersion, Lib};
 use env_logger;
-use ressa::{node::ProgramPart, Builder, Parser};
+use resast::ProgramPart;
+use ressa::{Builder, Parser};
 
 #[test]
 fn es5() {
@@ -14,7 +15,8 @@ fn es5() {
         .map(|i| match i {
             Ok(i) => i,
             Err(e) => panic!("Error parsing {:?}\n{}", path, e),
-        }).collect();
+        })
+        .collect();
 }
 
 #[test]
@@ -46,7 +48,8 @@ fn es2015_module() {
         .map(|i| match i {
             Ok(i) => i,
             Err(e) => panic!("Error parsing {:?}\n{}", path, e),
-        }).collect();
+        })
+        .collect();
     // only one default export is allowed so these must be run ad-hoc
     let js_list = vec![
         "export default function (){}",
@@ -70,6 +73,7 @@ fn es2015_module() {
             .map(|i| match i {
                 Ok(i) => i,
                 Err(e) => panic!("Error parsing {}\n{}", export, e),
-            }).collect();
+            })
+            .collect();
     }
 }

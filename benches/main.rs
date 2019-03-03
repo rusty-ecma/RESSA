@@ -19,7 +19,7 @@ extern crate test;
 
 use std::{fs::read_to_string, path::PathBuf};
 
-use ress::refs::{RefScanner as Scanner, RefItem as Item};
+use ress::refs::{RefItem as Item, RefScanner as Scanner};
 use ressa::Parser;
 use test::{black_box, Bencher};
 #[bench]

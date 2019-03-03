@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use env_logger;
-use ressa::node::*;
+use resast::prelude::*;
 use ressa::Parser;
 
 #[test]
@@ -21,18 +21,18 @@ fn parse_directive_prologues() {
 }
 
 #[test]
-fn parse_with_statement() {
+fn parse_with_stmt() {
     let js = "with (Math) {
         floor(PI * random())
         }";
-    let random = Expression::call(Expression::ident("random"), vec![]);
-    let pi = Expression::ident("PI");
-    let bin = Expression::binary(pi, BinaryOperator::Times, random);
-    let floor = Expression::call(Expression::ident("floor"), vec![bin]);
-    let part = ProgramPart::Statement(Statement::Expr(floor));
-    let body = Statement::Block(vec![part]);
-    let stmt = Statement::with(Expression::ident("Math"), body);
-    let part = ProgramPart::Statement(stmt);
+    let random = Expr::call(Expr::ident("random"), vec![]);
+    let pi = Expr::ident("PI");
+    let bin = Expr::binary(pi, BinaryOperator::Times, random);
+    let floor = Expr::call(Expr::ident("floor"), vec![bin]);
+    let part = ProgramPart::Stmt(Stmt::Expr(floor));
+    let body = Stmt::Block(vec![part]);
+    let stmt = Stmt::with(Expr::ident("Math"), body);
+    let part = ProgramPart::Stmt(stmt);
     let expectation = Program::Script(vec![part]);
     execute(js, expectation);
 }
@@ -43,21 +43,17 @@ fn parse_while_stmt() {
         console.log('false');
         break;
     }";
-    let test = Expression::boolean(true);
-    let bk = Statement::Break(None);
-    let log_args = Expression::string("'false'");
-    let member = Expression::member(
-        Expression::ident("console"),
-        Expression::ident("log"),
-        false,
-    );
-    let call = Expression::call(member, vec![log_args]);
-    let call = Statement::Expr(call);
-    let part = ProgramPart::Statement(call);
-    let part2 = ProgramPart::Statement(bk);
-    let body = Statement::Block(vec![part, part2]);
-    let stmt = Statement::while_stmt(test, body);
-    let part = ProgramPart::Statement(stmt);
+    let test = Expr::boolean(true);
+    let bk = Stmt::Break(None);
+    let log_args = Expr::string("'false'");
+    let member = Expr::member(Expr::ident("console"), Expr::ident("log"), false);
+    let call = Expr::call(member, vec![log_args]);
+    let call = Stmt::Expr(call);
+    let part = ProgramPart::Stmt(call);
+    let part2 = ProgramPart::Stmt(bk);
+    let body = Stmt::Block(vec![part, part2]);
+    let stmt = Stmt::while_stmt(test, body);
+    let part = ProgramPart::Stmt(stmt);
     let expectation = Program::Script(vec![part]);
     execute(js, expectation);
 }
@@ -68,31 +64,23 @@ fn parse_while_stmt_2() {
     while (Math.random() > 0.1) {
         console.log('loop');
     }";
-    let math_random = Expression::call(
-        Expression::member(
-            Expression::ident("Math"),
-            Expression::ident("random"),
-            false,
-        ),
+    let math_random = Expr::call(
+        Expr::member(Expr::ident("Math"), Expr::ident("random"), false),
         vec![],
     );
-    let test = Expression::binary(
+    let test = Expr::binary(
         math_random,
         BinaryOperator::GreaterThan,
-        Expression::number("0.1"),
+        Expr::number("0.1"),
     );
-    let lp = Expression::string("'loop'");
-    let console_log = Expression::call(
-        Expression::member(
-            Expression::ident("console"),
-            Expression::ident("log"),
-            false,
-        ),
+    let lp = Expr::string("'loop'");
+    let console_log = Expr::call(
+        Expr::member(Expr::ident("console"), Expr::ident("log"), false),
         vec![lp],
     );
-    let body = Statement::Block(vec![ProgramPart::Statement(Statement::Expr(console_log))]);
-    let while_loop = Statement::while_stmt(test, body);
-    let part = ProgramPart::Statement(while_loop);
+    let body = Stmt::Block(vec![ProgramPart::Stmt(Stmt::Expr(console_log))]);
+    let while_loop = Stmt::while_stmt(test, body);
+    let part = ProgramPart::Stmt(while_loop);
     execute(js, Program::Script(vec![part]));
 }
 
@@ -100,8 +88,8 @@ fn parse_while_stmt_2() {
 fn parse_var_stmt() {
     let js = "var i;";
     let decl = VariableDecl::uninitialized("i");
-    let stmt = Statement::Var(vec![decl]);
-    let part = ProgramPart::Statement(stmt);
+    let stmt = Stmt::Var(vec![decl]);
+    let part = ProgramPart::Stmt(stmt);
     let program = Program::Script(vec![part]);
     execute(js, program);
 }
@@ -109,9 +97,9 @@ fn parse_var_stmt() {
 #[test]
 fn parse_var_stmt_2() {
     let js = "var i = 0;";
-    let decl = VariableDecl::with_value("i", Expression::number("0"));
-    let stmt = Statement::Var(vec![decl]);
-    let part = ProgramPart::Statement(stmt);
+    let decl = VariableDecl::with_value("i", Expr::number("0"));
+    let stmt = Stmt::Var(vec![decl]);
+    let part = ProgramPart::Stmt(stmt);
     let program = Program::Script(vec![part]);
     execute(js, program);
 }
@@ -119,13 +107,13 @@ fn parse_var_stmt_2() {
 #[test]
 fn parse_var_stmt_3() {
     let js = "var a, b, c, d = 22";
-    let stmt = Statement::Var(vec![
+    let stmt = Stmt::Var(vec![
         VariableDecl::uninitialized("a"),
         VariableDecl::uninitialized("b"),
         VariableDecl::uninitialized("c"),
-        VariableDecl::with_value("d", Expression::number("22")),
+        VariableDecl::with_value("d", Expr::number("22")),
     ]);
-    let part = ProgramPart::Statement(stmt);
+    let part = ProgramPart::Stmt(stmt);
     let program = Program::Script(vec![part]);
     execute(js, program);
 }
@@ -135,21 +123,17 @@ fn parse_var_stmt_fn() {
     let js = "var fn = function (one, two) {
         return one + two;
         }";
-    let addition = Expression::binary(
-        Expression::ident("one"),
-        BinaryOperator::Plus,
-        Expression::ident("two"),
-    );
-    let body = vec![ProgramPart::Statement(Statement::Return(Some(addition)))];
-    let func = Expression::function(
+    let addition = Expr::binary(Expr::ident("one"), BinaryOperator::Plus, Expr::ident("two"));
+    let body = vec![ProgramPart::Stmt(Stmt::Return(Some(addition)))];
+    let func = Expr::function(
         None,
         vec![FunctionArg::ident("one"), FunctionArg::ident("two")],
         body,
         false,
         false,
     );
-    let v = Statement::Var(vec![VariableDecl::with_value("fn", func)]);
-    let part = ProgramPart::Statement(v);
+    let v = Stmt::Var(vec![VariableDecl::with_value("fn", func)]);
+    let part = ProgramPart::Stmt(v);
     let program = Program::Script(vec![part]);
     execute(js, program);
 }
@@ -161,15 +145,15 @@ fn parse_var_stmt_fn_2() {
         yield 'two';
     }";
 
-    let one = Expression::yield_with_arg(Expression::string("'one'"), false);
-    let two = Expression::yield_with_arg(Expression::string("'two'"), false);
+    let one = Expr::yield_with_arg(Expr::string("'one'"), false);
+    let two = Expr::yield_with_arg(Expr::string("'two'"), false);
     let body = vec![
-        ProgramPart::Statement(Statement::Expr(one)),
-        ProgramPart::Statement(Statement::Expr(two)),
+        ProgramPart::Stmt(Stmt::Expr(one)),
+        ProgramPart::Stmt(Stmt::Expr(two)),
     ];
-    let func = Expression::function(Some("x".to_string()), vec![], body, true, false);
-    let v = Statement::Var(vec![VariableDecl::with_value("fn", func)]);
-    let part = ProgramPart::Statement(v);
+    let func = Expr::function(Some("x".to_string()), vec![], body, true, false);
+    let v = Stmt::Var(vec![VariableDecl::with_value("fn", func)]);
+    let part = ProgramPart::Stmt(v);
     let program = Program::Script(vec![part]);
     execute(js, program);
 }
@@ -183,8 +167,8 @@ fn parse_var_stmt_destructure() {
         ObjectProperty::number("c", "2"),
     ];
     let decl = VariableDecl::destructed(&["a", "b", "c"], init);
-    let stmt = Statement::Var(vec![decl]);
-    let program = Program::Script(vec![ProgramPart::Statement(stmt)]);
+    let stmt = Stmt::Var(vec![decl]);
+    let program = Program::Script(vec![ProgramPart::Stmt(stmt)]);
     execute(js, program);
 }
 
@@ -199,8 +183,8 @@ fn parse_var_stmt_destructure_rest() {
         ObjectProperty::number("e", "4"),
     ];
     let decl = VariableDecl::destructed_with_rest(&["a", "b", "c"], "arg", init);
-    let stmt = Statement::Var(vec![decl]);
-    let program = Program::Script(vec![ProgramPart::Statement(stmt)]);
+    let stmt = Stmt::Var(vec![decl]);
+    let program = Program::Script(vec![ProgramPart::Stmt(stmt)]);
     execute(js, program);
 }
 
@@ -228,11 +212,15 @@ fn parse_try_stmt_2() {
 fn parse_labeled_stmt_lf() {
     let js = "linefeed:0\n0;";
     let program = Program::Script(vec![
-        ProgramPart::Statement(Statement::Labeled(LabeledStatement {
+        ProgramPart::Stmt(Stmt::Labeled(LabeledStmt {
             label: "linefeed".to_string(),
-            body: Box::new(Statement::Expr(Expression::number("0"))),
+            body: Box::new(Stmt::Expr(Expr::Literal(Literal::Number(String::from(
+                "0",
+            ))))),
         })),
-        ProgramPart::Statement(Statement::Expr(Expression::number("0"))),
+        ProgramPart::Stmt(Stmt::Expr(Expr::Literal(Literal::Number(String::from(
+            "0",
+        ))))),
     ]);
     execute(js, program);
 }
@@ -264,13 +252,13 @@ fn parse_nested_delegated_yield() {
     parse(js);
 }
 #[test]
-fn parse_obj_patter_fn_fat_arrow() {
+fn parse_obj_pattern_fn_fat_arrow() {
     let _ = env_logger::try_init();
     let js = "({i = 0, i: j = 0}) => {;};";
     parse(js);
 }
 #[test]
-fn parse_obj_pattern_fn_fat_arrow2() {
+fn parse_obj_pat_fn_fat_arrow2() {
     let _ = env_logger::try_init();
     let js = "({x}) => ({x});";
 
@@ -309,12 +297,12 @@ fn parse_delete_comma_op() {
 fn doc_snippet() {
     let js = "function helloWorld() { alert('Hello world'); }";
     let p = Parser::new(&js).unwrap();
-    let f = ProgramPart::decl(Declaration::Function(Function {
+    let f = ProgramPart::decl(Decl::Function(Function {
         id: Some("helloWorld".to_string()),
         params: vec![],
-        body: vec![ProgramPart::Statement(Statement::Expr(Expression::call(
-            Expression::ident("alert"),
-            vec![Expression::string("'Hello world'")],
+        body: vec![ProgramPart::Stmt(Stmt::Expr(Expr::call(
+            Expr::ident("alert"),
+            vec![Expr::string("'Hello world'")],
         )))],
         generator: false,
         is_async: false,
@@ -332,31 +320,37 @@ fn builder_doc_snippet() {
         }";
     let p = Builder::new().module(false).js(js).build().unwrap();
     for part in p {
-        let expecation = ProgramPart::Statement(Statement::For(ForStatement {
-            init: Some(LoopInit::Variable(VariableKind::Var, vec![VariableDecl::with_value(
-                "i",
-                Expression::number("0"),
-            )])),
-            test: Some(Expression::binary(
-                Expression::ident("i"),
-                BinaryOperator::LessThan,
-                Expression::number("100"),
-            )),
-            update: Some(Expression::Update(UpdateExpression {
+        let var = VariableDecl {
+            id: Pat::Identifier("i".to_string()),
+            init: Some(Expr::Literal(Literal::Number("0".to_string()))),
+        };
+        let test = Expr::Binary(BinaryExpr {
+            left: Box::new(Expr::Ident("i".to_string())),
+            operator: BinaryOperator::LessThan,
+            right: Box::new(Expr::Literal(Literal::Number("100".to_string()))),
+        });
+        let body = Box::new(Stmt::Block(vec![ProgramPart::Stmt(Stmt::Expr(
+            Expr::Call(CallExpr {
+                callee: Box::new(Expr::Member(MemberExpr {
+                    object: Box::new(Expr::Ident("console".to_string())),
+                    property: Box::new(Expr::Ident("log".to_string())),
+                    computed: false,
+                })),
+                arguments: vec![
+                    Expr::Literal(Literal::String("'loop'".to_string())),
+                    Expr::Ident("i".to_string()),
+                ],
+            }),
+        ))]));
+        let expecation = ProgramPart::Stmt(Stmt::For(ForStmt {
+            init: Some(LoopInit::Variable(VariableKind::Var, vec![var])),
+            test: Some(test),
+            update: Some(Expr::Update(UpdateExpr {
                 operator: UpdateOperator::Increment,
-                argument: Box::new(Expression::ident("i")),
+                argument: Box::new(Expr::Ident("i".to_string())),
                 prefix: false,
             })),
-            body: Box::new(Statement::Block(vec![ProgramPart::Statement(
-                Statement::Expr(Expression::call(
-                    Expression::member(
-                        Expression::ident("console"),
-                        Expression::ident("log"),
-                        false,
-                    ),
-                    vec![Expression::string("'loop'"), Expression::ident("i")],
-                )),
-            )])),
+            body,
         }));
         assert_eq!(part.unwrap(), expecation);
     }
@@ -366,13 +360,16 @@ fn builder_doc_snippet() {
 fn parse_doc_example() {
     let js = "function helloWorld() { alert('Hello world'); }";
     let mut p = Parser::new(&js).unwrap();
-    let expectation = Program::Script(vec![ProgramPart::decl(Declaration::Function(Function {
+    let call = CallExpr {
+        callee: Box::new(Expr::Ident(String::from("alert"))),
+        arguments: vec![Expr::Literal(Literal::String(String::from(
+            "'Hello world'",
+        )))],
+    };
+    let expectation = Program::Script(vec![ProgramPart::Decl(Decl::Function(Function {
         id: Some("helloWorld".to_string()),
         params: vec![],
-        body: vec![ProgramPart::Statement(Statement::Expr(Expression::call(
-            Expression::ident("alert"),
-            vec![Expression::string("'Hello world'")],
-        )))],
+        body: vec![ProgramPart::Stmt(Stmt::Expr(Expr::Call(call)))],
         generator: false,
         is_async: false,
     }))]);
@@ -392,7 +389,7 @@ function Thing() {
         let part = part.expect("Error parsing part");
         match part {
             ProgramPart::Decl(decl) => match decl {
-                Declaration::Function(f) => {
+                Decl::Function(f) => {
                     if let Some(ref id) = f.id {
                         assert_eq!(id, "Thing");
                     }
@@ -401,11 +398,11 @@ function Thing() {
                     assert!(!f.is_async);
                     for part in f.body {
                         match part {
-                            ProgramPart::Statement(stmt) => match stmt {
-                                Statement::Return(expr) => {
+                            ProgramPart::Stmt(stmt) => match stmt {
+                                Stmt::Return(expr) => {
                                     if let Some(expr) = expr {
                                         match expr {
-                                            Expression::Literal(lit) => match lit {
+                                            Expr::Literal(lit) => match lit {
                                                 Literal::String(value) => {
                                                     assert_eq!(value, String::from("'stuff'"))
                                                 }
@@ -430,21 +427,17 @@ function Thing() {
 
 #[test]
 fn first_blog_post() {
-    let expect = ProgramPart::Decl(Declaration::Function(Function {
+    let expect = ProgramPart::Decl(Decl::Function(Function {
         id: Some(String::from("print")),
-        params: vec![FunctionArg::Pattern(Pattern::Identifier(String::from(
-            "message",
-        )))],
-        body: vec![ProgramPart::Statement(Statement::Expr(Expression::Call(
-            CallExpression {
-                callee: Box::new(Expression::Member(MemberExpression {
-                    object: Box::new(Expression::Ident(String::from("console"))),
-                    property: Box::new(Expression::Ident(String::from("log"))),
-                    computed: false,
-                })),
-                arguments: vec![Expression::Ident(String::from("message"))],
-            },
-        )))],
+        params: vec![FunctionArg::Pat(Pat::Identifier(String::from("message")))],
+        body: vec![ProgramPart::Stmt(Stmt::Expr(Expr::Call(CallExpr {
+            callee: Box::new(Expr::Member(MemberExpr {
+                object: Box::new(Expr::Ident(String::from("console"))),
+                property: Box::new(Expr::Ident(String::from("log"))),
+                computed: false,
+            })),
+            arguments: vec![Expr::Ident(String::from("message"))],
+        })))],
         generator: false,
         is_async: false,
     }));
@@ -455,7 +448,7 @@ fn first_blog_post() {
 }
 
 #[test]
-fn obj_pattern() {
+fn obj_pat() {
     let js = "console.log({a: 'thing', b() {console.log('b')}});";
     let out = parse(js);
     println!("{:?}", out);
@@ -528,7 +521,7 @@ fn class_expr() {
 }
 
 #[test]
-fn class_expr_pattern() {
+fn class_expr_pat() {
     let _ = env_logger::try_init();
     let js = "for ([class get {} ().iterator] of []);";
     println!("{:#?}", parse(js));
@@ -578,7 +571,7 @@ fn for_loop_nonsense() {
 }
 
 #[test]
-fn function_param_pattern() {
+fn function_param_pat() {
     let _ = env_logger::try_init();
     let js = r#"function f(x, await = () => Array.isArray(revocable.proxy), ...get) {
     dbg.getNewestFrame().older.eval("print(a)");
@@ -708,6 +701,82 @@ fn ref_regex() {
 	originAnchor = document.createElement( "a" );
 	originAnchor.href = location.href;"#;
     println!("{:#?}", parse(js));
+}
+#[test]
+fn job_queue() {
+    let _ = env_logger::try_init();
+    let js = 
+    "var log = '';
+async function f(label, k) {
+  log += label + '1';
+  await 1;
+  log += label + '2';
+  await 1;
+  log += label + '3';
+
+  return k();
+}";
+    println!("{:?}", parse(js));
+}
+
+#[test]
+fn another_async_fn_failure() {
+    let _ = env_logger::try_init();
+    let js = 
+r#"// Test uncatchable error when a stream's queuing strategy's size() method is called.
+
+// Make `debugger;` raise an uncatchable exception.
+let g = newGlobal({newCompartment: true});
+g.parent = this;
+g.hit = false;
+g.eval(`
+    var dbg = new Debugger(parent);
+    dbg.onDebuggerStatement = (_frame, exc) => (hit = true, null);
+`);
+
+let fnFinished = false;
+async function fn() {
+    // Await once to postpone the uncatchable error until we're running inside
+    // a reaction job. We don't want the rest of the test to be terminated.
+    // (`drainJobQueue` catches uncatchable errors!)
+    await 1; 
+
+    try {
+        // Create a stream with a strategy whose .size() method raises an
+        // uncatchable exception, and have it call that method.
+        new ReadableStream({
+            start(controller) {
+                controller.enqueue("FIRST POST");  // this calls .size()
+            }
+        }, {
+            size() {
+                debugger;
+            }
+        });
+    } finally {
+        fnFinished = true;
+    }
+}
+
+fn();
+drainJobQueue();
+assertEq(g.hit, true);
+assertEq(fnFinished, false);
+"#;
+    println!("{:?}", parse(js));
+
+}
+
+#[test]
+fn async_method_failure() {
+    let _ = env_logger::try_init();
+    let js =
+r#"class X {
+    async ["foo"]() {
+        return eval();
+    }
+}"#;
+    println!("{:?}", parse(js));
 }
 
 fn execute(js: &str, expectation: Program) {

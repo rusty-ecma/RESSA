@@ -17,7 +17,8 @@ impl CommentHandler for DefaultCommentHandler {
 }
 
 impl<F> CommentHandler for F
-where F: FnMut(Item)
+where
+    F: FnMut(Item),
 {
     fn handle_comment(&mut self, item: Item) {
         self(item)
