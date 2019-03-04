@@ -779,6 +779,18 @@ r#"class X {
     println!("{:?}", parse(js));
 }
 
+#[test]
+fn new_member_expr_failure() {
+    let _ = env_logger::try_init();
+    let js =
+"function isElement(node) {
+  return !!(node &&
+    (node.nodeName  // We are a direct element.
+    || (node.prop && node.attr && node.find)));  // We have an on and find method part of jQuery API.
+}";
+    println!("{:#?}", parse(js));
+}
+
 fn execute(js: &str, expectation: Program) {
     let s = parse(js);
     assert_eq!(s, expectation);

@@ -856,7 +856,7 @@ where
     fn parse_module_specifier(&mut self) -> Res<Literal> {
         let item = self.next_item()?;
         match &item.token {
-            Token::String(_) => Ok(Literal::String(self.get_string(&item.span))),
+            Token::String(_) => Ok(Literal::String(self.get_string(&item.span)?)),
             _ => self.expected_token_error(&item, &["[string]"]),
         }
     }
@@ -1487,7 +1487,6 @@ where
             } else {
                 return Err(self.reinterpret_error("expression", "ident"));
             };
-
             if !self.context.label_set.insert(format!("${}", &id)) {
                 return Err(self.redecl_error(&id));
             }
@@ -2206,8 +2205,8 @@ where
             //     //FIXME: possible tolerable error
             // }
             let id = match &item.token {
-                Token::String(_) => Literal::String(self.get_string(&item.span)),
-                Token::Numeric(_) => Literal::Number(self.get_string(&item.span)),
+                Token::String(_) => Literal::String(self.get_string(&item.span)?),
+                Token::Numeric(_) => Literal::Number(self.get_string(&item.span)?),
                 _ => return Err(self.reinterpret_error("number or string", "literal")),
             };
             Ok(PropertyKey::Literal(id))
@@ -2216,7 +2215,7 @@ where
             || item.token.is_null()
             || item.token.is_keyword()
         {
-            let id = self.get_string(&item.span);
+            let id = self.get_string(&item.span)?;
             Ok(PropertyKey::Expr(Expr::Ident(id)))
         } else if item.token.matches_punct(&Punct::OpenBracket) {
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
@@ -2276,7 +2275,7 @@ where
                 self.parse_function_expr()
             } else {
                 let ident = self.next_item()?;
-                Ok(Expr::Ident(self.get_string(&ident.span)))
+                Ok(Expr::Ident(self.get_string(&ident.span)?))
             }
         } else if self.look_ahead.token.is_number() || self.look_ahead.token.is_string() {
             // if self.context.strict && self.look_ahead.token.is_oct_literal() {
@@ -2287,10 +2286,10 @@ where
             let item = self.next_item()?;
             let lit = match item.token {
                 Token::Numeric(_) => {
-                    Literal::Number(self.scanner.stream[item.span.start..item.span.end].to_string())
+                    Literal::Number(self.scanner.string_for(&item.span).unwrap_or(String::new()))
                 }
                 Token::String(_) => {
-                    Literal::String(self.scanner.stream[item.span.start..item.span.end].to_string())
+                    Literal::String(self.scanner.string_for(&item.span).unwrap_or(String::new()))
                 }
                 _ => unreachable!(),
             };
@@ -2326,7 +2325,7 @@ where
             let regex = self.next_item()?;
             let lit = match regex.token {
                 Token::RegEx => {
-                    let raw = &self.scanner.stream[regex.span.start..regex.span.end];
+                    let raw = &self.scanner.string_for(&regex.span).unwrap_or(String::new());
                     let end = raw.rfind('/').ok_or_else(|| {
                         Error::UnexpectedToken(self.current_position, "malformed regex".to_string())
                     })?;
@@ -2532,7 +2531,7 @@ where
         let start_pos = self.look_ahead_position;
         let mut has_proto = has_proto;
         let (key, is_async, computed) = if let Token::Ident = start.token {
-            let id = self.scanner.stream[start.span.start..start.span.end].to_string();
+            let id = self.scanner.string_for(&start.span).unwrap_or(String::new());
             let _ = self.next_item()?;
             let computed = self.at_punct(Punct::OpenBracket);
             let is_async = self.context.has_line_term
@@ -2543,7 +2542,7 @@ where
             let key = if is_async {
                 self.parse_object_property_key()?
             } else {
-                PropertyKey::Expr(Expr::Ident(id.to_string()))
+                PropertyKey::Expr(Expr::Ident(id))
             };
             (Some(key), is_async, computed)
         } else if self.at_punct(Punct::Asterisk) {
@@ -2706,7 +2705,7 @@ where
         debug!("parse_template_element");
         let item = self.next_item()?;
         if let Token::Template(t) = item.token {
-            let raw = self.get_string(&item.span);
+            let raw = self.get_string(&item.span)?;
             let (cooked, tail) = match t {
                 ress::refs::tokens::Template::Head => (raw[1..raw.len() - 2].to_string(), false),
                 ress::refs::tokens::Template::Body => (raw[1..raw.len() - 2].to_string(), false),
@@ -2792,14 +2791,21 @@ where
 
     fn parse_ident_name(&mut self) -> Res<Identifier> {
         debug!("parse_ident_name");
-        let ident = self.next_item()?;
-        match ident.token {
-            Token::Ident => Ok(self.scanner.stream[ident.span.start..ident.span.end].to_string()),
-            Token::Keyword(k) => Ok(k.to_string()),
-            Token::Boolean(b) => Ok(b.to_string()),
-            Token::Null => Ok("null".to_string()),
-            _ => self.expected_token_error(&ident, &["identifier name"]),
-        }
+        let lh = self.get_string(&self.look_ahead.span);
+        debug!("lh: {:?}", lh);
+        let ident = self.next_item()?; 
+        let ret = self.get_string(&ident.span)?;
+        debug!("ident: {:?}", ret);
+        Ok(ret)
+
+        // let ret = match ident.token {
+        //     Token::Ident => Ok(self.scanner.string_for(&ident.span).unwrap_or(String::new())),
+        //     Token::Keyword(k) => Ok(k.to_string()),
+        //     Token::Boolean(b) => Ok(b.to_string()),
+        //     Token::Null => Ok("null".to_string()),
+        //     _ => self.expected_token_error(&ident, &["identifier name"]),
+        // };
+        // ret
     }
 
     fn parse_var_ident(&mut self, is_var: bool) -> Res<Identifier> {
@@ -2821,11 +2827,12 @@ where
         {
             return self.expected_token_error(&ident, &["variable identifier"]);
         }
-        match &ident.token {
-            &Token::Ident => Ok(self.scanner.stream[ident.span.start..ident.span.end].to_string()),
-            &Token::Keyword(ref k) => Ok(k.to_string()),
-            _ => self.expected_token_error(&ident, &["variable identifier"]),
-        }
+        let i = match &ident.token {
+            &Token::Ident => self.scanner.string_for(&ident.span).unwrap_or(String::new()),
+            &Token::Keyword(ref k) => k.to_string(),
+            _ => self.expected_token_error(&ident, &["variable identifier"])?,
+        };
+        Ok(i)
     }
 
     fn parse_formal_params(&mut self) -> Res<FormalParams> {
@@ -3443,24 +3450,20 @@ where
         let token = self.look_ahead.clone();
         let mut prec = self.bin_precedence(&token.token);
         if prec > 0 {
-            debug!("prec: {} > 0 {}", prec, self.context.allow_yield);
             self.next_item()?;
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let mut left = current.clone();
-            debug!("left: {:#?} {}", left, self.context.allow_yield);
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let mut right = self.parse_exponentiation_expression()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-            debug!("right: {:#?} {}", right, self.context.allow_yield);
             let mut stack = vec![left.clone(), right.clone()];
             let mut ops = vec![token.token.clone()];
             let mut precs = vec![prec];
             loop {
                 prec = self.bin_precedence(&self.look_ahead.token);
-                debug!("prec: {} > 0 {}", prec, self.context.allow_yield);
                 if prec <= 0 {
                     break;
                 }
@@ -3797,6 +3800,7 @@ where
                     object: Box::new(expr),
                     property: Box::new(prop),
                 };
+                debug!(target: "look_ahead", "{:?}", member);
                 expr = Expr::Member(member);
             } else if self.at_punct(Punct::Period) {
                 self.context.is_binding_element = false;
@@ -3866,7 +3870,8 @@ where
                     object: Box::new(expr),
                     property: Box::new(prop),
                     computed: false,
-                })
+                });
+                debug!(target: "look_ahead", "1 {:?}", expr);
             } else if self.at_punct(Punct::OpenParen) {
                 let current_pos = self.look_ahead_position;
                 let async_arrow = is_async && start_pos.line == current_pos.line;
@@ -3896,12 +3901,13 @@ where
                 let prop = self.parse_expression()?;
                 self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                 self.expect_punct(Punct::CloseBracket)?;
-                let inner = MemberExpr {
+                let member = MemberExpr {
                     object: Box::new(expr),
                     computed: true,
                     property: Box::new(prop),
                 };
-                expr = Expr::Member(inner);
+                debug!(target: "look_ahead", "{:?}", member);
+                expr = Expr::Member(member);
             } else if self.look_ahead.token.is_template_head() {
                 let quasi = self.parse_template_literal()?;
                 let temp = TaggedTemplateExpr {
@@ -4098,7 +4104,7 @@ where
         prev_first: Option<Item>,
     ) -> Res<()> {
         if let Some(ref _e) = prev_first {
-            //FIXME this needs todo something
+            //FIXME this needs to do something
             //like an error?
         }
         self.context.is_binding_element = prev_bind;
@@ -4152,24 +4158,17 @@ where
     /// swap the last look ahead with this new token
     /// and return the last token
     fn next_item(&mut self) -> Res<Item> {
-        trace!(target: "resp:trace", "{:?}", self.look_ahead);
+        let mut look_ahead_span = self.look_ahead.span;
         loop {
             self.context.has_line_term = self.scanner.pending_new_line;
             if let Some(look_ahead) = self.scanner.next() {
                 if cfg!(feature = "debug_look_ahead") {
-                    self._look_ahead = format!("{:?}", look_ahead.token);
+                    self._look_ahead = format!("{:?}: {:?}", look_ahead.token, self.scanner.string_for(&look_ahead.span));
+                    debug!("look_ahead: {:?}", self._look_ahead);
                 }
-                // let expected_current = self.get_item_position(&self.look_ahead);
-                // let expected_next = self.get_item_position(&look_ahead);
-                self.update_positions(look_ahead.span.start)?;
-                // debug!("\n\t{:?} - {:?} - {:?}\n\t{:?} - {:?} - {:?}", self.look_ahead.token, self.current_position, 
-                //                                                 expected_current, look_ahead.token, 
-                //                                                 self.look_ahead_position, expected_next);
-                // assert_eq!(self.current_position, expected_current);
-                // assert_eq!(self.look_ahead_position, expected_next);
+                self.update_positions(look_ahead_span, look_ahead.span.start)?;
                 if let Token::Comment(ref kind) = &look_ahead.token {
-                    let c =
-                        self.scanner.stream[look_ahead.span.start..look_ahead.span.end].to_string();
+                    let c = self.get_string(&look_ahead.span)?;
                     let kind = match kind {
                         ress::refs::tokens::Comment::MultiLine => ress::CommentKind::Multi,
                         ress::refs::tokens::Comment::SingleLine => ress::CommentKind::Single,
@@ -4180,10 +4179,9 @@ where
                         span: look_ahead.span,
                         token: ress::tokens::Token::Comment(comment),
                     });
-                    self.look_ahead.span = look_ahead.span;
+                    look_ahead_span = look_ahead.span;
                     continue;
                 }
-                // self.update_positions(look_ahead.span.start)?;
                 let ret = replace(&mut self.look_ahead, look_ahead);
                 return Ok(ret);
             } else {
@@ -4205,17 +4203,9 @@ where
         }
     }
 
-    fn update_positions(&mut self, next_look_ahead_start: usize) -> Res<()> {
-        let prev_text = &self.scanner.stream[self.look_ahead.span.start..next_look_ahead_start];
-        let whitespace = &self.scanner.stream[self.look_ahead.span.end..next_look_ahead_start];
-        // if whitespace.len() == 0 {
-        //     debug!("empty whitespace");
-        //     if next_look_ahead_start != 0 {
-        //         self.current_position = self.look_ahead_position;
-        //         self.look_ahead_position.column += 1;
-        //     }
-        //     return Ok(())
-        // }
+    fn update_positions(&mut self, look_ahead_span: Span, next_look_ahead_start: usize) -> Res<()> {
+        let prev_text = &self.scanner.stream[look_ahead_span.start..next_look_ahead_start];
+        let whitespace = &self.scanner.stream[look_ahead_span.end..next_look_ahead_start];
         
         let old_look_ahead_pos = self.look_ahead_position;
         self.current_position = old_look_ahead_pos;
@@ -4225,7 +4215,6 @@ where
             return Ok(())
         }
         let last_line_len = if let Some(last_line) = prev_text.lines().last() {
-            debug!("last_line {:?} {:?}", last_line, &prev_text[prev_text.len() - 2..prev_text.len()]);
             // Lines doesn't include a final empty line if the string ends with a new line
             // we need to make sure we reset the column to 0 if the string ends with a new line
             if let Some(ref c) = prev_text.chars().last() {
@@ -4243,7 +4232,6 @@ where
         };
         self.look_ahead_position.line += line_counts;
         self.look_ahead_position.column = last_line_len;
-        debug!(target: "update_position", "old_look_ahead_pos {:?} - new_look_ahead_pos {:?}", old_look_ahead_pos, self.look_ahead_position);
         Ok(())
     }
     /// Get the next token and validate that it matches
@@ -4458,8 +4446,8 @@ where
         ret
     }
 
-    fn get_string(&self, span: &Span) -> String {
-        self.scanner.stream[span.start..span.end].to_string()
+    fn get_string(&self, span: &Span) -> Res<String> {
+        self.scanner.string_for(span).ok_or_else(|| self.op_error("Unable to get string"))
     }
     /// performs a binary search of the list of lines to determine
     /// which line the item exists within and calculates the relative
@@ -4517,7 +4505,7 @@ where
         error!("{:?}", bt);
         let pos = self.get_item_position(item);
 
-        let name = self.scanner.stream[item.span.start..item.span.end].to_string();
+        let name = self.scanner.string_for(&item.span).unwrap_or(String::new());
         Err(Error::UnexpectedToken(
             pos,
             format!("Found unexpected token: {}; {}", name, msg),
