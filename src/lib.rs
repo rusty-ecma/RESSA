@@ -124,6 +124,8 @@ struct Context {
     /// If we have passed the initial prelude where a valid
     /// `'use strict'` directive would exist
     past_prolog: bool,
+    /// If we encounter an error, the iterator should stop
+    errored: bool,
 }
 
 impl Default for Config {
@@ -152,6 +154,7 @@ impl Default for Context {
             strict: false,
             has_line_term: false,
             past_prolog: false,
+            errored: false,
         }
     }
 }
@@ -455,14 +458,8 @@ where
             context,
             _tokens: vec![],
             _comments: vec![],
-            current_position: Position {
-                line: 1,
-                column: 0,
-            },
-            look_ahead_position: Position {
-                line: 1,
-                column: 0,
-            },
+            current_position: Position { line: 1, column: 0 },
+            look_ahead_position: Position { line: 1, column: 0 },
             _look_ahead: String::new(),
             comment_handler,
         };
@@ -2206,7 +2203,15 @@ where
             // }
             let id = match &item.token {
                 Token::String(_) => Literal::String(self.get_string(&item.span)?),
-                Token::Numeric(_) => Literal::Number(self.get_string(&item.span)?),
+                Token::Numeric(_) => {
+                    if self.at_big_int_flag() {
+                        return self.unexpected_token_error(
+                            &self.look_ahead,
+                            "BigInt cannot be uses as an object literal key",
+                        );
+                    }
+                    Literal::Number(self.get_string(&item.span)?)
+                }
                 _ => return Err(self.reinterpret_error("number or string", "literal")),
             };
             Ok(PropertyKey::Literal(id))
@@ -2286,7 +2291,13 @@ where
             let item = self.next_item()?;
             let lit = match item.token {
                 Token::Numeric(_) => {
-                    Literal::Number(self.scanner.string_for(&item.span).unwrap_or(String::new()))
+                    let mut span = item.span;
+                    if self.at_big_int_flag() {
+                        span.end += 1;
+                        // Consume the ident
+                        let _n = self.next_item();
+                    }
+                    Literal::Number(self.scanner.string_for(&span).unwrap_or(String::new()))
                 }
                 Token::String(_) => {
                     Literal::String(self.scanner.string_for(&item.span).unwrap_or(String::new()))
@@ -2325,7 +2336,10 @@ where
             let regex = self.next_item()?;
             let lit = match regex.token {
                 Token::RegEx => {
-                    let raw = &self.scanner.string_for(&regex.span).unwrap_or(String::new());
+                    let raw = &self
+                        .scanner
+                        .string_for(&regex.span)
+                        .unwrap_or(String::new());
                     let end = raw.rfind('/').ok_or_else(|| {
                         Error::UnexpectedToken(self.current_position, "malformed regex".to_string())
                     })?;
@@ -2531,7 +2545,10 @@ where
         let start_pos = self.look_ahead_position;
         let mut has_proto = has_proto;
         let (key, is_async, computed) = if let Token::Ident = start.token {
-            let id = self.scanner.string_for(&start.span).unwrap_or(String::new());
+            let id = self
+                .scanner
+                .string_for(&start.span)
+                .unwrap_or(String::new());
             let _ = self.next_item()?;
             let computed = self.at_punct(Punct::OpenBracket);
             let is_async = self.context.has_line_term
@@ -2793,19 +2810,10 @@ where
         debug!("parse_ident_name");
         let lh = self.get_string(&self.look_ahead.span);
         debug!("lh: {:?}", lh);
-        let ident = self.next_item()?; 
+        let ident = self.next_item()?;
         let ret = self.get_string(&ident.span)?;
         debug!("ident: {:?}", ret);
         Ok(ret)
-
-        // let ret = match ident.token {
-        //     Token::Ident => Ok(self.scanner.string_for(&ident.span).unwrap_or(String::new())),
-        //     Token::Keyword(k) => Ok(k.to_string()),
-        //     Token::Boolean(b) => Ok(b.to_string()),
-        //     Token::Null => Ok("null".to_string()),
-        //     _ => self.expected_token_error(&ident, &["identifier name"]),
-        // };
-        // ret
     }
 
     fn parse_var_ident(&mut self, is_var: bool) -> Res<Identifier> {
@@ -2828,7 +2836,10 @@ where
             return self.expected_token_error(&ident, &["variable identifier"]);
         }
         let i = match &ident.token {
-            &Token::Ident => self.scanner.string_for(&ident.span).unwrap_or(String::new()),
+            &Token::Ident => self
+                .scanner
+                .string_for(&ident.span)
+                .unwrap_or(String::new()),
             &Token::Keyword(ref k) => k.to_string(),
             _ => self.expected_token_error(&ident, &["variable identifier"])?,
         };
@@ -4163,7 +4174,11 @@ where
             self.context.has_line_term = self.scanner.pending_new_line;
             if let Some(look_ahead) = self.scanner.next() {
                 if cfg!(feature = "debug_look_ahead") {
-                    self._look_ahead = format!("{:?}: {:?}", look_ahead.token, self.scanner.string_for(&look_ahead.span));
+                    self._look_ahead = format!(
+                        "{:?}: {:?}",
+                        look_ahead.token,
+                        self.scanner.string_for(&look_ahead.span)
+                    );
                     debug!("look_ahead: {:?}", self._look_ahead);
                 }
                 self.update_positions(look_ahead_span, look_ahead.span.start)?;
@@ -4206,13 +4221,17 @@ where
     fn update_positions(&mut self, look_ahead_span: Span, next_look_ahead_start: usize) -> Res<()> {
         let prev_text = &self.scanner.stream[look_ahead_span.start..next_look_ahead_start];
         let whitespace = &self.scanner.stream[look_ahead_span.end..next_look_ahead_start];
-        
+
         let old_look_ahead_pos = self.look_ahead_position;
         self.current_position = old_look_ahead_pos;
-        let line_counts = prev_text.chars().filter(|c| c == &'\n' || c == &'\r' || c == &'\u{2028}' || c == &'\u{2029}').count() - whitespace.matches("\r\n").count();
+        let line_counts = prev_text
+            .chars()
+            .filter(|c| c == &'\n' || c == &'\r' || c == &'\u{2028}' || c == &'\u{2029}')
+            .count()
+            - whitespace.matches("\r\n").count();
         if line_counts == 0 {
             self.look_ahead_position.column += prev_text.len();
-            return Ok(())
+            return Ok(());
         }
         let last_line_len = if let Some(last_line) = prev_text.lines().last() {
             // Lines doesn't include a final empty line if the string ends with a new line
@@ -4223,7 +4242,6 @@ where
                 } else {
                     last_line.len()
                 }
-
             } else {
                 0
             }
@@ -4286,9 +4304,14 @@ where
             Token::Ident
             | Token::String(_)
             | Token::Boolean(_)
-            | Token::Numeric(_)
             | Token::Null
             | Token::Keyword(_) => true,
+            Token::Numeric(_) => {
+                let start = self.look_ahead.span.end + 1;
+                let next_char = &self.scanner.stream[start..start + 1];
+                debug!("next_char: {}", next_char);
+                next_char != "n"
+            }
             Token::Punct(ref p) => p == &Punct::OpenBracket,
             _ => false,
         }
@@ -4361,7 +4384,10 @@ where
                 debug!("peeking ahead {:?}", peek);
                 let pos = self.look_ahead_position;
                 let next_pos = self.get_item_position(&peek);
-                debug!("positions:\n\tlook ahead 1: {:?}\n\tlook ahead 2: {:?}", pos, next_pos);
+                debug!(
+                    "positions:\n\tlook ahead 1: {:?}\n\tlook ahead 2: {:?}",
+                    pos, next_pos
+                );
                 pos.line == next_pos.line && peek.token.matches_keyword(&Keyword::Function)
             } else {
                 debug!("scanner failed to lookahead");
@@ -4446,8 +4472,15 @@ where
         ret
     }
 
+    fn at_big_int_flag(&self) -> bool {
+        let Span { start, end } = self.look_ahead.span;
+        &self.scanner.stream[start..end] == "n"
+    }
+
     fn get_string(&self, span: &Span) -> Res<String> {
-        self.scanner.string_for(span).ok_or_else(|| self.op_error("Unable to get string"))
+        self.scanner
+            .string_for(span)
+            .ok_or_else(|| self.op_error("Unable to get string"))
     }
     /// performs a binary search of the list of lines to determine
     /// which line the item exists within and calculates the relative
@@ -4533,7 +4566,13 @@ where
     fn next_part(&mut self) -> Res<ProgramPart> {
         if !self.context.past_prolog {
             if self.look_ahead.is_string() {
-                let next_part = self.parse_directive()?;
+                let next_part = match self.parse_directive() {
+                    Ok(n) => n,
+                    Err(e) => {
+                        self.context.errored = true;
+                        return Err(e);
+                    }
+                };
                 self.context.past_prolog = match &next_part {
                     ProgramPart::Dir(_) => false,
                     _ => true,
@@ -4543,7 +4582,13 @@ where
                 self.context.past_prolog = true;
             }
         }
-        let ret = self.parse_statement_list_item()?;
+        let ret = match self.parse_statement_list_item() {
+            Ok(p) => p,
+            Err(e) => {
+                self.context.errored = true;
+                return Err(e);
+            }
+        };
         trace!(target: "resp:trace", "{:?}", ret);
         Ok(ret)
     }
@@ -4555,7 +4600,7 @@ where
 {
     type Item = Res<ProgramPart>;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.look_ahead.token.is_eof() {
+        if self.look_ahead.token.is_eof() || self.context.errored {
             None
         } else {
             Some(self.next_part())

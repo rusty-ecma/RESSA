@@ -196,9 +196,9 @@ fn parse_line(span: Span, line: &str) -> Option<FutureWork> {
     } else {
         return None;
     };
-    let work = line.trim_left_matches(prefix);
-    let work = work.trim_left_matches(":");
-    let work = work.trim_left().to_owned();
+    let work = line.trim_start_matches(prefix);
+    let work = work.trim_start_matches(":");
+    let work = work.trim_start().to_owned();
     Some(if todo {
         FutureWork::ToDo(span, work)
     } else {
