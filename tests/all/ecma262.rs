@@ -24,7 +24,7 @@ fn es2015_script() {
     let _ = env_logger::try_init();
     info!("ES2015 Script");
     let path = Lib::Everything(EverythingVersion::Es2015Script).path();
-    let js = get_js_file(&path).expect(&format!("Faield to get {:?}", path));
+    let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
     let mut p = Parser::new(&js).expect("Failed to create parser");
     let mut res = vec![];
     while let Some(item) = p.next() {
@@ -38,7 +38,7 @@ fn es2015_module() {
     info!("ES2015 Module");
     let _ = env_logger::try_init();
     let path = Lib::Everything(EverythingVersion::Es2015Module).path();
-    let js = get_js_file(&path).expect(&format!("Faield to get {:?}", path));
+    let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
     let p = Builder::new()
         .module(true)
         .js(js)
