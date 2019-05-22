@@ -705,8 +705,7 @@ fn ref_regex() {
 #[test]
 fn job_queue() {
     let _ = env_logger::try_init();
-    let js = 
-    "var log = '';
+    let js = "var log = '';
 async function f(label, k) {
   log += label + '1';
   await 1;
@@ -722,8 +721,8 @@ async function f(label, k) {
 #[test]
 fn another_async_fn_failure() {
     let _ = env_logger::try_init();
-    let js = 
-r#"// Test uncatchable error when a stream's queuing strategy's size() method is called.
+    let js =
+        r#"// Test uncatchable error when a stream's queuing strategy's size() method is called.
 
 // Make `debugger;` raise an uncatchable exception.
 let g = newGlobal({newCompartment: true});
@@ -764,14 +763,12 @@ assertEq(g.hit, true);
 assertEq(fnFinished, false);
 "#;
     println!("{:?}", parse(js));
-
 }
 
 #[test]
 fn async_method_failure() {
     let _ = env_logger::try_init();
-    let js =
-r#"class X {
+    let js = r#"class X {
     async ["foo"]() {
         return eval();
     }
@@ -789,6 +786,35 @@ fn new_member_expr_failure() {
     || (node.prop && node.attr && node.find)));  // We have an on and find method part of jQuery API.
 }";
     println!("{:#?}", parse(js));
+}
+
+#[test]
+fn big_int() {
+    let _ = env_logger::try_init();
+    let js = "function big_one() {
+    return 1n;
+}";
+    let expectation = Program::Script(vec![ProgramPart::decl(Decl::Function(Function {
+        id: Some("big_one".to_string()),
+        generator: false,
+        is_async: false,
+        params: vec![],
+        body: vec![ProgramPart::stmt(Stmt::Return(Some(Expr::Literal(
+            Literal::Number("1n".to_string()),
+        ))))],
+    }))]);
+    execute(js, expectation);
+}
+
+#[test]
+fn big_int_fails_as_obj_key() {
+    let js = "{ 1n: 2n }";
+
+    let p = Parser::new(js).unwrap();
+    for r in p {
+        println!("{:?}", r);
+        assert!(!r.is_ok());
+    }
 }
 
 fn execute(js: &str, expectation: Program) {
