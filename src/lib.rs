@@ -4308,9 +4308,7 @@ where
             | Token::Keyword(_) => true,
             Token::Numeric(_) => {
                 let start = self.look_ahead.span.end + 1;
-                let next_char = &self.scanner.stream[start..start + 1];
-                debug!("next_char: {}", next_char);
-                next_char != "n"
+                &self.scanner.stream[start..start + 1] == "n"
             }
             Token::Punct(ref p) => p == &Punct::OpenBracket,
             _ => false,
