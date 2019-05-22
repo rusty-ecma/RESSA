@@ -90,9 +90,13 @@ fn run(file: &Path) -> Result<(), Error> {
         || file.ends_with("auto-regress/bug650574.js")
         || file.ends_with("baseline/setcall.js")
         //FIXME binint support
-        || file.ends_with("ion/bug1526840.js")
-        || file.ends_with("ion/bug1528818.js")
-        || file.ends_with("cacheir/bug1526872.js")
+        // // || file.ends_with("ion/bug1526840.js")
+        // || file.ends_with("ion/bug1528818.js")
+        // || file.ends_with("cacheir/bug1526872.js")
+        // Anonymous Object with getter/setter number properties
+        || file.ends_with("jit-test/tests/arrays/sort-update-types.js")
+        || file.ends_with("jit-test/tests/collections/WeakMap-constructor-arraylike-exception.js")
+        || file.ends_with("jit-test/tests/baseline/getter_setter.js")
     {
         return Ok(());
     }
