@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 ress = { path = "../ress" }#"0.6.3"
-resast =  { path = "../resast" } #"0.2"
+resast =  "0.2.1"
 log = "0.4"
 env_logger = "0.6"
 backtrace = "0"
