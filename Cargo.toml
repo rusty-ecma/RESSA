@@ -11,7 +11,7 @@ categories = ["parsing", "text-processing", "web-programming"]
 edition = "2018"
 
 [dependencies]
-ress = { path = "../ress" }#"0.6.3"
+ress = "0.7.0-beta.4"
 resast =  "0.2.1"
 log = "0.4"
 env_logger = "0.6"
@@ -33,3 +33,9 @@ docopt = "1"
 walkdir = "2"
 serde_derive = "1"
 serde = "1"
+lazy_static = "1"
+criterion = "0.2"
+
+[[bench]]
+name = "major_libs"
+harness = false
