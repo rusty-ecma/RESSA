@@ -1,7 +1,7 @@
 #![cfg(test)]
 use super::{get_js_file, EverythingVersion, Lib};
 use env_logger;
-use resast::ProgramPart;
+
 use ressa::{Builder, Parser};
 
 #[test]
@@ -10,7 +10,7 @@ fn es5() {
     info!("ES5");
     let path = Lib::Everything(EverythingVersion::Es5).path();
     let js = get_js_file(&path).expect(&format!("Faield to get {:?}", path));
-    let _res: Vec<ProgramPart> = Parser::new(&js)
+    let _res: Vec<_> = Parser::new(&js)
         .expect("Failed to create parser")
         .map(|i| match i {
             Ok(i) => i,
@@ -39,12 +39,13 @@ fn es2015_module() {
     let _ = env_logger::try_init();
     let path = Lib::Everything(EverythingVersion::Es2015Module).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
-    let p = Builder::new()
+    let mut b = Builder::new();
+    let p = b
         .module(true)
-        .js(js)
+        .js(&js)
         .build()
         .expect("Failed to create parser");
-    let _res: Vec<ProgramPart> = p
+    let _res: Vec<_> = p
         .map(|i| match i {
             Ok(i) => i,
             Err(e) => panic!("Error parsing {:?}\n{}", path, e),
@@ -69,7 +70,7 @@ fn es2015_module() {
             .js(export)
             .build()
             .expect("Failed to create parser");
-        let _res: Vec<ProgramPart> = p
+        let _res: Vec<_> = p
             .map(|i| match i {
                 Ok(i) => i,
                 Err(e) => panic!("Error parsing {}\n{}", export, e),

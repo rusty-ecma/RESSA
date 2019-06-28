@@ -1,26 +1,27 @@
-use ress::Item;
+use ress::prelude::*;
+
 /// A comment handler will allow you to specify
 /// behavior about what to do with comments
 /// officially comments are supposed to operate
 /// the same as whitespace so the default behavior
 /// would be to throw away any comments found
-pub trait CommentHandler {
-    fn handle_comment(&mut self, comment: Item);
+pub trait CommentHandler<'a> {
+    fn handle_comment(&mut self, comment: Item<Token<&'a str>>);
 }
 /// The default comment handler,
 /// this will discard comments
 /// provided to it
 pub struct DefaultCommentHandler;
 
-impl CommentHandler for DefaultCommentHandler {
-    fn handle_comment(&mut self, _: Item) {}
+impl<'a> CommentHandler<'a> for DefaultCommentHandler {
+    fn handle_comment(&mut self, _: Item<Token<&'a str>>) {}
 }
 
-impl<F> CommentHandler for F
+impl<'a, F> CommentHandler<'a> for F
 where
-    F: FnMut(Item),
+    F: FnMut(Item<Token<&'a str>>),
 {
-    fn handle_comment(&mut self, item: Item) {
+    fn handle_comment(&mut self, item: Item<Token<&'a str>>) {
         self(item)
     }
 }

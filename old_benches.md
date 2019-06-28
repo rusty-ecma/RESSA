@@ -1,0 +1,33 @@
+| name                       | per iter   | over under |
+| -------------------------- | ---------- | ---------- |
+| angular1                   | 221.360 ms |  59.768 ms |
+| angular1_scanner_only      | 174.472 ms |  81.506 ms |
+| ng1_esprima                |  29.664 ms |   6.817 ms |
+| angular1_min               | 159.560 ms |  46.748 ms |
+| angular1_min_scanner_only  | 124.062 ms |  20.608 ms |
+| ng1_min_esprima            |  22.652 ms |   4.889 ms |
+| jquery                     | 110.127 ms |  54.385 ms |
+| jquery_scanner_only        |  80.058 ms |   4.708 ms |
+| jq_esprima                 |  13.525 ms |   3.449 ms |
+| jquery_min                 |  81.885 ms |  34.109 ms |
+| jquery_min_scanner_only    |  64.402 ms |  25.993 ms |
+| jq_min_esprima             |  12.106 ms |   2.783 ms |
+| react                      |  31.363 ms |  14.823 ms |
+| react_esprima              |   3.237 ms |   2.178 ms |
+| react_min                  |   9.755 ms |   1.511 ms |
+| react_min_esprima          |   1.136 ms |   1.135 ms |
+| react_dom                  | 206.558 ms |  45.696 ms |
+| react_dom_esprima          |  27.033 ms |   5.461 ms |
+| react_dom_min              |  84.361 ms |  27.796 ms |
+| react_dom_min_scanner_only |  64.341 ms |   3.687 ms |
+| react_dom_min_esprima      |  12.994 ms |   3.165 ms |
+| react_dom_scanner_only     | 169.657 ms |   6.539 ms |
+| react_min_scanner_only     |   7.325 ms |   0.494 ms |
+| react_scanner_only         |  22.927 ms |   8.695 ms |
+| vue                        | 116.235 ms |   4.123 ms |
+| vue_scanner_only           |  92.723 ms |   8.228 ms |
+| vue_esprima                |  16.832 ms |   6.146 ms |
+| vue_min                    |  81.437 ms |   4.288 ms |
+| vue_min_scanner_only       |  62.800 ms |   2.289 ms |
+| vue_min_esprima            |  13.800 ms |   3.947 ms |
+

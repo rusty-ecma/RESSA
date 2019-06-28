@@ -11,7 +11,8 @@ fn main() {
     } else {
         false
     };
-    let mut p = Builder::new().module(module).js(js).build().unwrap();
+    let mut b = Builder::new();
+    let mut p = b.module(module).js(&js).build().unwrap();
     let ast = p.parse().unwrap();
     println!("{:#?}", ast);
 }
