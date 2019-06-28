@@ -1,4 +1,4 @@
-use ress::{Item, RefToken};
+use ress::prelude::*;
 
 /// A comment handler will allow you to specify
 /// behavior about what to do with comments
@@ -6,7 +6,7 @@ use ress::{Item, RefToken};
 /// the same as whitespace so the default behavior
 /// would be to throw away any comments found
 pub trait CommentHandler<'a> {
-    fn handle_comment(&mut self, comment: Item<RefToken<'a>>);
+    fn handle_comment(&mut self, comment: Item<Token<&'a str>>);
 }
 /// The default comment handler,
 /// this will discard comments
@@ -14,14 +14,14 @@ pub trait CommentHandler<'a> {
 pub struct DefaultCommentHandler;
 
 impl<'a> CommentHandler<'a> for DefaultCommentHandler {
-    fn handle_comment(&mut self, _: Item<RefToken<'a>>) {}
+    fn handle_comment(&mut self, _: Item<Token<&'a str>>) {}
 }
 
 impl<'a, F> CommentHandler<'a> for F
 where
-    F: FnMut(Item<RefToken<'a>>),
+    F: FnMut(Item<Token<&'a str>>),
 {
-    fn handle_comment(&mut self, item: Item<RefToken<'a>>) {
+    fn handle_comment(&mut self, item: Item<Token<&'a str>>) {
         self(item)
     }
 }

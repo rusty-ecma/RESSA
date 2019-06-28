@@ -11,7 +11,7 @@ categories = ["parsing", "text-processing", "web-programming"]
 edition = "2018"
 
 [dependencies]
-ress = "0.7.0-beta.4"
+ress = "0.7.1"
 resast =  "0.2.1"
 log = "0.4"
 env_logger = "0.6"
