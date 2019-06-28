@@ -199,13 +199,7 @@ impl<'b> Builder<'b> {
         let is_module = self.is_module;
         let tolerant = self.tolerant;
         let scanner = Scanner::new(self.js);
-        Parser::build(
-            tolerant,
-            is_module,
-            scanner,
-            DefaultCommentHandler,
-            self.js,
-        )
+        Parser::build(tolerant, is_module, scanner, DefaultCommentHandler, self.js)
     }
 }
 
@@ -289,9 +283,7 @@ where
         comment_handler: CH,
         original: &'b str,
     ) -> Res<Self> {
-        let config = Config {
-            tolerant,
-        };
+        let config = Config { tolerant };
         let context = Context {
             is_module,
             ..Default::default()
@@ -310,10 +302,7 @@ where
         let look_ahead = Item {
             token: Token::EoF,
             span: Span { start: 0, end: 0 },
-            location: SourceLocation::new(
-                Position::new(0, 0),
-                Position::new(0, 0),
-            ),
+            location: SourceLocation::new(Position::new(0, 0), Position::new(0, 0)),
         };
         let mut ret = Self {
             scanner,
@@ -1620,7 +1609,7 @@ where
                 return self.expected_token_error(&start, &[]);
             }
             let first_restricted = if !self.context.strict {
-                if start.token.is_restricted() ||  start.token.is_strict_reserved() {
+                if start.token.is_restricted() || start.token.is_strict_reserved() {
                     Some(start)
                 } else {
                     None
@@ -1793,7 +1782,8 @@ where
                 && self.at_contextual_keyword("async")
                 && !self.look_ahead.token.matches_punct(Punct::Colon)
                 && !self.look_ahead.token.matches_punct(Punct::OpenParen)
-                && !self.look_ahead.token.matches_punct(Punct::Asterisk) {
+                && !self.look_ahead.token.matches_punct(Punct::Asterisk)
+            {
                 return self.expected_token_error(&self.look_ahead, &[":", "(", "*"]);
             }
         }
@@ -2217,7 +2207,9 @@ where
     fn parse_primary_expression(&mut self) -> Res<Expr<'b>> {
         debug!("{}: parse_primary_expression", self.look_ahead.span.start);
         if self.look_ahead.token.is_ident() {
-            if ((self.context.is_module || self.context.r#await) && self.at_keyword(Keyword::Await)) && !self.config.tolerant {
+            if ((self.context.is_module || self.context.r#await) && self.at_keyword(Keyword::Await))
+                && !self.config.tolerant
+            {
                 return self.unexpected_token_error(
                     &self.look_ahead,
                     "Modules do not allow 'await' to be used as an identifier",
@@ -2299,7 +2291,8 @@ where
             if (!self.context.strict
                 && ((self.context.allow_yield && self.at_keyword(Keyword::Yield))
                     || self.at_keyword(Keyword::Let)))
-                    || (!self.context.strict && self.look_ahead.token.is_strict_reserved()) {
+                || (!self.context.strict && self.look_ahead.token.is_strict_reserved())
+            {
                 let ident = self.parse_ident_name()?;
                 Ok(Expr::Ident(ident))
             } else {
@@ -2505,7 +2498,9 @@ where
             let key = if is_async {
                 self.parse_object_property_key()?
             } else {
-                PropertyKey::Expr(Expr::Ident(&self.original[start.span.start..start.span.end]))
+                PropertyKey::Expr(Expr::Ident(
+                    &self.original[start.span.start..start.span.end],
+                ))
             };
             (Some(key), is_async, computed)
         } else if self.at_punct(Punct::Asterisk) {
@@ -2544,76 +2539,74 @@ where
                 method: true,
                 short_hand: false,
             })
-        } else {
-            if let Some(key) = key {
-                let kind = PropertyKind::Init;
-                if self.at_punct(Punct::Colon) && !is_async {
-                    if !computed && Self::is_proto_(&key) {
-                        if has_proto {
-                            self.tolerate_error(Error::Redecl(
-                                start_pos,
-                                "prototype can only be declared once".to_string(),
-                            ))?;
-                        }
-                        has_proto = true;
+        } else if let Some(key) = key {
+            let kind = PropertyKind::Init;
+            if self.at_punct(Punct::Colon) && !is_async {
+                if !computed && Self::is_proto_(&key) {
+                    if has_proto {
+                        self.tolerate_error(Error::Redecl(
+                            start_pos,
+                            "prototype can only be declared once".to_string(),
+                        ))?;
                     }
+                    has_proto = true;
+                }
+                let _ = self.next_item()?;
+                let (prev_bind, prev_assign, prev_first) = self.get_cover_grammar_state();
+                let value = self.parse_assignment_expr()?;
+                self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
+                ObjectProperty::Property(Property {
+                    computed,
+                    key,
+                    value: PropertyValue::Expr(value),
+                    kind,
+                    method: false,
+                    short_hand: false,
+                })
+            } else if self.at_punct(Punct::OpenParen) {
+                ObjectProperty::Property(Property {
+                    computed,
+                    key,
+                    value: if is_async {
+                        self.parse_async_property_method()?
+                    } else {
+                        self.parse_property_method()?
+                    },
+                    kind,
+                    method: true,
+                    short_hand: false,
+                })
+            } else if start.token.is_ident() {
+                if self.at_punct(Punct::Equal) {
+                    self.context.first_covert_initialized_name_error =
+                        Some(self.look_ahead.clone());
                     let _ = self.next_item()?;
-                    let (prev_bind, prev_assign, prev_first) = self.get_cover_grammar_state();
-                    let value = self.parse_assignment_expr()?;
-                    self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
+                    let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
+                    let inner = self.parse_assignment_expr()?;
+                    self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     ObjectProperty::Property(Property {
                         computed,
                         key,
-                        value: PropertyValue::Expr(value),
+                        value: PropertyValue::Expr(inner),
                         kind,
                         method: false,
-                        short_hand: false,
+                        short_hand: true,
                     })
-                } else if self.at_punct(Punct::OpenParen) {
+                } else {
                     ObjectProperty::Property(Property {
                         computed,
                         key,
-                        value: if is_async {
-                            self.parse_async_property_method()?
-                        } else {
-                            self.parse_property_method()?
-                        },
+                        value: PropertyValue::None,
                         kind,
-                        method: true,
-                        short_hand: false,
+                        method: false,
+                        short_hand: true,
                     })
-                } else if start.token.is_ident() {
-                    if self.at_punct(Punct::Equal) {
-                        self.context.first_covert_initialized_name_error =
-                            Some(self.look_ahead.clone());
-                        let _ = self.next_item()?;
-                        let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
-                        let inner = self.parse_assignment_expr()?;
-                        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-                        ObjectProperty::Property(Property {
-                            computed,
-                            key,
-                            value: PropertyValue::Expr(inner),
-                            kind,
-                            method: false,
-                            short_hand: true,
-                        })
-                    } else {
-                        ObjectProperty::Property(Property {
-                            computed,
-                            key,
-                            value: PropertyValue::None,
-                            kind,
-                            method: false,
-                            short_hand: true,
-                        })
-                    }
-                } else {
-                    return self.expected_token_error(&start, &["object property value"]);
                 }
             } else {
-                return self.expected_token_error(&start, &["object property key"]);
+                return self.expected_token_error(&start, &["object property value"]);
             }
+        } else {
+            return self.expected_token_error(&start, &["object property key"]);
         };
         Ok((has_proto, prop))
     }
@@ -2769,7 +2762,9 @@ where
     fn parse_var_ident(&mut self, is_var: bool) -> Res<&'b str> {
         debug!("{}: parse_var_ident", self.look_ahead.span.start);
         let ident = self.next_item()?;
-        if ident.token.matches_keyword(Keyword::Yield) && (self.context.strict || !self.context.allow_yield) {
+        if ident.token.matches_keyword(Keyword::Yield)
+            && (self.context.strict || !self.context.allow_yield)
+        {
             return self.expected_token_error(&ident, &["variable identifier"]);
         } else if !ident.token.is_ident() {
             if self.context.strict && ident.token.is_strict_reserved() {
@@ -2784,9 +2779,7 @@ where
             return self.expected_token_error(&ident, &["variable identifier"]);
         }
         let i: &'b str = match ident.token {
-            Token::Ident(_) | Token::Keyword(_) => {
-                self.scanner.str_for(&ident.span).unwrap_or("")
-            }
+            Token::Ident(_) | Token::Keyword(_) => self.scanner.str_for(&ident.span).unwrap_or(""),
             _ => self.expected_token_error(&ident, &["variable identifier"])?,
         };
         Ok(i)
@@ -2840,7 +2833,10 @@ where
     }
 
     #[inline]
-    fn parse_rest_element(&mut self, params: &mut Vec<Item<Token<&'b str>>>) -> Res<(bool, Pat<'b>)> {
+    fn parse_rest_element(
+        &mut self,
+        params: &mut Vec<Item<Token<&'b str>>>,
+    ) -> Res<(bool, Pat<'b>)> {
         debug!("{}: parse_rest_element", self.look_ahead.span.start);
         self.expect_punct(Punct::Ellipsis)?;
         let (restricted, arg) = self.parse_pattern(None, params)?;
@@ -2855,7 +2851,10 @@ where
     }
 
     #[inline]
-    fn parse_binding_rest_el(&mut self, params: &mut Vec<Item<Token<&'b str>>>) -> Res<(bool, Pat<'b>)> {
+    fn parse_binding_rest_el(
+        &mut self,
+        params: &mut Vec<Item<Token<&'b str>>>,
+    ) -> Res<(bool, Pat<'b>)> {
         debug!("{}: parse_binding_rest_el", self.look_ahead.span.start);
         self.expect_punct(Punct::Ellipsis)?;
         self.parse_pattern(None, params)
@@ -3085,55 +3084,32 @@ where
                         });
                     };
                 }
-            } else {
-                if self.at_assign() {
-                    if !self.context.is_assignment_target {
-                        if !self.config.tolerant {
-                            return self.unexpected_token_error(
-                                &self.look_ahead,
-                                "Not at assignment target",
-                            );
+            } else if self.at_assign() {
+                if !self.context.is_assignment_target && !self.config.tolerant {
+                    return self
+                        .unexpected_token_error(&self.look_ahead, "Not at assignment target");
+                }
+                if self.context.strict && Self::is_ident(&current) {
+                    if let Expr::Ident(ref i) = current {
+                        if Self::is_restricted_word(i) || Self::is_strict_reserved(i) {
+                            return self
+                                .expected_token_error(&self.look_ahead, &[&format!("not {}", i)]);
                         }
                     }
-                    if self.context.strict && Self::is_ident(&current) {
-                        if let Expr::Ident(ref i) = current {
-                            if Self::is_restricted_word(i) {
-                                return self.expected_token_error(
-                                    &self.look_ahead,
-                                    &[&format!("not {}", i)],
-                                );
-                            }
-                            if Self::is_strict_reserved(i) {
-                                return self.expected_token_error(
-                                    &self.look_ahead,
-                                    &[&format!("not {}", i)],
-                                );
-                            }
-                        }
-                    }
-                    let left = if !self.at_punct(Punct::Equal) {
-                        self.context.is_assignment_target = false;
-                        self.context.is_binding_element = false;
-                        AssignmentLeft::Expr(Box::new(current))
-                    } else {
-                        AssignmentLeft::Expr(Box::new(current))
-                    };
-                    let item = self.next_item()?;
-                    let op = match item.token {
-                        Token::Punct(ref p) => {
-                            if let Some(op) = Self::assignment_operator(*p) {
-                                op
-                            } else {
-                                return self.expected_token_error(
-                                    &item,
-                                    &[
-                                        "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=",
-                                        "<<=", ">>=", ">>>=",
-                                    ],
-                                );
-                            }
-                        }
-                        _ => {
+                }
+                let left = if !self.at_punct(Punct::Equal) {
+                    self.context.is_assignment_target = false;
+                    self.context.is_binding_element = false;
+                    AssignmentLeft::Expr(Box::new(current))
+                } else {
+                    AssignmentLeft::Expr(Box::new(current))
+                };
+                let item = self.next_item()?;
+                let op = match item.token {
+                    Token::Punct(ref p) => {
+                        if let Some(op) = Self::assignment_operator(*p) {
+                            op
+                        } else {
                             return self.expected_token_error(
                                 &item,
                                 &[
@@ -3142,17 +3118,26 @@ where
                                 ],
                             );
                         }
-                    };
-                    let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
-                    let right = self.parse_assignment_expr()?;
-                    self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-                    self.context.first_covert_initialized_name_error = None;
-                    return Ok(Expr::Assignment(AssignmentExpr {
-                        operator: op,
-                        left,
-                        right: Box::new(right),
-                    }));
-                }
+                    }
+                    _ => {
+                        return self.expected_token_error(
+                            &item,
+                            &[
+                                "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=", "<<=",
+                                ">>=", ">>>=",
+                            ],
+                        );
+                    }
+                };
+                let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
+                let right = self.parse_assignment_expr()?;
+                self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+                self.context.first_covert_initialized_name_error = None;
+                return Ok(Expr::Assignment(AssignmentExpr {
+                    operator: op,
+                    left,
+                    right: Box::new(right),
+                }));
             }
             Ok(current)
         }
@@ -3161,9 +3146,9 @@ where
     #[inline]
     fn is_async(expr: &Expr) -> bool {
         match expr {
-            &Expr::Function(ref f) => f.is_async,
-            &Expr::ArrowFunction(ref f) => f.is_async,
-            &Expr::ArrowParamPlaceHolder(_, b) => b,
+            Expr::Function(ref f) => f.is_async,
+            Expr::ArrowFunction(ref f) => f.is_async,
+            Expr::ArrowParamPlaceHolder(_, b) => *b,
             _ => false,
         }
     }
@@ -3178,9 +3163,7 @@ where
             Punct::PercentEqual => Some(AssignmentOperator::ModEqual),
             Punct::DoubleLessThanEqual => Some(AssignmentOperator::LeftShiftEqual),
             Punct::DoubleGreaterThanEqual => Some(AssignmentOperator::RightShiftEqual),
-            Punct::TripleGreaterThanEqual => {
-                Some(AssignmentOperator::UnsignedRightShiftEqual)
-            }
+            Punct::TripleGreaterThanEqual => Some(AssignmentOperator::UnsignedRightShiftEqual),
             Punct::PipeEqual => Some(AssignmentOperator::OrEqual),
             Punct::CaretEqual => Some(AssignmentOperator::XOrEqual),
             Punct::AmpersandEqual => Some(AssignmentOperator::AndEqual),
@@ -3192,7 +3175,7 @@ where
     #[inline]
     fn is_arrow_param_placeholder(expr: &Expr) -> bool {
         match expr {
-            &Expr::ArrowParamPlaceHolder(_, _) => true,
+            Expr::ArrowParamPlaceHolder(_, _) => true,
             _ => false,
         }
     }
@@ -3214,32 +3197,28 @@ where
             .map(|p| {
                 if Self::is_assignment(&p) {
                     match &p {
-                        FunctionArg::Pat(ref p) => match p {
-                            Pat::Assignment(ref a) => match &*a.right {
-                                Expr::Yield(ref y) => {
+                        FunctionArg::Pat(ref p) => {
+                            if let Pat::Assignment(ref a) = p {
+                                if let Expr::Yield(ref y) = &*a.right {
                                     if y.argument.is_some() {
                                         invalid_param = true;
                                     } else {
                                         return FunctionArg::Pat(Pat::Identifier("yield"));
                                     }
                                 }
-                                _ => (),
-                            },
-                            _ => (),
-                        },
-                        FunctionArg::Expr(ref e) => match e {
-                            Expr::Assignment(ref a) => match &*a.right {
-                                Expr::Yield(ref y) => {
+                            }
+                        }
+                        FunctionArg::Expr(ref e) => {
+                            if let Expr::Assignment(ref a) = e {
+                                if let Expr::Yield(ref y) = &*a.right {
                                     if y.argument.is_some() {
                                         invalid_param = true;
                                     } else {
                                         return FunctionArg::Expr(Expr::Ident("yield"));
                                     }
                                 }
-                                _ => (),
-                            },
-                            _ => (),
-                        },
+                            }
+                        }
                     }
                     p
                 } else if async_arrow && Self::is_await(&p) {
@@ -3258,17 +3237,13 @@ where
         }
         if self.context.strict && !self.context.allow_yield {
             for param in params.iter() {
-                match param {
-                    FunctionArg::Expr(ref e) => match e {
-                        Expr::Yield(_) => {
-                            return self.expected_token_error(
-                                &self.look_ahead,
-                                &["not a yield expression in a function param"],
-                            );
-                        }
-                        _ => (),
-                    },
-                    _ => (),
+                if let FunctionArg::Expr(ref e) = param {
+                    if let Expr::Yield(_) = e {
+                        return self.expected_token_error(
+                            &self.look_ahead,
+                            &["not a yield expression in a function param"],
+                        );
+                    }
                 }
             }
         }
@@ -3455,24 +3430,25 @@ where
                     self.context.allow_yield
                 );
                 while !stack.is_empty() && !ops.is_empty() && prec <= precs[precs.len() - 1] {
-                    right = stack
-                        .pop()
-                        .ok_or_else(|| self.op_error("invalid binary operation, no right expr in stack"))?;
+                    right = stack.pop().ok_or_else(|| {
+                        self.op_error("invalid binary operation, no right expr in stack")
+                    })?;
                     debug!("right: {:#?} {}", right, self.context.allow_yield);
-                    let op = ops
-                        .pop()
-                        .ok_or_else(|| self.op_error("invalid binary operation, too few operators"))?;
+                    let op = ops.pop().ok_or_else(|| {
+                        self.op_error("invalid binary operation, too few operators")
+                    })?;
                     let _ = precs.pop();
-                    left = stack
-                        .pop()
-                        .ok_or_else(|| self.op_error("invalid binary operation, no left expr in stack"))?;
+                    left = stack.pop().ok_or_else(|| {
+                        self.op_error("invalid binary operation, no left expr in stack")
+                    })?;
                     debug!("left: {:#?} {}", left, self.context.allow_yield);
                     if op.matches_punct(Punct::DoubleAmpersand)
                         || op.matches_punct(Punct::DoublePipe)
                     {
                         stack.push(Expr::Logical(LogicalExpr {
-                            operator: Self::logical_operator(&op)
-                                .ok_or_else(|| self.op_error("Unable to convert logical operator"))?,
+                            operator: Self::logical_operator(&op).ok_or_else(|| {
+                                self.op_error("Unable to convert logical operator")
+                            })?,
                             left: Box::new(left),
                             right: Box::new(right),
                         }));
@@ -3497,7 +3473,7 @@ where
                 .pop()
                 .ok_or_else(|| self.op_error("invalid binary operation, too few expressions"))?;
 
-            while ops.len() > 0 && stack.len() > 0 {
+            while !ops.is_empty() && !stack.is_empty() {
                 let op = ops
                     .pop()
                     .ok_or_else(|| self.op_error("invalid binary operation, too few operators"))?;
@@ -3506,9 +3482,9 @@ where
                         .ok_or_else(|| self.op_error("Unable to convert logical operator"))?;
                     current = Expr::Logical(LogicalExpr {
                         operator,
-                        left: Box::new(stack.pop().ok_or_else(|| 
-                            self.op_error("invalid logical operation, too few expressions"),
-                        )?),
+                        left: Box::new(stack.pop().ok_or_else(|| {
+                            self.op_error("invalid logical operation, too few expressions")
+                        })?),
                         right: Box::new(current),
                     })
                 } else {
@@ -3516,9 +3492,9 @@ where
                         .ok_or_else(|| self.op_error("Unable to convert binary operator"))?;
                     current = Expr::Binary(BinaryExpr {
                         operator,
-                        left: Box::new(stack.pop().ok_or_else(|| 
-                            self.op_error("invalid binary operation, too few expressions"),
-                        )?),
+                        left: Box::new(stack.pop().ok_or_else(|| {
+                            self.op_error("invalid binary operation, too few expressions")
+                        })?),
                         right: Box::new(current),
                     });
                 }
@@ -3572,7 +3548,8 @@ where
             if op.token.matches_keyword(Keyword::Delete)
                 && self.context.strict
                 && Self::is_ident(&arg)
-                && !self.config.tolerant {
+                && !self.config.tolerant
+            {
                 return self.unexpected_token_error(&op, "Cannot delete ident in strict mode");
             }
             self.context.is_assignment_target = false;
@@ -3680,17 +3657,9 @@ where
             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
             let ex = self.parse_unary_expression()?;
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
-            if self.context.strict && Self::is_ident(&ex) {
-                match ex {
-                    Expr::Ident(ref i) => {
-                        if Self::is_restricted_word(i) {
-                            // TODO: double check this
-                            if !self.config.tolerant {
-                                return self.unexpected_token_error(&start, "restricted ident");
-                            }
-                        }
-                    }
-                    _ => (),
+            if let Expr::Ident(ref i) = ex {
+                if Self::is_restricted_word(i) && self.context.strict {
+                    return self.unexpected_token_error(&start, "restricted ident");
                 }
             }
             if !self.context.is_assignment_target && !self.config.tolerant {
@@ -3710,41 +3679,37 @@ where
             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
             let expr = self.parse_left_hand_side_expr_allow_call()?;
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
-            if !self.context.has_line_term && self.look_ahead.token.is_punct() {
-                if self.at_punct(Punct::DoublePlus) || self.at_punct(Punct::DoubleDash) {
-                    if self.context.strict {
-                        match expr {
-                            Expr::Ident(ref i) => {
-                                if Self::is_restricted_word(i) {
-                                    return self.expected_token_error(&start, &[]);
-                                }
-                            }
-                            _ => (),
-                        }
+            if !self.context.has_line_term
+                && self.look_ahead.token.is_punct()
+                && (self.at_punct(Punct::DoublePlus) || self.at_punct(Punct::DoubleDash))
+            {
+                if let Expr::Ident(ref i) = expr {
+                    if self.context.strict && Self::is_restricted_word(i) {
+                        return self.expected_token_error(&start, &[]);
                     }
-                    let op = self.next_item()?;
-                    if !self.context.is_assignment_target && !self.config.tolerant {
-                        return self.unexpected_token_error(
-                            &op,
-                            "Cannot increment when not at assignment target",
-                        );
-                    }
-                    self.context.is_assignment_target = false;
-                    self.context.is_binding_element = false;
-                    let prefix = false;
-                    let ret = UpdateExpr {
-                        operator: if op.token.matches_punct(Punct::DoublePlus) {
-                            UpdateOperator::Increment
-                        } else if op.token.matches_punct(Punct::DoubleDash) {
-                            UpdateOperator::Decrement
-                        } else {
-                            return self.expected_token_error(&op, &["++", "--"]);
-                        },
-                        argument: Box::new(expr),
-                        prefix,
-                    };
-                    return Ok(Expr::Update(ret));
                 }
+                let op = self.next_item()?;
+                if !self.context.is_assignment_target && !self.config.tolerant {
+                    return self.unexpected_token_error(
+                        &op,
+                        "Cannot increment when not at assignment target",
+                    );
+                }
+                self.context.is_assignment_target = false;
+                self.context.is_binding_element = false;
+                let prefix = false;
+                let ret = UpdateExpr {
+                    operator: if op.token.matches_punct(Punct::DoublePlus) {
+                        UpdateOperator::Increment
+                    } else if op.token.matches_punct(Punct::DoubleDash) {
+                        UpdateOperator::Decrement
+                    } else {
+                        return self.expected_token_error(&op, &["++", "--"]);
+                    },
+                    argument: Box::new(expr),
+                    prefix,
+                };
+                return Ok(Expr::Update(ret));
             }
             Ok(expr)
         }
@@ -4352,7 +4317,10 @@ where
     fn consume_semicolon(&mut self) -> Res<()> {
         if self.at_punct(Punct::SemiColon) {
             let _semi = self.next_item()?;
-        } else if !self.context.has_line_term && !self.look_ahead.token.is_eof() && !self.at_punct(Punct::CloseBrace) {
+        } else if !self.context.has_line_term
+            && !self.look_ahead.token.is_eof()
+            && !self.at_punct(Punct::CloseBrace)
+        {
             return self.expected_token_error(&self.look_ahead, &["`;`", "`eof`", "`}`"]);
         }
         Ok(())
@@ -4437,7 +4405,7 @@ where
             .str_for(span)
             .ok_or_else(|| self.op_error("Unable to get &str from scanner"))
     }
-    
+
     fn expected_token_error<T>(&self, item: &Item<Token<&'b str>>, expectation: &[&str]) -> Res<T> {
         let bt = backtrace::Backtrace::new();
         error!("{:?}", bt);

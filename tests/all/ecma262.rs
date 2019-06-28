@@ -1,7 +1,7 @@
 #![cfg(test)]
 use super::{get_js_file, EverythingVersion, Lib};
 use env_logger;
-use resast::ProgramPart;
+
 use ressa::{Builder, Parser};
 
 #[test]
