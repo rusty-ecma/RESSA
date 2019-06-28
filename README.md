@@ -1,14 +1,12 @@
 [![travis](https://img.shields.io/travis/FreeMasen/RESSA.svg)](https://travis-ci.org/FreeMasen/RESSA)
-<!-- [![appveyor](https://img.shields.io/appveyor/ci/FreeMasen/RESSA.svg)](https://ci.appveyor.com/project/FreeMasen/RESSA) -->
 [![crates.io](https://img.shields.io/crates/v/ressa.svg)](https://crates.io/crates/ressa)
 [![last commit master](https://img.shields.io/github/last-commit/FreeMasen/RESSA.svg)](https://github.com/FreeMasen/RESSA/commits/master)
 # RESSA
 > Rust EcmaScript Syntax Analyzer
 
-This project is designed to parse javascript text into an Abstract Syntax Tree (AST), based on [ESTREE](https://github.com/estree/estree) (there is still some work todo to map directly to the [ESTREE structure](#a-couple-of-notes))
+This project is part of a series of crates designed to enable developers to create JavaScript development tools using the Rust programming language. [Rusty ECMA Details](#rusty-ecma-details)
 
-
-The two major pieces that users will interact with are the `Parser` struct and the enums defined in the `node` module.
+The two major pieces that users will interact with are the `Parser` struct and the enums defined by `resast`
 
 ## `Parser`
 
@@ -18,53 +16,30 @@ this means that you can evaluate your JS in pieces from top to bottom. These pie
 
 ### Iterator Example
 ```rust
-extern crate ressa;
-use ressa::{
-    Parser,
-    node::*,
-};
+use ressa::Parser;
+use resast::prelude::*;
 fn main() {
-    let js = "
-function Thing() {
-    return 'stuff';
-}
-";
-    let parser = Parser::new(js).expect("Failed to create parser");
-    for part in parser {
-        let part = part.expect("Error parsing part");
-        match part {
-            ProgramPart::Decl(decl) => match decl {
-                Declaration::Function(f) => {
-                    if let Some(ref id) = f.id {
-                        assert_eq!(id, "Thing");
-                    }
-                    assert!(f.params.len() == 0);
-                    assert!(!f.generator);
-                    assert!(!f.is_async);
-                    for part in f.body {
-                        match part {
-                            ProgramPart::Statement(stmt) => match stmt {
-                                Statement::Return(expr) => {
-                                    if let Some(expr) = expr {
-                                        match expr {
-                                            Expression::Literal(lit) => match lit {
-                                                Literal::String(value) => assert_eq!(value, String::from("'stuff'")),
-                                                _ => ()
-                                            },
-                                            _ => ()
-                                        }
-                                    }
-                                },
-                                _ => (),
-                            },
-                            _ => ()
-                        }
-                    }
-                },
-                _ => ()
-            },
-            _ => (),
-        }
+    let js = "function helloWorld() { alert('Hello world'); }";
+    let p = Parser::new(&js).unwrap();
+    let f = ProgramPart::decl(
+        Decl::Function(
+            Function {
+                id: Some("helloWorld".to_string()),
+                params: vec![],
+                body: vec![
+                    ProgramPart::Stmt(
+                        Stmt::Expr(
+                            Expr::call(Expr::ident("alert"), vec![Expr::string("'Hello world'")])
+                        )
+                    )
+                ],
+                generator: false,
+                is_async: false,
+            }
+        )
+    );
+    for part in p {
+        assert_eq!(part.unwrap(), f);
     }
 }
 ```
@@ -73,12 +48,10 @@ Another way to interact with a `Parser` would be to utilize the `parse` method. 
 
 ### Parse Example
 ```rust
-extern crate ressa;
 use ressa::{
     Parser,
-    node::*,
 };
-
+use resast::prelude::*;
 fn main() {
     let js = "
 function Thing() {
@@ -89,24 +62,19 @@ function Thing() {
     let program = parser.parse().expect("Unable to parse text");
     match program {
         Program::Script(parts) => println!("found a script"),
-        Program::Module(parts) => println!("found an es6 module"),
+        Program::Mod(parts) => println!("found an es6 module"),
     }
 }
 ```
 Once you get to the inner `parts` of a `Program` you have a `Vec<ProgramPart>` which will operate the same as the [iterator example](#iterator-example)
-## `Node`
-The `node` module houses a collection of `enums` and `structs` that represent the static meaning of JS text. The primary entry point is going to be the `ProgramPart` enum. There are 3 types of `ProgramParts` a
 
-- `Directive` - This is a literal value at the top of a scope (i.e. `'use strict'`)
-- `Declaration` - This defines something in the top level of scope
-    - `Variable` - `var`, `let` or `const` statements
-    - `Function` - a named function definition in the top scope
-    - `Class` - a named class in the top scope
-    - `Import` - importing of assets from another file (ES6 Modules only)
-    - `Export` - exporting of assets from this file (ES6 Modules only)
-- `Statement` - This is the primary unit of js, see the node module for additional details
+# Rusty ECMA Details
+## The Rust ECMA Crates
+- [RESS](https://github.com/freemasen/ress) - Tokenizer or Scanner
+- [RESSA](https://github.com/freemasen/ressa) - Parser
+- [RESAST](https://github.com/freemasen/resast) - AST
+- [RESW](https://github.com/freemasen/resw) - Writer
 
-### A couple of notes
-1. Currently this module defines some structures that are never used, most notable the `Node` struct and `Item` enum. This is because I am still working through how I am going to fully reconcile the inheritance based approach that [ESTREE](https://github.com/estree/estree) uses to define their AST and the trait based approach that rust uses for composition.
-2. In the not so distant future, I intend to break this module into its own crate to allow for more modularity.
-3. My goal is to have this AST, when serialized to JSON, match the output of [esprima](https://github.com/jquery/esprima)
+## Why So Many?
+While much of what each crate provides is closely coupled with the other crates, the main goal is to provide the largest amount of customizability. For example, someone writing a fuzzer would only need the `RESAST` and `RESW`, it seems silly to require that they also pull in `RESS` and `RESSA` needlessly.
+

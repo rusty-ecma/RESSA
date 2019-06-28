@@ -2235,8 +2235,7 @@ where
                         span.end += 1;
                         // Consume the ident
                         let _n = self.next_item();
-                    }
-                    Literal::Number(self.scanner.str_for(&span).unwrap_or(""))
+                    }                    Literal::Number(self.scanner.str_for(&span).unwrap_or(""))
                 }
                 Token::String(_) => Literal::String(self.scanner.str_for(&item.span).unwrap_or("")),
                 _ => unreachable!(),
@@ -4393,7 +4392,6 @@ where
         ret
     }
 
-    #[inline]
     #[inline]
     fn at_big_int_flag(&self) -> bool {
         let Span { start, end } = self.look_ahead.span;
