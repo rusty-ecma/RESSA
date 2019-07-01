@@ -18,12 +18,12 @@ type OP = ObjectProperty<'static>;
 lazy_static! {
     pub static ref ES5: Vec<ProgramPart<'static>> =
         vec![
-            labeled_statement("tab"),
-            labeled_statement("verticalTab"),
-            labeled_statement("formFeed"),
-            labeled_statement("space"),
-            labeled_statement("nbsp"),
-            labeled_statement("bom"),
+            preamble_labeled_statement("tab"),
+            preamble_labeled_statement("verticalTab"),
+            preamble_labeled_statement("formFeed"),
+            preamble_labeled_statement("space"),
+            preamble_labeled_statement("nbsp"),
+            preamble_labeled_statement("bom"),
             line_term("lineFeed"),
             number_literal_part("0"),
             line_term("carriageReturn"),
@@ -569,12 +569,77 @@ lazy_static! {
             for_exprs_part(None, Some(number_literal_expr("0")), None, Stmt::Continue(None)),
             labeled_statement_continue("x"),
             for_exprs_part(None, None, None, Stmt::Break(None)),
-            labeled_statement("x"),
+            preamble_labeled_statement("x"),
+            switch_zero_part(vec![
+                case_zero(vec![ProgramPart::Stmt(Stmt::Break(None))])
+            ]),
+            func_part(
+                "f",
+                vec![],
+                vec![ProgramPart::Stmt(Stmt::Return(None))]
+            ),
+            func_part(
+                "f",
+                vec![],
+                vec![ProgramPart::Stmt(Stmt::Return(
+                    Some(number_literal_expr("0"))
+                ))]
+            ),
+            ProgramPart::Stmt(Stmt::With(WithStmt { object: number_literal_expr("0"), body: Box::new(Stmt::Empty)})),
+            switch_zero_part(vec![]),
+            switch_zero_part(vec![
+                case_zero(vec![]),
+            ]),
+            switch_zero_part(vec![
+                case_zero(vec![]),
+                case_zero(vec![]),
+            ]),
+            switch_zero_part(vec![
+                default_case(vec![]),
+            ]),
+            switch_zero_part(vec![
+                case_zero(vec![]),
+                default_case(vec![]),
+                case_zero(vec![]),
+            ]),
+            switch_zero_part(vec![
+                case_zero(vec![
+                    empty_part(),
+                ]),
+            ]),
+            switch_zero_part(vec![
+                case_zero(vec![
+                    empty_part(),
+                    empty_part(),
+                ]),
+            ]),
+            switch_zero_part(vec![
+                default_case(vec![
+                    empty_part(),
+                ]),
+            ]),
+            switch_zero_part(vec![
+                default_case(vec![
+                    empty_part(),
+                    empty_part(),
+                ]),
+            ]),
+            labeled_part("x", Stmt::Empty),
+            labeled_part(
+                "x", 
+                labeled_stmt("y", Stmt::Empty)
+            )
             // ProgramPart::Stmt(Stmt::Empty),
         ];
 }
 
-fn labeled_statement(label: &'static str) -> ProgramPart {
+fn empty_part() -> Part {
+    ProgramPart::Stmt(
+        Stmt::Empty
+    )
+}
+
+fn preamble_labeled_statement(label: &'static str) -> ProgramPart {
     ProgramPart::Stmt(
         Stmt::Labeled(
             LabeledStmt {
@@ -620,28 +685,24 @@ fn labeled_statement_continue(label: &'static str) -> ProgramPart {
         )
     )
 }
-fn labeled_statement_break(label: &'static str) -> ProgramPart {
+
+fn labeled_part(label: &'static str, body: S) -> Part {
     ProgramPart::Stmt(
-        Stmt::Labeled(
-            LabeledStmt {
-                label,
-                body: Box::new(
-                    Stmt::For(
-                        ForStmt {
-                            init: None,
-                            test: Some(number_literal_expr("0")),
-                            update: None,
-                            body: Box::new(
-                                Stmt::Break(
-                                    Some(label)
-                                )
-                            )
-                        }
-                    )
-                )
-            }
-        )
+        labeled_stmt(label, body)
     )
+}
+
+fn labeled_stmt(label: &'static str, body: S) -> S {
+    Stmt::Labeled(
+        labeled(label, body)
+    )
+}
+
+fn labeled(label: &'static str, body: S) -> LabeledStmt {
+    LabeledStmt {
+        label,
+        body: Box::new(body),
+    }
 }
 
 fn line_term(label: &str) -> ProgramPart {
@@ -947,6 +1008,14 @@ fn empty_fn(id: &'static str, args: Vec<FA>) -> F {
         body: vec![],
         params: args
     }
+}
+
+fn func_part(id: &'static str, args: Vec<FA>, body: Vec<Part>) -> Part {
+    ProgramPart::Decl(
+        Decl::Function(
+            func(id, args, body)
+        )
+    )
 }
 
 fn func_expr(id: &'static str, args: Vec<FA>, body: Vec<Part>) -> E {
@@ -1661,5 +1730,38 @@ fn for_in_loop(left: LoopLeft<'static>, right: E, body: S) -> ForInStmt<'static>
         left,
         right,
         body: Box::new(body),
+    }
+}
+
+fn switch_zero_part(cases: Vec<SwitchCase<'static>>) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Switch(
+            switch(
+                number_literal_expr("0"),
+                cases,
+            )
+        )
+    )
+}
+
+fn switch(test: E, body: Vec<SwitchCase<'static>>) -> SwitchStmt<'static> {
+    SwitchStmt {
+        discriminant: test,
+        cases: body,
+    }
+}
+
+fn case_zero(body: Vec<Part>) -> SwitchCase<'static> {
+    switch_case(Some(number_literal_expr("0")), body)
+}
+
+fn default_case(body: Vec<Part>) -> SwitchCase<'static> {
+    switch_case(None, body)
+}
+
+fn switch_case(test: Option<E>, body: Vec<Part>) -> SwitchCase<'static> {
+    SwitchCase {
+        test,
+        consequent: body
     }
 }
