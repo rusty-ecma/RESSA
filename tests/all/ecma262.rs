@@ -2,21 +2,22 @@
 use super::{get_js_file, EverythingVersion, Lib};
 use env_logger;
 
-use ressa::{Builder, Parser};
 
+use ressa::{Builder, Parser};
+use resast::ref_tree::prelude::*;
+use crate::es_tokens;
 #[test]
 fn es5() {
     let _ = env_logger::try_init();
     info!("ES5");
     let path = Lib::Everything(EverythingVersion::Es5).path();
     let js = get_js_file(&path).expect(&format!("Faield to get {:?}", path));
-    let _res: Vec<_> = Parser::new(&js)
-        .expect("Failed to create parser")
-        .map(|i| match i {
+    for (i, (item, part)) in Parser::new(&js).expect("Failed to create parser").map(|i| match i {
             Ok(i) => i,
             Err(e) => panic!("Error parsing {:?}\n{}", path, e),
-        })
-        .collect();
+        }).zip(es_tokens::ES5.iter()).enumerate() {
+        assert_eq!((i, &item), (i, part));
+    }
 }
 
 #[test]
