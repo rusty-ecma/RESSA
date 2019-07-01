@@ -4,6 +4,11 @@ use resast::expr::{
     AssignmentOperator,
     UpdateOperator,
     UnaryOperator,
+    BinaryOperator,
+    LogicalOperator,
+};
+use resast::decl::{
+    VariableKind,
 };
 type Part = ProgramPart<'static>;
 type S = Stmt<'static>;
@@ -350,6 +355,222 @@ lazy_static! {
                 UpdateOperator::Decrement, 
                 true
             ),
+            zero_bin_zero_part(BinaryOperator::Times),
+            zero_bin_zero_part(BinaryOperator::Over),
+            zero_bin_zero_part(BinaryOperator::Mod),
+            zero_bin_zero_part(BinaryOperator::Plus),
+            zero_bin_zero_part(BinaryOperator::Minus),
+            zero_bin_zero_part(BinaryOperator::LeftShift),
+            zero_bin_zero_part(BinaryOperator::RightShift),
+            zero_bin_zero_part(BinaryOperator::UnsignedRightShift),
+            zero_bin_zero_part(BinaryOperator::LessThan),
+            zero_bin_zero_part(BinaryOperator::GreaterThan),
+            zero_bin_zero_part(BinaryOperator::LessThanEqual),
+            zero_bin_zero_part(BinaryOperator::GreaterThanEqual),
+            zero_bin_expr_part(
+                BinaryOperator::InstanceOf,
+                Expr::Function(empty_anon_fn(vec![])),
+            ),
+            zero_bin_expr_part(
+                BinaryOperator::In,
+                obj_literal_expr(vec![]),
+            ),
+            zero_bin_zero_part(BinaryOperator::Equal),
+            zero_bin_zero_part(BinaryOperator::NotEqual),
+            zero_bin_zero_part(BinaryOperator::StrictEqual),
+            zero_bin_zero_part(BinaryOperator::StrictNotEqual),
+            zero_bin_zero_part(BinaryOperator::And),
+            zero_bin_zero_part(BinaryOperator::XOr),
+            zero_bin_zero_part(BinaryOperator::Or),
+            zero_log_zero(LogicalOperator::And),
+            zero_log_zero(LogicalOperator::Or),
+            conditional_part(
+                number_literal_expr("0"),
+                number_literal_expr("0"),
+                number_literal_expr("0"),
+            ),
+            // TODO: Validate this
+            conditional_part(
+                number_literal_expr("0"),
+                conditional_expr(
+                    number_literal_expr("0"), 
+                    number_literal_expr("0"), 
+                    number_literal_expr("0"), 
+                ),
+                number_literal_expr("0"), 
+            ),
+            conditional_part(
+                zero_log_zero_expr(LogicalOperator::Or),
+                assign_expr(
+                    assign_left_ident("x"),
+                    number_literal_expr("0"),
+                ),
+                assign_expr(
+                    assign_left_ident("x"),
+                    number_literal_expr("0"), 
+                ),
+            ),
+            // ^^^^^^^^^^^^^^^^^^^^^^^^^^
+            ident_assign_zero_part("x", AssignmentOperator::Equal),
+            ident_assign_zero_part("x", AssignmentOperator::TimesEqual),
+            ident_assign_zero_part("x", AssignmentOperator::DivEqual),
+            ident_assign_zero_part("x", AssignmentOperator::ModEqual),
+            ident_assign_zero_part("x", AssignmentOperator::PlusEqual),
+            ident_assign_zero_part("x", AssignmentOperator::MinusEqual),
+            ident_assign_zero_part("x", AssignmentOperator::LeftShiftEqual),
+            ident_assign_zero_part("x", AssignmentOperator::RightShiftEqual),
+            ident_assign_zero_part("x", AssignmentOperator::UnsignedRightShiftEqual),
+            ident_assign_zero_part("x", AssignmentOperator::AndEqual),
+            ident_assign_zero_part("x", AssignmentOperator::XOrEqual),
+            ident_assign_zero_part("x", AssignmentOperator::OrEqual),
+            zero_sequence(2),
+            zero_sequence(3),
+            sequence(vec![
+                ident_assign_zero_expr("x", AssignmentOperator::Equal),
+                ident_assign_zero_expr("x", AssignmentOperator::Equal),
+            ]),
+            block_part(vec![]),
+            block_part(vec![ProgramPart::Stmt(Stmt::Empty)]),
+            block_part(vec![number_literal_part("0")]),
+            block_part(vec![number_literal_part("0")]),
+            block_part(vec![
+                number_literal_part("0"),
+                number_literal_part("0"),
+            ]),
+            block_part(vec![
+                number_literal_part("0"),
+                number_literal_part("0"),
+            ]),
+            variable_decl_part(vec![
+                variable_decl_none("x")
+            ]),
+            variable_decl_part(vec![
+                variable_decl_none("x"),
+                variable_decl_none("y"),
+            ]),
+            variable_decl_part(vec![
+                variable_decl_none("x"),
+                variable_decl_none("y"),
+                variable_decl_none("z"),
+            ]),
+            variable_decl_part(vec![
+                variable_decl_zero("x"),
+            ]),
+            variable_decl_part(vec![
+                variable_decl_zero("x"),
+                variable_decl_none("y"),
+            ]),
+            variable_decl_part(vec![
+                variable_decl_none("x"),
+                variable_decl_zero("y"),
+            ]),
+            variable_decl_part(vec![
+                variable_decl_zero("x"),
+                variable_decl_zero("y"),
+            ]),
+            ProgramPart::Stmt(Stmt::Empty),
+            if_zero_empty(),
+            if_zero_empty_else(),
+            do_while_zero(),
+            while_zero(),
+            for_exprs_part(None, None, None, Stmt::Break(None)),
+            for_exprs_part(
+                Some(number_literal_expr("0")), 
+                Some(number_literal_expr("0")), 
+                Some(number_literal_expr("0")), 
+                Stmt::Empty,
+            ),
+            for_exprs_part(
+                Some(zero_bin_expr_expr(
+                    BinaryOperator::In,
+                    array_expr(vec![]),
+                )),
+                Some(number_literal_expr("0")), 
+                None, 
+                Stmt::Empty,
+            ),
+            for_var_part(
+                VariableKind::Var, 
+                vec![
+                var_decl("a")
+                ],
+                None,
+                None,
+                Stmt::Break(None),
+            ),
+            for_var_part(
+                VariableKind::Var, 
+                vec![
+                var_decl("a"),
+                var_decl("b"),
+                ],
+                Some(number_literal_expr("0")),
+                Some(number_literal_expr("0")),
+                Stmt::Empty,
+            ),
+            for_var_part(
+                VariableKind::Var, 
+                vec![
+                variable_decl_zero("a")
+                ],
+                None,
+                None,
+                Stmt::Break(None),
+            ),
+            for_var_part(
+                VariableKind::Var, 
+                vec![
+                    VariableDecl {
+                        id: Pat::Identifier("a"),
+                        init: Some(
+                            zero_bin_expr_expr(
+                                BinaryOperator::In, 
+                                array_expr(vec![])
+                            )
+                        )
+                    }
+                ],
+                Some(number_literal_expr("0")),
+                None,
+                Stmt::Empty,
+            ),
+            for_in_loop_part(
+                LoopLeft::Expr(Expr::Ident("x")),
+                obj_literal_expr(vec![]),
+                Stmt::Empty,
+            ),
+            for_in_loop_part(
+                LoopLeft::Variable(
+                    VariableKind::Var,
+                    var_decl("x")
+                ),
+                obj_literal_expr(vec![]),
+                Stmt::Empty,
+            ),
+            for_in_loop_part(
+                LoopLeft::Variable(
+                    VariableKind::Var,
+                    var_decl_init("x", array_expr(vec![]))
+                ),
+                obj_literal_expr(vec![]),
+                Stmt::Empty,
+            ),
+            for_in_loop_part(
+                LoopLeft::Variable(
+                    VariableKind::Var,
+                    var_decl_init(
+                        "x", 
+                        zero_bin_expr_expr(BinaryOperator::In, array_expr(vec![]))
+                    )
+                ),
+                obj_literal_expr(vec![]),
+                Stmt::Empty,
+            ),
+            for_exprs_part(None, Some(number_literal_expr("0")), None, Stmt::Continue(None)),
+            labeled_statement_continue("x"),
+            for_exprs_part(None, None, None, Stmt::Break(None)),
+            labeled_statement("x"),
+            // ProgramPart::Stmt(Stmt::Empty),
         ];
 }
 
@@ -363,6 +584,52 @@ fn labeled_statement(label: &'static str) -> ProgramPart {
                         ForStmt {
                             init: None,
                             test: None,
+                            update: None,
+                            body: Box::new(
+                                Stmt::Break(
+                                    Some(label)
+                                )
+                            )
+                        }
+                    )
+                )
+            }
+        )
+    )
+}
+fn labeled_statement_continue(label: &'static str) -> ProgramPart {
+    ProgramPart::Stmt(
+        Stmt::Labeled(
+            LabeledStmt {
+                label,
+                body: Box::new(
+                    Stmt::For(
+                        ForStmt {
+                            init: None,
+                            test: Some(number_literal_expr("0")),
+                            update: None,
+                            body: Box::new(
+                                Stmt::Continue(
+                                    Some(label)
+                                )
+                            )
+                        }
+                    )
+                )
+            }
+        )
+    )
+}
+fn labeled_statement_break(label: &'static str) -> ProgramPart {
+    ProgramPart::Stmt(
+        Stmt::Labeled(
+            LabeledStmt {
+                label,
+                body: Box::new(
+                    Stmt::For(
+                        ForStmt {
+                            init: None,
+                            test: Some(number_literal_expr("0")),
                             update: None,
                             body: Box::new(
                                 Stmt::Break(
@@ -507,6 +774,15 @@ fn var_decl(id: &'static str) -> VariableDecl {
     }
 }
 
+fn var_decl_init(id: &'static str, init: E) -> VariableDecl<'static> {
+    VariableDecl {
+        id: Pat::Identifier(id),
+        init: Some(
+            init,
+        )
+    }
+}
+
 fn string_literal_part(s: &'static str) -> Part {
     ProgramPart::Stmt(
         string_literal_stmt(s)
@@ -589,10 +865,14 @@ fn ident_stmt(id: &'static str) -> ProgramPart<'static> {
 fn array(content: Vec<Option<Expr<'static>>>) -> ProgramPart<'static> {
     ProgramPart::Stmt(
         Stmt::Expr(
-            Expr::Array(
-                content
-            )
+            array_expr(content)
         )
+    )
+}
+
+fn array_expr(content: Vec<Option<E>>) -> E {
+    Expr::Array(
+        content
     )
 }
 
@@ -1116,5 +1396,270 @@ fn unary(op: UnaryOperator, e: E, prefix: bool) -> UnaryExpr<'static> {
         operator: op,
         argument: Box::new(e),
         prefix
+    }
+}
+
+fn zero_bin_zero_part(op: BinaryOperator) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Expr(
+            Expr::Binary(
+                binary(
+                    number_literal_expr("0"),
+                    op,
+                    number_literal_expr("0")
+                )
+            )
+        )
+    )
+}
+
+fn ident_assign_zero_part(i: &'static str, op: AssignmentOperator) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Expr(
+            ident_assign_zero_expr(i, op)
+        )
+    )
+}
+
+fn ident_assign_zero_expr(i: &'static str, op: AssignmentOperator) -> Expr {
+    Expr::Assignment(
+        ident_assign_zero(i, op)
+    )
+}
+
+fn ident_assign_zero(i: &'static str, op: AssignmentOperator) -> AssignmentExpr {
+    AssignmentExpr {
+        left: AssignmentLeft::Expr(
+            Box::new(Expr::Ident(i))
+        ),
+        operator: op,
+        right: Box::new(number_literal_expr("0")),
+    }
+}
+
+fn zero_bin_expr_part(op: BinaryOperator, e: E) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Expr(
+            zero_bin_expr_expr(op, e)
+        )
+    )
+}
+
+fn zero_bin_expr_expr(
+    op: BinaryOperator, e: E
+) -> E {
+    Expr::Binary(
+        binary(
+            number_literal_expr("0"),
+            op,
+            e
+        )
+    )
+}
+
+fn binary(l: E, op: BinaryOperator, r: E) -> BinaryExpr<'static> {
+    BinaryExpr {
+        operator: op,
+        left: Box::new(l),
+        right: Box::new(r),
+    }
+}
+
+fn zero_log_zero(op: LogicalOperator) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Expr(
+           zero_log_zero_expr(op)
+        )
+    )
+}
+fn zero_log_zero_expr(op: LogicalOperator) -> E {
+    Expr::Logical(
+        logical(
+            number_literal_expr("0"), 
+            op, 
+            number_literal_expr("0"),
+        )
+    )
+}
+
+fn logical(l: E, op: LogicalOperator, r: E) -> LogicalExpr<'static> {
+    LogicalExpr {
+        operator: op,
+        left: Box::new(l),
+        right: Box::new(r),
+    }
+}
+
+fn conditional_part(t: E, c: E, a: E) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Expr(
+            conditional_expr(t, c, a)
+        )
+    )
+}
+
+fn conditional_expr(t: E, c: E, a: E) -> E {
+    Expr::Conditional(
+        conditional(t, c, a)
+    )
+}
+
+fn conditional(t: E, c: E, a: E) -> ConditionalExpr<'static> {
+    ConditionalExpr {
+        test: Box::new(t),
+        consequent: Box::new(c),
+        alternate: Box::new(a),
+    }
+}
+
+fn zero_sequence(ct: usize) -> Part {
+    let mut seq = vec![];
+    for _ in 0..ct {
+        seq.push(
+            number_literal_expr("0")
+        )
+    }
+    sequence(seq)
+}
+
+fn sequence(seq: Vec<E>) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Expr(
+            Expr::Sequence(seq)
+        )
+    )
+}
+
+fn block_part(body: Vec<Part>) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Block(body)
+    )
+}
+
+fn variable_decl_part(decls: Vec<VariableDecl<'static>>) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Var(
+            decls
+        )
+    )
+}
+
+fn variable_decl_none(ident: &'static str) -> VariableDecl<'static> {
+    VariableDecl {
+        id: Pat::Identifier(ident),
+        init: None,
+    }
+}
+fn variable_decl_zero(ident: &'static str) -> VariableDecl<'static> {
+    variable_decl(
+        ident,
+        number_literal_expr("0")
+    )
+}
+fn variable_decl(ident: &'static str, e: E) -> VariableDecl<'static> {
+    VariableDecl {
+        id: Pat::Identifier(ident),
+        init: Some(e),
+    }
+}
+
+fn if_zero_empty() -> Part {
+    ProgramPart::Stmt(
+        Stmt::If(
+            if_stmt(
+                number_literal_expr("0"),
+                Stmt::Empty,
+                None,
+            )
+        )
+    )
+}
+
+fn if_zero_empty_else() -> Part {
+    ProgramPart::Stmt(
+        Stmt::If(
+            if_stmt(
+                number_literal_expr("0"),
+                Stmt::Empty,
+                Some(Stmt::Empty),
+            )
+        )
+    )
+
+}
+
+fn if_stmt(t: E, c: S, a: Option<S>) -> IfStmt<'static> {
+    IfStmt {
+        test: t,
+        consequent: Box::new(c),
+        alternate: a.map(|a| Box::new(a)),
+    }
+}
+
+fn do_while_zero() -> Part {
+    ProgramPart::Stmt(
+        Stmt::DoWhile(
+            DoWhileStmt {
+                test: number_literal_expr("0"),
+                body: Box::new(Stmt::Empty),
+            }
+        )
+    )
+}
+
+fn while_zero() -> Part {
+    ProgramPart::Stmt(
+        Stmt::While(
+            WhileStmt {
+                test: number_literal_expr("0"),
+                body: Box::new(Stmt::Empty),
+            }
+        )
+    )
+}
+
+fn for_exprs_part(init: Option<E>, test: Option<E>, update: Option<E>, body: S) -> Part {
+    ProgramPart::Stmt(
+        Stmt::For(
+            for_(init.map(LoopInit::Expr), test, update, body)
+        )
+    )
+}
+
+fn for_var_part(kind: VariableKind, init: Vec<VariableDecl<'static>>, test: Option<E>, update: Option<E>, body: S) -> Part {
+    ProgramPart::Stmt(
+        Stmt::For(
+            for_(Some(LoopInit::Variable(kind, init)), test, update, body)
+        )
+    )
+}
+
+fn for_(
+    init: Option<LoopInit<'static>>,
+    test: Option<E>,
+    update: Option<E>,
+    body: S,
+) -> ForStmt<'static> {
+    ForStmt {
+        init,
+        test,
+        update,
+        body: Box::new(body),
+    }
+}
+
+fn for_in_loop_part(left: LoopLeft<'static>, right: E, body: S) -> Part {
+    ProgramPart::Stmt(
+        Stmt::ForIn(
+            for_in_loop(left, right, body)
+        )
+    )
+}
+
+fn for_in_loop(left: LoopLeft<'static>, right: E, body: S) -> ForInStmt<'static> {
+    ForInStmt {
+        left,
+        right,
+        body: Box::new(body),
     }
 }
