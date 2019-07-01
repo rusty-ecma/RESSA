@@ -1,7 +1,9 @@
 use resast::ref_tree::prelude::*;
 use resast::expr::{
     PropertyKind,
-    AssignmentOperator
+    AssignmentOperator,
+    UpdateOperator,
+    UnaryOperator,
 };
 type Part = ProgramPart<'static>;
 type S = Stmt<'static>;
@@ -243,6 +245,110 @@ lazy_static! {
                     )
                 ),
                 vec![]
+            ),
+            call_ident_part("x", vec![]),
+            call_part(
+                call_ident_expr("x", vec![]),
+                vec![],
+            ),
+            call_ident_part(
+                "x", vec![
+                    Expr::Ident("x")
+                ]
+            ),
+            call_ident_part(
+                "x", vec![
+                    Expr::Ident("x"),
+                    Expr::Ident("x"),
+                ]
+            ),
+            call_part(
+                member_expr(
+                    call_expr(
+                        member_ident_ident_expr(
+                            "x", "a"
+                        ),
+                        vec![]
+                    ),
+                    Expr::Ident("a"),
+                    false,
+                ),
+                vec![]
+            ),
+            call_part(
+                member_expr(
+                    call_expr(
+                        member_ident_number_expr("x", "0"),
+                        vec![],
+                    ),
+                    number_literal_expr("0"),
+                    true
+                ),
+                vec![]
+            ),
+            call_part(
+                member_expr(
+                    member_expr(
+                        call_expr(
+                            Expr::Ident("x"), 
+                            vec![]
+                        ),
+                        Expr::Ident("a"),
+                        false,
+                    ),
+                    number_literal_expr("0"),
+                    true,
+                )
+                , vec![]
+            ),
+            update_part(
+                Expr::Ident("x"), 
+                UpdateOperator::Increment, 
+                false
+            ),
+            update_part(
+                Expr::Ident("x"), 
+                UpdateOperator::Decrement, 
+                false
+            ),
+            unary_part(
+                UnaryOperator::Delete, 
+                unary_expr(
+                    UnaryOperator::Void,
+                    unary_expr(
+                        UnaryOperator::TypeOf, 
+                        unary_expr(
+                            UnaryOperator::Plus,
+                            unary_expr(
+                                UnaryOperator::Minus,
+                                unary_expr(
+                                    UnaryOperator::Tilde,
+                                    unary_expr(
+                                        UnaryOperator::Not,
+                                        Expr::Ident("x"),
+                                        true,
+                                    ),
+                                    true,
+                                ),
+                                true,
+                            ),
+                            true,
+                        ),
+                        true,
+                    ),
+                    true,
+                ), 
+                true
+            ),
+            update_part(
+                Expr::Ident("x"), 
+                UpdateOperator::Increment, 
+                true
+            ),
+            update_part(
+                Expr::Ident("x"), 
+                UpdateOperator::Decrement, 
+                true
             ),
         ];
 }
@@ -829,6 +935,10 @@ fn member_ident_ident(i: &'static str, i2: &'static str) -> MemberExpr<'static> 
     )
 }
 
+fn member_expr(obj: E, prop: E, computed: bool) -> E {
+    Expr::Member(member(obj, prop, computed))
+}
+
 fn member(obj: E, prop: E, computed: bool) -> MemberExpr<'static> {
     MemberExpr {
         computed,
@@ -927,5 +1037,84 @@ fn new_ident(i: &'static str, args: Vec<E>) -> NewExpr<'static> {
     NewExpr {
         callee: Box::new(Expr::Ident(i)),
         arguments: args,
+    }
+}
+
+fn call_ident_part(i: &'static str, args: Vec<E>) -> Part {
+    call_part(Expr::Ident(i), args)
+}
+
+fn call_part(callee: E, args: Vec<E>) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Expr(
+            Expr::Call(
+                call(callee, args)
+            )
+        )
+    )
+}
+
+fn call_expr(callee: E, args: Vec<E>) -> E {
+    Expr::Call(call(callee, args))
+}
+
+fn call_ident_expr(i: &'static str, args: Vec<E>) -> E {
+    Expr::Call(
+        call_ident(i, args)
+    )
+}
+
+fn call_ident(i: &'static str, args: Vec<E>) -> CallExpr<'static> {
+    call(
+        Expr::Ident(i),
+        args,
+    )
+}
+
+fn call(callee: E, args: Vec<E>) -> CallExpr<'static> {
+    CallExpr {
+        callee: Box::new(callee),
+        arguments: args,
+    }
+}
+
+fn update_part(e: E, op: UpdateOperator, prefix: bool) -> Part {
+    ProgramPart::Stmt(
+        update_stmt(e, op, prefix)
+    )
+}
+fn update_stmt(e: E, op: UpdateOperator, prefix: bool) -> S {
+    Stmt::Expr(
+        update_expr(e, op, prefix)
+    )
+}
+
+fn update_expr(e: E, op: UpdateOperator, prefix: bool) -> E {
+    Expr::Update(
+        UpdateExpr {
+            argument: Box::new(e),
+            operator: op,
+            prefix,
+        }
+    )
+}
+
+fn unary_part(op: UnaryOperator, e: E, prefix: bool) -> Part {
+    ProgramPart::Stmt(unary_stmt(op, e, prefix))
+}
+
+fn unary_stmt(op: UnaryOperator, e: E, prefix: bool) -> S {
+    Stmt::Expr(unary_expr(op, e, prefix))
+}
+
+fn unary_expr(op: UnaryOperator, e: E, prefix: bool) -> E {
+    Expr::Unary(unary(op, e, prefix))
+}
+
+fn unary(op: UnaryOperator, e: E, prefix: bool) -> UnaryExpr<'static> {
+    UnaryExpr {
+        operator: op,
+        argument: Box::new(e),
+        prefix
     }
 }
