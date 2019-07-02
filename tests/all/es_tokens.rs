@@ -765,6 +765,41 @@ lazy_static! {
         ];
 }
 
+lazy_static! {
+    pub static ref ES2015: Vec<ProgramPart<'static>> = vec![
+        preamble_labeled_statement("tab"),
+        preamble_labeled_statement("verticalTab"),
+        preamble_labeled_statement("formFeed"),
+        preamble_labeled_statement("space"),
+        preamble_labeled_statement("nbsp"),
+        preamble_labeled_statement("bom"),
+        line_term("lineFeed"),
+        number_literal_part("0"),
+        line_term("carriageReturn"),
+        number_literal_part("0"),
+        line_term("carriageReturnLineFeed"),
+        number_literal_part("0"),
+        line_term("lineSeparator"),
+        number_literal_part("0"),
+        line_term("paragraphSeparator"),
+        number_literal_part("0"),
+        var_decl_one_2015(),
+        var_decl_two_2015(),
+        // ProgramPart::Decl(
+        //     Decl::Variable(
+        //         VariableKind::Var,
+        //         vec![var_decl("yield")],
+        //     )
+        // ),
+        // ProgramPart::Decl(
+        //     Decl::Variable(
+        //         VariableKind::Var,
+        //         vec![var_decl("letx")],
+        //     )
+        // ),
+    ];
+}
+
 fn directive_part(dir: &'static str) -> Part {
     ProgramPart::Dir(
         Dir {
@@ -949,10 +984,50 @@ fn var_decl_one() -> ProgramPart<'static> {
     )
 }
 
+fn var_decl_one_2015() -> Part {
+    ProgramPart::Stmt(
+        Stmt::Var(
+            var_decls(&[
+                r"$", 
+                r"_", 
+                r"\u0078", 
+                r"\u{2F9F9}",
+                r"x$", 
+                r"x_", 
+                r"x\u0030", 
+                r"x\u{e01d5}",
+                r"xa", 
+                r"x0", 
+                r"x0a", 
+                r"x0123456789",
+                r"qwertyuiopasdfghjklzxcvbnm", 
+                r"QWERTYUIOPASDFGHJKLZXCVBNM",
+            ])      
+        )
+    )
+}
+
 fn var_decl_two() -> ProgramPart<'static> {
     ProgramPart::Stmt(
         Stmt::Var(
             var_decls(&[
+                r"œ一", 
+                r"ǻ둘", 
+                r"ɤ〩", 
+                r"φ", 
+                r"ﬁⅷ", 
+                r"ユニコード", 
+                r"x‌‍",
+            ])
+        )
+    )
+}
+fn var_decl_two_2015() -> ProgramPart<'static> {
+    ProgramPart::Stmt(
+        Stmt::Var(
+            var_decls(&[
+                r"䩶",
+                r"x󠇕",
                 r"œ一", 
                 r"ǻ둘", 
                 r"ɤ〩", 
