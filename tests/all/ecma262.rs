@@ -26,11 +26,11 @@ fn es2015_script() {
     info!("ES2015 Script");
     let path = Lib::Everything(EverythingVersion::Es2015Script).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
-    let mut p = Parser::new(&js).expect("Failed to create parser");
-    let mut res = vec![];
-    while let Some(item) = p.next() {
-        let item = item.unwrap();
-        res.push(item);
+     for (i, (item, part)) in Parser::new(&js).expect("Failed to create parser").map(|i| match i {
+            Ok(i) => i,
+            Err(e) => panic!("Error parsing {:?}\n{}", path, e),
+        }).zip(es_tokens::ES2015.iter()).enumerate() {
+        assert_eq!((i, &item), (i, part));
     }
 }
 
