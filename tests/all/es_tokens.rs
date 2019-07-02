@@ -628,9 +628,150 @@ lazy_static! {
             labeled_part(
                 "x", 
                 labeled_stmt("y", Stmt::Empty)
-            )
-            // ProgramPart::Stmt(Stmt::Empty),
+            ),
+            try_part(
+                vec![
+                    throw_part(
+                        number_literal_expr("0")
+                    )
+                ], 
+                Some(catch_(Some(Pat::Identifier("x")), vec![])), 
+                None
+            ),
+            try_part(
+                vec![], 
+                Some(catch_(Some(Pat::Identifier("x")), vec![])), 
+                None
+            ),
+            try_part(
+                vec![], 
+                None, 
+                Some(vec![])
+            ),
+            try_part(
+                vec![], 
+                Some(catch_(Some(Pat::Identifier("x")), vec![])), 
+                Some(vec![])
+            ),
+            ProgramPart::Stmt(Stmt::Debugger),
+            func_part("f", vec![], vec![]),
+            func_part(
+                "f", 
+                vec![
+                    fn_arg_ident_pat("x"),
+                ], 
+                vec![]
+            ),
+            func_part(
+                "f", 
+                vec![
+                    fn_arg_ident_pat("x"),
+                    fn_arg_ident_pat("y"),
+                ], 
+                vec![]
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    func_part(
+                        "f", 
+                        vec![], 
+                        vec![]
+                    ),
+                ]
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    directive_part("\"use strict\""),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    directive_part("'use strict'"),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    directive_part("\"other directive\""),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    directive_part("'other directive'"),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    string_literal_part("\"string\""),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    string_literal_part("'string'"),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    ProgramPart::Stmt(
+                        Stmt::Expr(
+                            Expr::Binary(
+                                binary(
+                                    string_literal_expr("'string'"), 
+                                    BinaryOperator::Plus, 
+                                    number_literal_expr("0")
+                                )
+                            )
+                        )
+                    ),
+                ],
+            ),
+            func_expr_part(None, vec![], vec![]),
+            func_expr_part(None, vec![
+                fn_arg_ident_pat("x")
+            ], vec![]),
+            func_expr_part(None, vec![
+                fn_arg_ident_pat("x"),
+                fn_arg_ident_pat("y"),
+            ], vec![]),
+            func_expr_part(None, vec![], vec![
+                func_part("f", vec![], vec![]),
+            ]),
+            func_expr_part(Some("f"), vec![], vec![]),
+            func_expr_part(Some("f"), vec![
+                fn_arg_ident_pat("x")
+            ], vec![]),
+            func_expr_part(Some("f"), vec![
+                fn_arg_ident_pat("x"),
+                fn_arg_ident_pat("y"),
+            ], vec![]),
+            func_expr_part(Some("f"), vec![], vec![
+                func_part("f", vec![], vec![]),
+            ]),
         ];
+}
+
+fn directive_part(dir: &'static str) -> Part {
+    ProgramPart::Dir(
+        Dir {
+            expr: string_literal(dir),
+            dir: &dir[1..dir.len() - 1],
+        }
+    )
 }
 
 fn empty_part() -> Part {
@@ -1014,6 +1155,27 @@ fn func_part(id: &'static str, args: Vec<FA>, body: Vec<Part>) -> Part {
     ProgramPart::Decl(
         Decl::Function(
             func(id, args, body)
+        )
+    )
+}
+
+fn func_expr_part(id: Option<&'static str>, args: Vec<FA>, body: Vec<Part>) -> Part {
+    let f = if let Some(id) = id {
+        func(id, args, body)
+    } else {
+        Function {
+            id: None,
+            params: args,
+            body,
+            generator: false,
+            is_async: false,
+        }
+    };
+    ProgramPart::Stmt(
+        Stmt::Expr(
+            Expr::Function(
+                f
+            )
         )
     )
 }
@@ -1764,4 +1926,37 @@ fn switch_case(test: Option<E>, body: Vec<Part>) -> SwitchCase<'static> {
         test,
         consequent: body
     }
+}
+
+fn try_part(block: Vec<Part>, handler: Option<CatchClause<'static>>, finalizer: Option<Vec<Part>>) -> Part { 
+    ProgramPart::Stmt(
+        Stmt::Try(
+            try_(block, handler, finalizer)
+        )
+    )
+}
+
+fn try_(block: Vec<Part>, handler: Option<CatchClause<'static>>, finalizer: Option<Vec<Part>>) -> TryStmt<'static> {
+    TryStmt {
+        block,
+        handler,
+        finalizer,
+    }
+}
+
+fn catch_(param: Option<P>, body: Vec<Part>) -> CatchClause<'static> {
+    CatchClause {
+        param,
+        body,
+    }
+}
+
+fn throw_part(e: E) -> Part {
+    ProgramPart::Stmt(throw_stmt(e))
+}
+
+fn throw_stmt(e: E) -> S {
+    Stmt::Throw(
+        e
+    )
 }
