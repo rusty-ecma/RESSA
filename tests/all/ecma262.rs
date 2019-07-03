@@ -12,12 +12,26 @@ fn es5() {
     info!("ES5");
     let path = Lib::Everything(EverythingVersion::Es5).path();
     let js = get_js_file(&path).expect(&format!("Faield to get {:?}", path));
-    for (i, (item, part)) in Parser::new(&js).expect("Failed to create parser").map(|i| match i {
-            Ok(i) => i,
-            Err(e) => panic!("Error parsing {:?}\n{}", path, e),
-        }).zip(es_tokens::ES5.iter()).enumerate() {
-        assert_eq!((i, &item), (i, part));
+    let mut p = Parser::new(&js).expect("Failed to create parser");
+    let mut tokens = es_tokens::ES5.iter();
+    let mut i = 0;
+    while let Some(ref item) = p.next() {
+        if let Some(part) = tokens.next() {
+            let item = match item {
+                Ok(i) => i,
+                Err(e) => panic!("Error parsing {:?}\n{}", path, e),
+            };
+            if item != part {
+                let pos = p.next_position();
+                panic!("Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}", i, item, part, pos.start.line, pos.start.column)
+            }
+        }
+        i += 1;
     }
+    // for (i, (item, part)) in p.zip(es_tokens::ES5.iter()).enumerate() {
+        
+    //     // assert_eq!((i, &item), (i, part));
+    // }
 }
 
 #[test]
@@ -26,11 +40,21 @@ fn es2015_script() {
     info!("ES2015 Script");
     let path = Lib::Everything(EverythingVersion::Es2015Script).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
-     for (i, (item, part)) in Parser::new(&js).expect("Failed to create parser").map(|i| match i {
-            Ok(i) => i,
-            Err(e) => panic!("Error parsing {:?}\n{}", path, e),
-        }).zip(es_tokens::ES2015.iter()).enumerate() {
-        assert_eq!((i, &item), (i, part));
+     let mut p = Parser::new(&js).expect("Failed to create parser");
+    let mut tokens = es_tokens::ES2015.iter();
+    let mut i = 0;
+    while let Some(ref item) = p.next() {
+        if let Some(part) = tokens.next() {
+            let item = match item {
+                Ok(i) => i,
+                Err(e) => panic!("Error parsing {:?}\n{}", path, e),
+            };
+            if item != part {
+                let pos = p.next_position();
+                panic!("Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}", i, item, part, pos.start.line, pos.start.column)
+            }
+        }
+        i += 1;
     }
 }
 
