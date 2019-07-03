@@ -65,7 +65,7 @@ lazy_static! {
             string_literal_part(r#""\u0123\u4567\u89AB\uCDEF""#,),
             string_literal_part(r#""\
 ""#),
-            string_literal_part(r"''"),
+            string_literal_part(r"''"),//20
             string_literal_part(r#"'"'"#),
             string_literal_part(r#"'\'\"\\\b\f\n\r\t\v\0'"#),
             string_literal_part(r#"'\1\00\400\000'"#),
@@ -75,8 +75,8 @@ lazy_static! {
 '"#),
             regex_literal_part(r#"x"#, ""),
             regex_literal_part(r#"|"#, ""),
-            regex_literal_part(r#"|||"#, ""),
-            regex_literal_part(r#"^$\b\B"#, ""),
+            regex_literal_part(r#"|||"#, ""), 
+            regex_literal_part(r#"^$\b\B"#, ""), //30
             regex_literal_part(r#"(?=(?!(?:(.))))"#, ""),
             regex_literal_part(r#"a.\f\n\r\t\v\0\[\-\/\\\x00\u0000"#,""),
             regex_literal_part(r#"\d\D\s\S\w\W"#, ""),
@@ -85,8 +85,8 @@ lazy_static! {
             regex_literal_part(r#"[a-z-]"#,""),
             regex_literal_part(r#"[^\b\-^]"#,""),
             regex_literal_part(r#"[/\]\\]"#, ""),
-            regex_literal_part(r#"."#, "i"),
-            regex_literal_part(r#"."#, "g"),
+            regex_literal_part(r#"."#, "i"), 
+            regex_literal_part(r#"."#, "g"),//40
             regex_literal_part(r#"."#, "m"),
             regex_literal_part(r#"."#, "igm"),
             regex_literal_part(r#".*"#, ""),
@@ -95,8 +95,8 @@ lazy_static! {
             regex_literal_part(r#".+?"#, ""),
             regex_literal_part(r#".?"#, ""),
             regex_literal_part(r#".??"#, ""),
-            regex_literal_part(r#".{0}"#, ""),
-            regex_literal_part(r#".{0,}"#, ""),
+            regex_literal_part(r#".{0}"#, ""), 
+            regex_literal_part(r#".{0,}"#, ""), //50
             regex_literal_part(r#".{0,0}"#, ""),
             this_part(),
             ident_stmt("x"),
@@ -107,7 +107,7 @@ lazy_static! {
             array(vec![Some(number_literal_expr("0"))]),
             array(vec![None, Some(number_literal_expr("0"))]),
             array(vec![Some(number_literal_expr("0")), Some(number_literal_expr("0"))]),
-            array(vec![Some(number_literal_expr("0")), Some(number_literal_expr("0"))]),
+            array(vec![Some(number_literal_expr("0")), Some(number_literal_expr("0"))]), //60
             array(vec![Some(number_literal_expr("0")), None, Some(number_literal_expr("0"))]),
             array(vec![None, None]),
             //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -134,7 +134,7 @@ lazy_static! {
                 obj_prop_number_number("0.", "0"),
             ]),
             obj_literal_part(vec![
-                obj_prop_number_number("0.0", "0"),
+                obj_prop_number_number("0.0", "0"), // 80
             ]),
             obj_literal_part(vec![
                 obj_prop_number_number(".0", "0"),
@@ -165,6 +165,11 @@ lazy_static! {
             ]),
             member_number_ident_part("0.", "a"),
             member_number_number_part("0", "0"),
+            // Decl::Variable(
+            //     VariableKind::Var,
+            //     Var
+
+            // )
             assign_part(
                 assign_left_ident("x"), 
                 func_expr(
@@ -186,7 +191,7 @@ lazy_static! {
                 Expr::Ident("x")
             ),
             new_ident_part("x"),
-            new_part(
+            new_part( //90
                 new_ident_expr("x", vec![]),
                 vec![]
             ),
@@ -251,7 +256,7 @@ lazy_static! {
                 ),
                 vec![]
             ),
-            call_ident_part("x", vec![]),
+            call_ident_part("x", vec![]), //100
             call_part(
                 call_ident_expr("x", vec![]),
                 vec![],
@@ -345,7 +350,7 @@ lazy_static! {
                 ), 
                 true
             ),
-            update_part(
+            update_part( //110
                 Expr::Ident("x"), 
                 UpdateOperator::Increment, 
                 true
@@ -363,7 +368,7 @@ lazy_static! {
             zero_bin_zero_part(BinaryOperator::LeftShift),
             zero_bin_zero_part(BinaryOperator::RightShift),
             zero_bin_zero_part(BinaryOperator::UnsignedRightShift),
-            zero_bin_zero_part(BinaryOperator::LessThan),
+            zero_bin_zero_part(BinaryOperator::LessThan), //120
             zero_bin_zero_part(BinaryOperator::GreaterThan),
             zero_bin_zero_part(BinaryOperator::LessThanEqual),
             zero_bin_zero_part(BinaryOperator::GreaterThanEqual),
@@ -379,7 +384,7 @@ lazy_static! {
             zero_bin_zero_part(BinaryOperator::NotEqual),
             zero_bin_zero_part(BinaryOperator::StrictEqual),
             zero_bin_zero_part(BinaryOperator::StrictNotEqual),
-            zero_bin_zero_part(BinaryOperator::And),
+            zero_bin_zero_part(BinaryOperator::And),//130
             zero_bin_zero_part(BinaryOperator::XOr),
             zero_bin_zero_part(BinaryOperator::Or),
             zero_log_zero(LogicalOperator::And),
@@ -412,7 +417,7 @@ lazy_static! {
             ),
             // ^^^^^^^^^^^^^^^^^^^^^^^^^^
             ident_assign_zero_part("x", AssignmentOperator::Equal),
-            ident_assign_zero_part("x", AssignmentOperator::TimesEqual),
+            ident_assign_zero_part("x", AssignmentOperator::TimesEqual),//140
             ident_assign_zero_part("x", AssignmentOperator::DivEqual),
             ident_assign_zero_part("x", AssignmentOperator::ModEqual),
             ident_assign_zero_part("x", AssignmentOperator::PlusEqual),
@@ -422,7 +427,7 @@ lazy_static! {
             ident_assign_zero_part("x", AssignmentOperator::UnsignedRightShiftEqual),
             ident_assign_zero_part("x", AssignmentOperator::AndEqual),
             ident_assign_zero_part("x", AssignmentOperator::XOrEqual),
-            ident_assign_zero_part("x", AssignmentOperator::OrEqual),
+            ident_assign_zero_part("x", AssignmentOperator::OrEqual), //150
             zero_sequence(2),
             zero_sequence(3),
             sequence(vec![
@@ -441,37 +446,42 @@ lazy_static! {
                 number_literal_part("0"),
                 number_literal_part("0"),
             ]),
-            variable_decl_part(vec![
-                variable_decl_none("x")
-            ]),
-            variable_decl_part(vec![
+            variable_decl_part(
+                VariableKind::Var,
+                vec![
+                    variable_decl_none("x") //160
+                ]
+            ),
+            variable_decl_part(
+                VariableKind::Var,
+                vec![
                 variable_decl_none("x"),
                 variable_decl_none("y"),
             ]),
-            variable_decl_part(vec![
+            variable_decl_part(VariableKind::Var,vec![
                 variable_decl_none("x"),
                 variable_decl_none("y"),
                 variable_decl_none("z"),
             ]),
-            variable_decl_part(vec![
+            variable_decl_part(VariableKind::Var,vec![
                 variable_decl_zero("x"),
             ]),
-            variable_decl_part(vec![
+            variable_decl_part(VariableKind::Var,vec![
                 variable_decl_zero("x"),
                 variable_decl_none("y"),
             ]),
-            variable_decl_part(vec![
+            variable_decl_part(VariableKind::Var,vec![
                 variable_decl_none("x"),
                 variable_decl_zero("y"),
             ]),
-            variable_decl_part(vec![
+            variable_decl_part(VariableKind::Var,vec![
                 variable_decl_zero("x"),
                 variable_decl_zero("y"),
             ]),
             ProgramPart::Stmt(Stmt::Empty),
             if_zero_empty(),
             if_zero_empty_else(),
-            do_while_zero(),
+            do_while_zero(),//170
             while_zero(),
             for_exprs_part(None, None, None, Stmt::Break(None)),
             for_exprs_part(
@@ -785,19 +795,334 @@ lazy_static! {
         number_literal_part("0"),
         var_decl_one_2015(),
         var_decl_two_2015(),
-        // ProgramPart::Decl(
-        //     Decl::Variable(
-        //         VariableKind::Var,
-        //         vec![var_decl("yield")],
-        //     )
-        // ),
-        // ProgramPart::Decl(
-        //     Decl::Variable(
-        //         VariableKind::Var,
-        //         vec![var_decl("letx")],
-        //     )
-        // ),
+        variable_decl_part(
+            VariableKind::Var,
+            vec![var_decl("yield")]
+        ),
+        variable_decl_part(
+            VariableKind::Let,
+            vec![var_decl("letx")],
+        ),
+        variable_decl_part(
+            VariableKind::Let,
+            vec![
+                VariableDecl {
+                    id: Pat::Array(
+                        vec![
+                            Some(
+                                ArrayPatPart::Pat(
+                                    Pat::Identifier(r"x\u0078")
+                                )
+                            )
+                        ]
+                    ),
+                    init: Some(number_literal_expr("0"))
+                }
+            ]    
+        ),
+        variable_decl_part(
+            VariableKind::Const,
+            vec![var_decl_init("constx", number_literal_expr("0"))],
+        ),
+        block_part(
+            vec![
+                variable_decl_part(
+                    VariableKind::Let,
+                    vec![var_decl("x")]
+                ),
+                variable_decl_part(
+                    VariableKind::Let,
+                    vec![variable_decl("y", number_literal_expr("0"))],
+                ),
+                variable_decl_part(
+                    VariableKind::Const,
+                    vec![variable_decl("z", number_literal_expr("0"))],
+                )
+            ]
+        ),
+        null_literal_part(),
+        bool_literal_part(true),
+        bool_literal_part(false),
+        number_literal_part("0"),
+        number_literal_part("00"),
+        number_literal_part("1234567890"),
+        number_literal_part("01234567"),
+        number_literal_part("0."),
+        number_literal_part("0.00"),
+        number_literal_part("10.00"),
+        number_literal_part(".0"),
+        number_literal_part(".00"),
+        number_literal_part("0e0"),
+        number_literal_part("0E0"),
+        number_literal_part("0.e0"),
+        number_literal_part("0.00e+0"),
+        number_literal_part(".00e-0"),
+        number_literal_part("0x0"),
+        number_literal_part("0X0"),
+        number_literal_part("0x0123456789abcdefABCDEF"),
+        number_literal_part("0b0"),
+        number_literal_part("0B0"),
+        number_literal_part("0b01"),
+        number_literal_part("0b10"),
+        number_literal_part("0b10101010"),
+        number_literal_part("0o0"),
+        number_literal_part("0O0"),
+        number_literal_part("0o01234567"),
+        number_literal_part("2e308"),
+        string_literal_part(r#""""#,),
+        string_literal_part(r#""'""#,),
+        string_literal_part(r#""\'\"\\\b\f\n\r\t\v\0""#,),
+        string_literal_part(r#""\1\00\400\000""#,),
+        string_literal_part(r#""\x01\x23\x45\x67\x89\xAB\xCD\xEF\xab\xcd\xef""#,),
+        string_literal_part(r#""\u0123\u4567\u89AB\uCDEF\u00ab\ucdef""#,),
+        string_literal_part(r#""\uD834\uDF06\u2603\u03C6 \u{0000001F4a9}\u{1D306}\u{2603}\u{3c6} 𝌆☃φ""#),
+        string_literal_part(r#""\
+""#),
+        string_literal_part(r"''"),
+        string_literal_part(r#"'"'"#),
+        string_literal_part(r#"'\'\"\\\b\f\n\r\t\v\0'"#),
+        string_literal_part(r#"'\1\00\400\000'"#),
+        string_literal_part(r#"'\x01\x23\x45\x67\x89\xAB\xCD\xEF\xab\xcd\xef'"#),
+        string_literal_part(r#"'\u0123\u4567\u89AB\uCDEF\u00ab\ucdef'"#),
+        string_literal_part(r#"'\uD834\uDF06\u2603\u03C6 \u{0000001F4a9} \u{1D306}\u{2603}\u{3c6} 𝌆☃φ'"#),
+        string_literal_part(r#"'\
+'"#),
+        regex_literal_part(r#"x"#, ""),
+        regex_literal_part(r#"|"#, ""),
+        regex_literal_part(r#"|||"#, ""), 
+        regex_literal_part(r#"^$\b\B"#, ""), 
+        regex_literal_part(r#"(?=(?!(?:(.))))"#, ""),
+        regex_literal_part(r#"a.\f\n\r\t\v\0\[\-\/\\\x00\u0000\uD834\uDF06"#,""),
+        regex_literal_part(r#"\u{00000001d306}"#,"u"),
+        regex_literal_part(r#"\d\D\s\S\w\W"#, ""),
+        regex_literal_part(r#"\ca\cb\cc\cd\ce\cf\cg\ch\ci\cj\ck\cl\cm\cn\co\cp\cq\cr\cs\ct\cu\cv\cw\cx\cy\cz"#, ""),
+        regex_literal_part(r#"\cA\cB\cC\cD\cE\cF\cG\cH\cI\cJ\cK\cL\cM\cN\cO\cP\cQ\cR\cS\cT\cU\cV\cW\cX\cY\cZ"#, ""),
+        regex_literal_part(r#"[a-z-]"#,""),
+        regex_literal_part(r#"[^\b\-^]"#,""),
+        regex_literal_part(r#"[/\]\\]"#, ""),
+        regex_literal_part(r#"."#, "i"), 
+        regex_literal_part(r#"."#, "g"),
+        regex_literal_part(r#"."#, "m"),
+        regex_literal_part(r#"."#, "igm"),
+        regex_literal_part(r#".*"#, ""),
+        regex_literal_part(r#".*?"#, ""),
+        regex_literal_part(r#".+"#, ""),
+        regex_literal_part(r#".+?"#, ""),
+        regex_literal_part(r#".?"#, ""),
+        regex_literal_part(r#".??"#, ""),
+        regex_literal_part(r#".{0}"#, ""), 
+        regex_literal_part(r#".{0,}"#, ""), 
+        regex_literal_part(r#".{0,0}"#, ""),
+        template_part(vec![
+            template_element("`a`", true)
+        ], vec![
+        ]),
+        template_part(vec![
+            template_element("`${", false),
+            template_element("}`", true),
+        ], vec![
+            number_literal_expr("0")
+        ]),
+        template_part(vec![
+            template_element("`0${", false),
+            template_element("}2`", true),
+            
+        ], vec![
+            Expr::Sequence(vec![
+                number_literal_expr("0"),
+                number_literal_expr("1"),
+            ])
+        ]),
+        template_part(vec![
+            template_element("`0${", false),
+            template_element("}4`", true),
+        ], vec![
+            template_expr(vec![
+                template_element("`1${", false),
+                template_element("}3`", true),
+            ], vec![
+                number_literal_expr("2")
+            ])
+        ]),
+        template_part(vec![
+            template_element(r"`\``", true)
+        ], vec![
+
+        ]),
+        template_part(vec![
+            template_element(r"`a\${b`", true)
+        ], vec![
+
+        ]),
+        template_part(vec![
+            template_element(r"`\0\n\x0A\u000A\u{A}`", true)
+        ], vec![
+
+        ]),
+        this_part(),
+        ProgramPart::Stmt(Stmt::Expr(Expr::Ident("x"))),
+        array(vec![]),
+        array(vec![None]),
+        array(vec![Some(number_literal_expr("0"))]),
+        array(vec![Some(number_literal_expr("0"))]),
+        array(vec![None, Some(number_literal_expr("0"))]),
+        array(vec![Some(number_literal_expr("0")), Some(number_literal_expr("0"))]),
+        array(vec![Some(number_literal_expr("0")), Some(number_literal_expr("0"))]), //60
+        array(vec![Some(number_literal_expr("0")), None, Some(number_literal_expr("0"))]),
+        array(vec![None, None]),
+        obj_literal_part(vec![]),
+        obj_literal_part(vec![
+            obj_prop(
+                obj_key_ident("x"),
+                PropertyValue::None,
+                PropertyKind::Init,
+                false,
+                false,
+                true,
+            )
+        ]),
+        obj_literal_part(vec![
+            obj_prop_ident_number("x", "0")
+        ]),
+        obj_literal_part(vec![
+            obj_prop_ident_number("x", "0"),
+            obj_prop_ident_number("y", "0"),
+        ]),
+        obj_literal_part(vec![
+            obj_prop_ident_number("x", "0")
+        ]),
+        obj_literal_part(vec![
+            obj_prop_str_number("'x'", "0"),
+            obj_prop_str_number("\"y\"", "0"),
+            obj_prop_ident_number("in", "0")
+        ]),
+        obj_literal_part(vec![
+            obj_prop_number_number("0", "0"),
+            obj_prop_number_number("0.", "0"),
+            obj_prop_number_number("0.0", "0"),
+            obj_prop_number_number(".0", "0"),
+            obj_prop_number_number("0e0", "0"),
+            obj_prop_number_number("0x0", "0"),
+            obj_prop(
+                obj_key_number("0"),
+                obj_value_number("0"),
+                PropertyKind::Init,
+                false,
+                false,
+                true,
+            ),
+            obj_prop_ident_getter("x"),
+            obj_prop_ident_setter("x", vec![
+                fn_arg_ident_pat("a")
+            ]),
+            obj_prop_str_getter("'y'"),
+            obj_prop_str_setter("\"y\"", vec![
+                fn_arg_ident_pat("a")
+            ]),
+            obj_prop_number_getter("0"),
+            obj_prop_number_setter("0", vec![
+                fn_arg_ident_pat("a")
+            ]),
+            obj_prop(
+                obj_key_ident("var"),
+                obj_value_fn(empty_anon_fn(vec![])),
+                PropertyKind::Get,
+                false,
+                false,
+                false,
+            ),
+            obj_prop(
+                obj_key_ident("var"),
+                obj_value_fn(empty_anon_fn(vec![
+                    fn_arg_ident_pat("a")
+                ])),
+                PropertyKind::Set,
+                false,
+                false,
+                false,
+            ),
+            obj_prop(
+                obj_key_number("0"),
+                obj_value_fn(empty_anon_fn(vec![])),
+                PropertyKind::Get,
+                false,
+                true,
+                false,
+            ),
+            obj_prop(
+                obj_key_number("0"),
+                obj_value_fn(empty_anon_fn(vec![
+                    fn_arg_ident_pat("a")
+                ])),
+                PropertyKind::Set,
+                false,
+                true,
+                false,
+            ),
+            obj_prop(
+                obj_key_number("1"),
+                obj_value_fn(empty_anon_fn(vec![])),
+                PropertyKind::Init,
+                true,
+                true,
+                false,
+            ),
+            obj_prop_ident_fn("a", empty_anon_fn(vec![]), PropertyKind::Init),
+            obj_prop_str_fn("'b'", empty_anon_fn(vec![]), PropertyKind::Init),
+            obj_prop_str_fn("\"c\"", empty_anon_fn(vec![]), PropertyKind::Init),
+            obj_prop_number_fn("0", empty_anon_fn(vec![]), PropertyKind::Init),
+            obj_prop_number_fn(".1", empty_anon_fn(vec![]), PropertyKind::Init),
+            obj_prop_number_fn("1.", empty_anon_fn(vec![]), PropertyKind::Init),
+            obj_prop_number_fn("1e1", empty_anon_fn(vec![]), PropertyKind::Init),
+            obj_prop_ident_fn("var", empty_anon_fn(
+                long_args()
+            ), PropertyKind::Method),
+
+        ])
+        // ProgramPart::Stmt(Stmt::Empty)
     ];
+}
+
+fn long_args() -> Vec<FA> {
+    vec![
+        fn_arg_ident_pat("a"),
+        FunctionArg::Pat(
+            Pat::Assignment(
+                AssignmentPat {
+                    left: Box::new(
+                        Pat::Identifier("b")
+                    ),
+                    right: Box::new(
+                        number_literal_expr("0")
+                    )
+                }
+            )
+        ),
+        FunctionArg::Pat(
+            Pat::Array(vec![
+                Some(ArrayPatPart::Pat(
+                    Pat::Identifier("c")
+                )),
+                None,
+                Some(ArrayPatPart::Pat(
+                    Pat::Assignment(
+                        AssignmentPat {
+                            left: Box::new(Pat::Identifier("d")),
+                            right: Box::new(number_literal_expr("0"))
+                        }
+                    )
+                )),
+                Some(ArrayPatPart::Pat(
+                    Pat::RestElement(
+                        Box::new(
+                            Pat::Identifier("e")
+                        )
+                    )
+                ))
+            ]
+            )
+        )
+    ]   
 }
 
 fn directive_part(dir: &'static str) -> Part {
@@ -964,8 +1289,9 @@ fn bool_literal(b: bool) -> Literal<'static> {
 }
 
 fn var_decl_one() -> ProgramPart<'static> {
-    ProgramPart::Stmt(
-        Stmt::Var(
+    ProgramPart::Decl(
+        Decl::Variable(
+            VariableKind::Var,
             var_decls(&[
                 r"$", 
                 r"_", 
@@ -985,8 +1311,9 @@ fn var_decl_one() -> ProgramPart<'static> {
 }
 
 fn var_decl_one_2015() -> Part {
-    ProgramPart::Stmt(
-        Stmt::Var(
+    ProgramPart::Decl(
+        Decl::Variable(
+            VariableKind::Var,
             var_decls(&[
                 r"$", 
                 r"_", 
@@ -1008,8 +1335,9 @@ fn var_decl_one_2015() -> Part {
 }
 
 fn var_decl_two() -> ProgramPart<'static> {
-    ProgramPart::Stmt(
-        Stmt::Var(
+    ProgramPart::Decl(
+        Decl::Variable(
+            VariableKind::Var,
             var_decls(&[
                 r"œ一", 
                 r"ǻ둘", 
@@ -1023,8 +1351,9 @@ fn var_decl_two() -> ProgramPart<'static> {
     )
 }
 fn var_decl_two_2015() -> ProgramPart<'static> {
-    ProgramPart::Stmt(
-        Stmt::Var(
+    ProgramPart::Decl(
+        Decl::Variable(
+            VariableKind::Var,
             var_decls(&[
                 r"䩶",
                 r"x󠇕",
@@ -1441,16 +1770,6 @@ fn member_number_number_part(n: &'static str, i: &'static str) -> Part {
         member_number_number_stmt(n, i)
     )
 }
-fn member_ident_number_part(i: &'static str, n: &'static str) -> Part {
-    ProgramPart::Stmt(
-        member_ident_number_stmt(i, n)
-    )
-}
-fn member_ident_ident_part(i: &'static str, i2: &'static str) -> Part {
-    ProgramPart::Stmt(
-        member_ident_ident_stmt(i, i2)
-    )
-}
 fn member_number_ident_stmt(n: &'static str, i: &'static str) -> S {
     Stmt::Expr(
         member_number_ident_expr(n, i)
@@ -1459,16 +1778,6 @@ fn member_number_ident_stmt(n: &'static str, i: &'static str) -> S {
 fn member_number_number_stmt(n: &'static str, i: &'static str) -> S {
     Stmt::Expr(
         member_number_number_expr(n, i)
-    )
-}
-fn member_ident_number_stmt(i: &'static str, n: &'static str) -> S {
-    Stmt::Expr(
-        member_ident_number_expr(i, n)
-    )
-}
-fn member_ident_ident_stmt(i: &'static str, i2: &'static str) -> S {
-    Stmt::Expr(
-        member_ident_ident_expr(i, i2)
     )
 }
 fn member_number_ident_expr(n: &'static str, i: &'static str) -> E {
@@ -1842,9 +2151,10 @@ fn block_part(body: Vec<Part>) -> Part {
     )
 }
 
-fn variable_decl_part(decls: Vec<VariableDecl<'static>>) -> Part {
-    ProgramPart::Stmt(
-        Stmt::Var(
+fn variable_decl_part(kind: VariableKind, decls: Vec<VariableDecl<'static>>) -> Part {
+    ProgramPart::Decl(
+        Decl::Variable(
+            kind,
             decls
         )
     )
@@ -2034,4 +2344,42 @@ fn throw_stmt(e: E) -> S {
     Stmt::Throw(
         e
     )
+}
+
+fn template_part(
+    quasis: Vec<TemplateElement<'static>>, exprs: Vec<E>
+) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Expr(
+            template_expr(quasis, exprs)
+        )
+    )
+}
+
+fn template_expr(quasis: Vec<TemplateElement<'static>>, exprs: Vec<E>) -> E {
+    Expr::Literal(
+        Literal::Template(
+            template(quasis, exprs)
+        )
+    )
+}
+
+fn template(quasis: Vec<TemplateElement<'static>>, exprs: Vec<E>) -> TemplateLiteral<'static> {
+    TemplateLiteral {
+        quasis,
+        expressions: exprs
+    }
+}
+
+fn template_element(raw: &'static str, tail: bool) -> TemplateElement<'static> {
+    let end = if tail {
+        raw.len() - 1
+    } else {
+        raw.len() - 2
+    };
+    TemplateElement {
+        raw,
+        cooked: &raw[1..end],
+        tail
+    }
 }

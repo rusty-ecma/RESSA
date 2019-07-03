@@ -452,6 +452,17 @@ where
                     let stmt = self.parse_statement()?;
                     ProgramPart::Stmt(stmt)
                 }),
+                Keyword::Var => {
+                    let _var = self.next_item()?;
+                    let decls = self.parse_var_decl_list(false)?;
+                    self.consume_semicolon()?;
+                    Ok(ProgramPart::Decl(
+                        Decl::Variable(
+                            VariableKind::Var,
+                            decls,
+                        )
+                    ))
+                },
                 _ => {
                     let stmt = self.parse_statement()?;
                     Ok(ProgramPart::Stmt(stmt))
@@ -846,6 +857,7 @@ where
         debug!("{}: parse_var_stmt", self.look_ahead.span.start);
         self.expect_keyword(Keyword::Var)?;
         let decls = self.parse_var_decl_list(false)?;
+
         let stmt = Stmt::Var(decls);
         self.consume_semicolon()?;
         Ok(stmt)
@@ -2857,7 +2869,8 @@ where
     ) -> Res<(bool, Pat<'b>)> {
         debug!("{}: parse_binding_rest_el", self.look_ahead.span.start);
         self.expect_punct(Punct::Ellipsis)?;
-        self.parse_pattern(None, params)
+        let (b, pat) = self.parse_pattern(None, params)?;
+        Ok((b, Pat::RestElement(Box::new(pat))))
     }
 
     #[inline]
@@ -4455,6 +4468,10 @@ where
     }
     fn reinterpret_error(&self, from: &str, to: &str) -> Error {
         Error::UnableToReinterpret(self.current_position, from.to_owned(), to.to_owned())
+    }
+
+    pub fn next_position(&self) -> SourceLocation {
+        self.look_ahead.location
     }
 
     fn next_part(&mut self) -> Res<ProgramPart<'b>> {
