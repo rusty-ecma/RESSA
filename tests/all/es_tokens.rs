@@ -1121,7 +1121,25 @@ fn long_args() -> Vec<FA> {
                 ))
             ]
             )
-        )
+        ),
+        FunctionArg::Pat(
+            Pat::Object(vec![
+                ObjectPatPart::Assignment(
+                    Property {
+                        key: obj_key_ident("f"),
+                        value: PropertyValue::None,
+                        kind: PropertyKind::Init,
+                        method: false,
+                        computed: false,
+                        short_hand: true,
+                    }
+                ),
+                // g: h
+                //i = 0,
+                // i: j = 0
+            ])
+        ),
+        //...k
     ]   
 }
 
@@ -1534,7 +1552,6 @@ fn obj_prop_number_number(n: &'static str, number: &'static str) -> OP {
 }
 type F = Function<'static>;
 type FA = FunctionArg<'static>;
-type FB = FunctionBody<'static>;
 fn empty_anon_fn(args: Vec<FA>) -> F {
     Function {
         id: None,
@@ -1598,12 +1615,6 @@ fn func(id: &'static str, args: Vec<FA>, body: Vec<Part>) -> F {
         body,
         params: args,
     }
-}
-
-fn fn_arg_ident_expr(i: &'static str) -> FA {
-    FunctionArg::Expr(
-        Expr::Ident(i)
-    )
 }
 
 fn fn_arg_ident_pat(i: &'static str) -> FA {
@@ -1726,6 +1737,11 @@ fn obj_value_fn(f: Function<'static>) -> PV {
         Expr::Function(f)
     )
 }
+fn obj_value_ident(i: &'static str) -> PV {
+    PropertyValue::Expr(
+        Expr::Ident(i)
+    )
+}
 fn obj_key_ident(i: &'static str) -> PK {
     obj_prop_key_expr(
         Expr::Ident(i)
@@ -1759,7 +1775,6 @@ fn obj_prop_key_pat(pat: P) -> PK {
     )
 }
 
-type Mem = MemberExpr<'static>;
 fn member_number_ident_part(n: &'static str, i: &'static str) -> Part {
     ProgramPart::Stmt(
         member_number_ident_stmt(n, i)
