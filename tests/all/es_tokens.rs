@@ -165,11 +165,6 @@ lazy_static! {
             ]),
             member_number_ident_part("0.", "a"),
             member_number_number_part("0", "0"),
-            // Decl::Variable(
-            //     VariableKind::Var,
-            //     Var
-
-            // )
             assign_part(
                 assign_left_ident("x"), 
                 func_expr(
@@ -191,7 +186,7 @@ lazy_static! {
                 Expr::Ident("x")
             ),
             new_ident_part("x"),
-            new_part( //90
+            new_part( 
                 new_ident_expr("x", vec![]),
                 vec![]
             ),
@@ -1008,8 +1003,8 @@ lazy_static! {
                 obj_value_number("0"),
                 PropertyKind::Init,
                 false,
-                false,
                 true,
+                false,
             ),
             obj_prop_ident_getter("x"),
             obj_prop_ident_setter("x", vec![
@@ -1076,30 +1071,979 @@ lazy_static! {
             obj_prop_number_fn("1e1", empty_anon_fn(vec![]), PropertyKind::Init),
             obj_prop_ident_fn("var", empty_anon_fn(
                 long_args()
-            ), PropertyKind::Method),
-
-        ])
+            ), PropertyKind::Init),
+            obj_prop_ident_setter("in", vec![
+                FunctionArg::Pat(
+                    Pat::Array(
+                        long_args_array_pat().into_iter().map(|a| Some(ArrayPatPart::Pat(a))).collect()
+                    )
+                )
+            ]),
+            empty_generator_prop(obj_key_ident("d")),
+            empty_generator_prop(obj_key_string("'e'")),
+            empty_generator_prop(obj_key_string("\"f\"")),
+            empty_generator_prop(obj_key_number("2")),
+            empty_generator_prop(obj_key_number(".2")),
+            empty_generator_prop(obj_key_number("3.")),
+            empty_generator_prop(obj_key_number("2e2")),
+            empty_generator_prop(obj_key_ident("in")),
+        ]),
+        obj_literal_part(vec![
+            obj_prop(
+                obj_key_ident("__proto__"),
+                PropertyValue::Expr(null_literal_expr()),
+                PropertyKind::Init,
+                false,
+                false,
+                false,
+            ),
+            obj_prop_ident_getter("__proto__"),
+            obj_prop_ident_setter("__proto__", vec![fn_arg_ident_pat("a")])
+        ]),
+        obj_literal_part(vec![
+            obj_prop(
+                obj_key_string("\"__proto__\""),
+                PropertyValue::Expr(null_literal_expr()),
+                PropertyKind::Init,
+                false,
+                false,
+                false,
+            ),
+            obj_prop_ident_fn(
+                "__proto__", 
+                empty_anon_fn(vec![]), 
+                PropertyKind::Init
+            )
+        ]),
+        member_number_ident_part("0.", "a"),
+        member_number_ident_part("0", "a"),
+        member_number_ident_part("0", "a"),
+        member_number_number_part("0", "0"),
+        assign_part(
+                assign_left_ident("x"), 
+                func_expr(
+                    "f", vec![], vec![
+                        return_ident_part("f")
+                    ]
+                )
+            ),
+            assign_part(
+                assign_left_expr(
+                    member_ident_number_expr("x", "0")
+                ),
+                Expr::Ident("x")
+            ),
+            assign_part(
+                assign_left_expr(
+                    member_ident_ident_expr("x", "a")
+                ), 
+                Expr::Ident("x")
+            ),
+            new_ident_part("x"),
+            new_part( 
+                new_ident_expr("x", vec![]),
+                vec![]
+            ),
+            new_part(
+                Expr::Member(member_ident_number("x", "0")),
+                vec![]
+            ),
+            new_part(
+                Expr::Member(member_ident_ident("x", "a")),
+                vec![]
+            ),
+            new_part(
+                Expr::Member(
+                    member(
+                        Expr::Member(
+                            member_ident_number("x", "0")
+                        ),
+                        Expr::Ident("a"),
+                        false
+                    )
+                ),
+                vec![]
+            ),
+            new_part(
+                Expr::Member(
+                    member(
+                        Expr::Member(
+                            member_ident_ident("x", "a")
+                        ),
+                        number_literal_expr("0"),
+                        true,
+                    )
+                ),
+                vec![]
+            ),
+            new_ident_part("x"),
+            new_part(
+                new_ident_expr("x", vec![]),
+                vec![]
+            ),
+            new_part(
+                new_ident_expr("x", vec![]),
+                vec![]
+            ),
+            new_part(
+                Expr::Member(
+                    member(
+                        new_ident_expr("x", vec![]),
+                        Expr::Ident("a"),
+                        false
+                    )
+                ),
+                vec![]
+            ),
+            new_part(
+                Expr::Member(
+                    member(
+                        new_ident_expr("x", vec![]),
+                        number_literal_expr("0"),
+                        true,
+                    )
+                ),
+                vec![]
+            ),
+            call_ident_part("x", vec![]), //100
+            call_part(
+                call_ident_expr("x", vec![]),
+                vec![],
+            ),
+            call_ident_part(
+                "x", vec![
+                    Expr::Ident("x")
+                ]
+            ),
+            call_ident_part(
+                "x", vec![
+                    Expr::Ident("x"),
+                    Expr::Ident("x"),
+                ]
+            ),
+            call_part(
+                member_expr(
+                    call_expr(
+                        member_ident_ident_expr(
+                            "x", "a"
+                        ),
+                        vec![]
+                    ),
+                    Expr::Ident("a"),
+                    false,
+                ),
+                vec![]
+            ),
+            call_part(
+                member_expr(
+                    call_expr(
+                        member_ident_number_expr("x", "0"),
+                        vec![],
+                    ),
+                    number_literal_expr("0"),
+                    true
+                ),
+                vec![]
+            ),
+            call_part(
+                member_expr(
+                    member_expr(
+                        call_expr(
+                            Expr::Ident("x"), 
+                            vec![]
+                        ),
+                        Expr::Ident("a"),
+                        false,
+                    ),
+                    number_literal_expr("0"),
+                    true,
+                )
+                , vec![]
+            ),
+            call_part(
+                Expr::Ident("x"),
+                vec![
+                    Expr::Spread(
+                        Box::new(Expr::Array(vec![
+                            Some(number_literal_expr("0")),
+                            Some(number_literal_expr("1")),
+                        ]))
+                    ),
+                    Expr::Spread(
+                        Box::new(Expr::Array(vec![]))
+                    ),
+                    Expr::Spread(
+                        Box::new(Expr::Function(
+                            Function {
+                                id: Some("f"),
+                                params: vec![],
+                                body: vec![
+                                    ProgramPart::Stmt(Stmt::Return(
+                                        Some(Expr::Yield(YieldExpr {
+                                            argument: Some(Box::new(number_literal_expr("2"))),
+                                            delegate: false,
+                                        }))
+                                    ))
+                                ],
+                                generator: true,
+                                is_async: false,
+                            }
+                        ))
+                    )
+                ]
+            ),
+            ProgramPart::Stmt(
+                Stmt::Expr(
+                    Expr::TaggedTemplate(
+                        TaggedTemplateExpr {
+                            tag: Box::new(Expr::Ident("x")),
+                            quasi: template(vec![
+                                template_element("`a`", true),
+                            ], vec![])
+                        }
+                    )
+                )
+            ),
+            ProgramPart::Stmt(
+                Stmt::Expr(
+                    Expr::TaggedTemplate(
+                        TaggedTemplateExpr {
+                            tag: Box::new(Expr::Ident("x")),
+                            quasi: template(vec![
+                                template_element("`0${", false),
+                                template_element("}2`", true),
+                            ], vec![
+                                number_literal_expr("1"),
+                            ])
+                        }
+                    )
+                )
+            ),
+            update_part(
+                Expr::Ident("x"), 
+                UpdateOperator::Increment, 
+                false
+            ),
+            update_part(
+                Expr::Ident("x"), 
+                UpdateOperator::Decrement, 
+                false
+            ),
+            unary_part(
+                UnaryOperator::Delete, 
+                unary_expr(
+                    UnaryOperator::Void,
+                    unary_expr(
+                        UnaryOperator::TypeOf, 
+                        unary_expr(
+                            UnaryOperator::Plus,
+                            unary_expr(
+                                UnaryOperator::Minus,
+                                unary_expr(
+                                    UnaryOperator::Tilde,
+                                    unary_expr(
+                                        UnaryOperator::Not,
+                                        Expr::Ident("x"),
+                                        true,
+                                    ),
+                                    true,
+                                ),
+                                true,
+                            ),
+                            true,
+                        ),
+                        true,
+                    ),
+                    true,
+                ), 
+                true
+            ),
+            update_part( //110
+                Expr::Ident("x"), 
+                UpdateOperator::Increment, 
+                true
+            ),
+            update_part(
+                Expr::Ident("x"), 
+                UpdateOperator::Decrement, 
+                true
+            ),
+            zero_bin_zero_part(BinaryOperator::Times),
+            zero_bin_zero_part(BinaryOperator::Over),
+            zero_bin_zero_part(BinaryOperator::Mod),
+            zero_bin_zero_part(BinaryOperator::Plus),
+            zero_bin_zero_part(BinaryOperator::Minus),
+            zero_bin_zero_part(BinaryOperator::LeftShift),
+            zero_bin_zero_part(BinaryOperator::RightShift),
+            zero_bin_zero_part(BinaryOperator::UnsignedRightShift),
+            zero_bin_zero_part(BinaryOperator::LessThan), //120
+            zero_bin_zero_part(BinaryOperator::GreaterThan),
+            zero_bin_zero_part(BinaryOperator::LessThanEqual),
+            zero_bin_zero_part(BinaryOperator::GreaterThanEqual),
+            zero_bin_expr_part(
+                BinaryOperator::InstanceOf,
+                Expr::Function(empty_anon_fn(vec![])),
+            ),
+            zero_bin_expr_part(
+                BinaryOperator::In,
+                obj_literal_expr(vec![]),
+            ),
+            zero_bin_zero_part(BinaryOperator::Equal),
+            zero_bin_zero_part(BinaryOperator::NotEqual),
+            zero_bin_zero_part(BinaryOperator::StrictEqual),
+            zero_bin_zero_part(BinaryOperator::StrictNotEqual),
+            zero_bin_zero_part(BinaryOperator::And),//130
+            zero_bin_zero_part(BinaryOperator::XOr),
+            zero_bin_zero_part(BinaryOperator::Or),
+            zero_log_zero(LogicalOperator::And),
+            zero_log_zero(LogicalOperator::Or),
+            conditional_part(
+                number_literal_expr("0"),
+                number_literal_expr("0"),
+                number_literal_expr("0"),
+            ),
+            // TODO: Validate this
+            conditional_part(
+                number_literal_expr("0"),
+                conditional_expr(
+                    number_literal_expr("0"), 
+                    number_literal_expr("0"), 
+                    number_literal_expr("0"), 
+                ),
+                number_literal_expr("0"), 
+            ),
+            conditional_part(
+                zero_log_zero_expr(LogicalOperator::Or),
+                assign_expr(
+                    assign_left_ident("x"),
+                    number_literal_expr("0"),
+                ),
+                assign_expr(
+                    assign_left_ident("x"),
+                    number_literal_expr("0"), 
+                ),
+            ),
+            // ^^^^^^^^^^^^^^^^^^^^^^^^^^
+            ident_assign_zero_part("x", AssignmentOperator::Equal),
+            ident_assign_zero_part("x", AssignmentOperator::TimesEqual),//140
+            ident_assign_zero_part("x", AssignmentOperator::DivEqual),
+            ident_assign_zero_part("x", AssignmentOperator::ModEqual),
+            ident_assign_zero_part("x", AssignmentOperator::PlusEqual),
+            ident_assign_zero_part("x", AssignmentOperator::MinusEqual),
+            ident_assign_zero_part("x", AssignmentOperator::LeftShiftEqual),
+            ident_assign_zero_part("x", AssignmentOperator::RightShiftEqual),
+            ident_assign_zero_part("x", AssignmentOperator::UnsignedRightShiftEqual),
+            ident_assign_zero_part("x", AssignmentOperator::AndEqual),
+            ident_assign_zero_part("x", AssignmentOperator::XOrEqual),
+            ident_assign_zero_part("x", AssignmentOperator::OrEqual), //150
+            zero_sequence(2),
+            zero_sequence(3),
+            sequence(vec![
+                ident_assign_zero_expr("x", AssignmentOperator::Equal),
+                ident_assign_zero_expr("x", AssignmentOperator::Equal),
+            ]),
+            block_part(vec![]),
+            block_part(vec![ProgramPart::Stmt(Stmt::Empty)]),
+            block_part(vec![number_literal_part("0")]),
+            block_part(vec![number_literal_part("0")]),
+            block_part(vec![
+                number_literal_part("0"),
+                number_literal_part("0"),
+            ]),
+            block_part(vec![
+                number_literal_part("0"),
+                number_literal_part("0"),
+            ]),
+            variable_decl_part(
+                VariableKind::Var,
+                vec![
+                    variable_decl_none("x") //160
+                ]
+            ),
+            variable_decl_part(
+                VariableKind::Var,
+                vec![
+                variable_decl_none("x"),
+                variable_decl_none("y"),
+            ]),
+            variable_decl_part(VariableKind::Var,vec![
+                variable_decl_none("x"),
+                variable_decl_none("y"),
+                variable_decl_none("z"),
+            ]),
+            variable_decl_part(VariableKind::Var,vec![
+                variable_decl_zero("x"),
+            ]),
+            variable_decl_part(VariableKind::Var,vec![
+                variable_decl_zero("x"),
+                variable_decl_none("y"),
+            ]),
+            variable_decl_part(VariableKind::Var,vec![
+                variable_decl_none("x"),
+                variable_decl_zero("y"),
+            ]),
+            variable_decl_part(VariableKind::Var,vec![
+                variable_decl_zero("x"),
+                variable_decl_zero("y"),
+            ]),
+            ProgramPart::Stmt(Stmt::Empty),
+            if_zero_empty(),
+            if_zero_empty_else(),
+            do_while_zero(),
+            number_literal_part("0"),
+            do_while_zero(),
+            do_while_zero(),
+            number_literal_part("0"),
+            while_zero(),
+            for_exprs_part(None, None, None, Stmt::Break(None)),
+            for_exprs_part(
+                Some(number_literal_expr("0")), 
+                Some(number_literal_expr("0")), 
+                Some(number_literal_expr("0")), 
+                Stmt::Empty,
+            ),
+            for_exprs_part(
+                Some(zero_bin_expr_expr(
+                    BinaryOperator::In,
+                    array_expr(vec![]),
+                )),
+                Some(number_literal_expr("0")), 
+                None, 
+                Stmt::Empty,
+            ),
+            for_var_part(
+                VariableKind::Var, 
+                vec![
+                var_decl("a")
+                ],
+                None,
+                None,
+                Stmt::Break(None),
+            ),
+            for_var_part(
+                VariableKind::Var, 
+                vec![
+                var_decl("a"),
+                var_decl("b"),
+                ],
+                Some(number_literal_expr("0")),
+                Some(number_literal_expr("0")),
+                Stmt::Empty,
+            ),
+            for_var_part(
+                VariableKind::Var, 
+                vec![
+                variable_decl_zero("a")
+                ],
+                None,
+                None,
+                Stmt::Break(None),
+            ),
+            for_var_part(
+                VariableKind::Var, 
+                vec![
+                    VariableDecl {
+                        id: Pat::Identifier("a"),
+                        init: Some(
+                            zero_bin_expr_expr(
+                                BinaryOperator::In, 
+                                array_expr(vec![])
+                            )
+                        )
+                    }
+                ],
+                Some(number_literal_expr("0")),
+                None,
+                Stmt::Empty,
+            ),
+            for_in_loop_part(
+                LoopLeft::Expr(Expr::Ident("x")),
+                obj_literal_expr(vec![]),
+                Stmt::Empty,
+            ),
+            for_in_loop_part(
+                LoopLeft::Variable(
+                    VariableKind::Var,
+                    var_decl("x")
+                ),
+                obj_literal_expr(vec![]),
+                Stmt::Empty,
+            ),
+            ProgramPart::Stmt(
+                Stmt::ForOf(
+                    ForOfStmt {
+                        left: LoopLeft::Expr(
+                            Expr::Ident("x")
+                        ),
+                        right: array_expr(vec![]),
+                        body: Box::new(Stmt::Empty),
+                        is_await: false
+                    }
+                )
+            ),
+            ProgramPart::Stmt(
+                Stmt::ForOf(
+                    ForOfStmt {
+                        left: LoopLeft::Variable(
+                            VariableKind::Var,
+                            var_decl("x")
+                        ),
+                        right: array_expr(vec![]),
+                        body: Box::new(Stmt::Empty),
+                        is_await: false
+                    }
+                )
+            ),
+            for_exprs_part(None, Some(number_literal_expr("0")), None, Stmt::Continue(None)),
+            labeled_statement_continue("x"),
+            for_exprs_part(None, None, None, Stmt::Break(None)),
+            preamble_labeled_statement("x"),
+            
+            switch_zero_part(vec![
+                case_zero(vec![ProgramPart::Stmt(Stmt::Break(None))])
+            ]),
+            func_part(
+                "f",
+                vec![],
+                vec![ProgramPart::Stmt(Stmt::Return(None))]
+            ),
+            func_part(
+                "f",
+                vec![],
+                vec![ProgramPart::Stmt(Stmt::Return(
+                    Some(number_literal_expr("0"))
+                ))]
+            ),
+            ProgramPart::Stmt(Stmt::With(WithStmt { object: number_literal_expr("0"), body: Box::new(Stmt::Empty)})),
+            switch_zero_part(vec![]),
+            switch_zero_part(vec![
+                case_zero(vec![]),
+            ]),
+            switch_zero_part(vec![
+                case_zero(vec![]),
+                case_zero(vec![]),
+            ]),
+            switch_zero_part(vec![
+                default_case(vec![]),
+            ]),
+            switch_zero_part(vec![
+                case_zero(vec![]),
+                default_case(vec![]),
+                case_zero(vec![]),
+            ]),
+            switch_zero_part(vec![
+                case_zero(vec![
+                    empty_part(),
+                ]),
+            ]),
+            switch_zero_part(vec![
+                case_zero(vec![
+                    empty_part(),
+                    empty_part(),
+                ]),
+            ]),
+            switch_zero_part(vec![
+                default_case(vec![
+                    empty_part(),
+                ]),
+            ]),
+            switch_zero_part(vec![
+                default_case(vec![
+                    empty_part(),
+                    empty_part(),
+                ]),
+            ]),
+            labeled_part("x", Stmt::Empty),
+            labeled_part(
+                "x", 
+                labeled_stmt("y", Stmt::Empty)
+            ),
+            try_part(
+                vec![
+                    throw_part(
+                        number_literal_expr("0")
+                    )
+                ], 
+                Some(catch_(Some(Pat::Identifier("x")), vec![])), 
+                None
+            ),
+            try_part(
+                vec![], 
+                Some(catch_(Some(Pat::Identifier("x")), vec![])), 
+                None
+            ),
+            try_part(
+                vec![], 
+                None, 
+                Some(vec![])
+            ),
+            try_part(
+                vec![], 
+                Some(catch_(Some(Pat::Identifier("x")), vec![])), 
+                Some(vec![])
+            ),
+            ProgramPart::Stmt(Stmt::Debugger),
+            func_part("f", vec![], vec![]),
+            func_part(
+                "f", 
+                vec![
+                    fn_arg_ident_pat("x"),
+                ], 
+                vec![]
+            ),
+            func_part(
+                "f", 
+                vec![
+                    fn_arg_ident_pat("x"),
+                    fn_arg_ident_pat("y"),
+                ], 
+                vec![]
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    func_part(
+                        "f", 
+                        vec![], 
+                        vec![]
+                    ),
+                ]
+            ), 
+        block_part(vec![
+            func_part("f", vec![], vec![])
+        ]),
+        empty_part(),
+        func_part("f", long_args(), vec![]),
+        func_part(
+                "f", 
+                vec![], 
+                vec![
+                    directive_part("\"use strict\""),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    directive_part("'use strict'"),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    directive_part("\"other directive\""),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    directive_part("'other directive'"),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    string_literal_part("\"string\""),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    string_literal_part("'string'"),
+                ],
+            ),
+            func_part(
+                "f", 
+                vec![], 
+                vec![
+                    ProgramPart::Stmt(
+                        Stmt::Expr(
+                            Expr::Binary(
+                                binary(
+                                    string_literal_expr("'string'"), 
+                                    BinaryOperator::Plus, 
+                                    number_literal_expr("0")
+                                )
+                            )
+                        )
+                    ),
+                ],
+            ),
+            ProgramPart::Decl(
+                Decl::Function(
+                    Function {
+                        params: long_args(),
+                        id: Some("g"),
+                        body: long_gen_body(),
+                        generator: true,
+                        is_async: false,
+                    }
+                )
+            ),
+            ProgramPart::Stmt(
+                Stmt::Expr(
+                    Expr::Function(
+                        Function {
+                            params: long_args(),
+                            id: Some("g"),
+                            body: long_gen_body(),
+                            generator: true,
+                            is_async: false,
+                        }
+                    )
+                )
+            ),
+            ident_stmt("yield"),
+            ProgramPart::Stmt(
+                Stmt::Expr(
+                    Expr::Binary(
+                        BinaryExpr {
+                            left: Box::new(
+                                Expr::Ident("yield")
+                            ),
+                            operator: BinaryOperator::Plus,
+                            right: Box::new(
+                                number_literal_expr("0")
+                            )
+                        }
+                    )
+                )
+            ),
+            ProgramPart::Stmt(
+                Stmt::Expr(
+                    Expr::Binary(
+                        BinaryExpr {
+                            left: Box::new(
+                                Expr::Ident("yield")
+                            ),
+                            operator: BinaryOperator::Times,
+                            right: Box::new(
+                                number_literal_expr("0")
+                            )
+                        }
+                    )
+                )
+            ),
+            func_expr_part(None, vec![], vec![]),
+            func_expr_part(None, vec![
+                fn_arg_ident_pat("x")
+            ], vec![]),
+            func_expr_part(None, vec![
+                fn_arg_ident_pat("x"),
+                fn_arg_ident_pat("y"),
+            ], vec![]),
+            func_expr_part(None, vec![], vec![
+                func_part("f", vec![], vec![]),
+            ]),
+            func_expr_part(Some("f"), vec![], vec![]),
+            func_expr_part(Some("f"), vec![
+                fn_arg_ident_pat("x")
+            ], vec![]),
+            func_expr_part(Some("f"), vec![
+                fn_arg_ident_pat("x"),
+                fn_arg_ident_pat("y"),
+            ], vec![]),
+            func_expr_part(Some("f"), vec![], vec![
+                func_part("f", vec![], vec![]),
+            ]),
+            arrow_expr_part(vec![], number_literal_expr("0")),
+            arrow_expr_body_part(vec![],vec![
+                empty_part()
+            ]),
+            arrow_expr_part(vec![
+                fn_arg_ident_expr("x"),
+            ], Expr::Ident("x")),
+            arrow_expr_part(vec![
+                fn_arg_ident_expr("x"),
+            ], assign_expr(
+                assign_left_ident("x"), 
+                number_literal_expr("0"))),
+            arrow_expr_part(vec![
+                fn_arg_ident_expr("x")
+            ], Expr::ArrowFunction(arrow_expr(vec![
+                fn_arg_ident_expr("y")
+            ], Expr::Ident("x")))),
+            arrow_expr_body_part(vec![
+                fn_arg_ident_expr("x")
+            ], vec![
+                ident_stmt("x")
+            ]),
+            arrow_expr_part(vec![
+                fn_arg_ident_expr("x"),
+            ], obj_literal_expr(vec![
+                    obj_prop(
+                        obj_key_ident("x"), 
+                        PropertyValue::None, 
+                        PropertyKind::Init, 
+                        false, 
+                        false,
+                        true
+                    )
+                ])
+            ),
+            arrow_expr_part(vec![
+                fn_arg_ident_expr("x"),
+            ], Expr::Ident("x")),
+            arrow_expr_body_part(vec![
+                fn_arg_ident_expr("x"),
+            ],vec![
+                ProgramPart::Stmt(
+                    return_ident_stmt("x")
+                )
+            ]),
+            arrow_expr_part(vec![
+                fn_arg_ident_expr("x"),
+            ], obj_literal_expr(vec![
+                    obj_prop(
+                        obj_key_ident("x"), 
+                        PropertyValue::None, 
+                        PropertyKind::Init, 
+                        false, 
+                        false,
+                        true
+                    )
+                ])
+            ),
+            arrow_expr_part(vec![
+                FunctionArg::Expr(
+                    Expr::Object(vec![
+                        obj_prop(
+                            obj_key_ident("x"),
+                            PropertyValue::None,
+                            PropertyKind::Init,
+                            false,
+                            false,
+                            true,
+                        )
+                    ])
+                ),
+            ], obj_literal_expr(vec![
+                    obj_prop(
+                        obj_key_ident("x"), 
+                        PropertyValue::None, 
+                        PropertyKind::Init, 
+                        false, 
+                        false,
+                        true
+                    )
+                ])
+            ),
+            arrow_expr_body_part(
+                long_args_array_expr(),
+                vec![
+                    empty_part()
+                ]
+            )
         // ProgramPart::Stmt(Stmt::Empty)
     ];
 }
 
-fn long_args() -> Vec<FA> {
+fn long_gen_body() -> Vec<Part> {
     vec![
-        fn_arg_ident_pat("a"),
-        FunctionArg::Pat(
-            Pat::Assignment(
-                AssignmentPat {
-                    left: Box::new(
-                        Pat::Identifier("b")
-                    ),
-                    right: Box::new(
-                        number_literal_expr("0")
-                    )
+        ProgramPart::Stmt(
+            Stmt::Return(
+                Some(
+                    Expr::Assignment(AssignmentExpr {
+                        left: assign_left_ident("a"),
+                        right: Box::new(Expr::Yield(
+                            YieldExpr {
+                                delegate: true,
+                                argument: Some(
+                                    Box::new(
+                                        Expr::Assignment(
+                                            AssignmentExpr {
+                                                left: assign_left_ident("b"),
+                                                right: Box::new(
+                                                    Expr::Yield(
+                                                        YieldExpr {
+                                                            delegate: false,
+                                                            argument: Some(
+                                                                Box::new(
+                                                                    Expr::Assignment(
+                                                                        AssignmentExpr {
+                                                                            left: assign_left_ident("c"),
+                                                                            operator: AssignmentOperator::Equal,
+                                                                            right: Box::new(
+                                                                                Expr::Yield(
+                                                                                    YieldExpr {
+                                                                                        delegate: false,
+                                                                                        argument: Some(
+                                                                                            Box::new(
+                                                                                                Expr::Yield(
+                                                                                                    YieldExpr {
+                                                                                                        delegate: false,
+                                                                                                        argument: None,
+                                                                                                    }
+                                                                                                )
+                                                                                            )
+                                                                                        )
+                                                                                    }
+                                                                                )
+                                                                            )
+                                                                        }
+                                                                    )
+                                                                )
+                                                            )
+                                                        }
+                                                    )
+                                                ),
+                                                operator: AssignmentOperator::Equal,
+                                            }
+                                        )
+                                    )
+                                )
+                            }
+                        )),
+                        operator: AssignmentOperator::Equal,
+                    })
+                )
+            )
+        ),
+        
+
+    ]
+}
+
+fn empty_generator_prop(key: PK) -> OP {
+    obj_prop(
+        key,
+        PropertyValue::Expr(
+            Expr::Function(
+                Function {
+                    id: None,
+                    params: vec![],
+                    body: vec![],
+                    generator: true,
+                    is_async: false,
                 }
             )
         ),
-        FunctionArg::Pat(
-            Pat::Array(vec![
+        PropertyKind::Init,
+        true,
+        false,
+        false,
+    )
+}
+
+fn long_args_array_pat() -> Vec<P> {
+    vec![
+        Pat::Identifier("a"),
+        Pat::Assignment(
+            AssignmentPat {
+                left: Box::new(
+                    Pat::Identifier("b")
+                ),
+                right: Box::new(
+                    number_literal_expr("0")
+                )
+            }
+        ),
+        Pat::Array(vec![
                 Some(ArrayPatPart::Pat(
                     Pat::Identifier("c")
                 )),
@@ -1120,9 +2064,7 @@ fn long_args() -> Vec<FA> {
                     )
                 ))
             ]
-            )
-        ),
-        FunctionArg::Pat(
+            ),
             Pat::Object(vec![
                 ObjectPatPart::Assignment(
                     Property {
@@ -1135,12 +2077,144 @@ fn long_args() -> Vec<FA> {
                     }
                 ),
                 // g: h
+                ObjectPatPart::Assignment(
+                    Property {
+                        key: obj_key_ident("g"),
+                        value: PropertyValue::Pat(Pat::Identifier("h")),
+                        kind: PropertyKind::Init,
+                        method: false,
+                        computed: false,
+                        short_hand: false
+                    }
+                ),
                 //i = 0,
+                ObjectPatPart::Assignment(
+                    Property {
+                        key: obj_key_ident("i"),
+                        value: obj_value_number("0"),
+                        kind: PropertyKind::Init,
+                        method: false,
+                        computed: false,
+                        short_hand: true,
+                    }
+                ),
                 // i: j = 0
+                ObjectPatPart::Assignment(
+                    Property {
+                        key: obj_key_ident("i"),
+                        value: PropertyValue::Pat(
+                            Pat::Assignment(
+                                AssignmentPat {
+                                    left: Box::new(Pat::Identifier("j")),
+                                    right: Box::new(number_literal_expr("0"))
+                                }
+                            )
+                        ),
+                        kind: PropertyKind::Init,
+                        method: false,
+                        short_hand: false,
+                        computed: false,
+                    }
+                )
+            ]),
+            Pat::RestElement(
+                Box::new(Pat::Identifier("k"))
+            )
+    ]
+} 
+fn long_args_array_expr() -> Vec<FA> {
+    vec![
+        FunctionArg::Expr(
+            Expr::Ident("a"),
+        ),
+        FunctionArg::Expr(
+            Expr::Assignment(
+                AssignmentExpr {
+                    operator: AssignmentOperator::Equal,
+                    left: AssignmentLeft::Expr(
+                        Box::new(Expr::Ident("b"))
+                    ),
+                    right: Box::new(
+                        number_literal_expr("0")
+                    )
+                }
+            )
+        ),
+        FunctionArg::Expr(
+            array_expr(vec![
+                Some(Expr::Ident("c")),
+                None,
+                Some(
+                    Expr::Assignment(
+                        AssignmentExpr {
+                            operator: AssignmentOperator::Equal,
+                            left: AssignmentLeft::Expr(Box::new(Expr::Ident("d"))),
+                            right: Box::new(number_literal_expr("0"))
+                        }
+                    )
+                ),
+                Some(Expr::Spread(
+                        Box::new(
+                            Expr::Ident("e")
+                        )
+                    )
+                ),
             ])
         ),
-        //...k
-    ]   
+        FunctionArg::Expr(
+            Expr::Object(vec![
+                obj_prop(
+                    obj_key_ident("f"),
+                    PropertyValue::None,
+                    PropertyKind::Init,
+                    false,
+                    false,
+                    true,
+                ),
+                obj_prop(
+                    obj_key_ident("g"),
+                    PropertyValue::Expr(Expr::Ident("h")),
+                    PropertyKind::Init,
+                    false,
+                    false,
+                    false
+                ),
+                obj_prop(
+                    obj_key_ident("i"),
+                    obj_value_number("0"),
+                    PropertyKind::Init,
+                    false,
+                    false,
+                    true,
+                ),
+                obj_prop(
+                    obj_key_ident("i"),
+                    PropertyValue::Expr(
+                        Expr::Assignment(
+                            AssignmentExpr {
+                                operator: AssignmentOperator::Equal,
+                                left: AssignmentLeft::Expr(Box::new(Expr::Ident("j"))),
+                                right: Box::new(number_literal_expr("0"))
+                            }
+                        )
+                    ),
+                    PropertyKind::Init,
+                    false,
+                    false,
+                    false,
+                )
+            ])
+        ),
+        FunctionArg::Pat(
+            Pat::RestElement(
+                Box::new(Pat::Identifier("k"))
+            ),
+        ),
+    ]
+}
+
+fn long_args() -> Vec<FA> {
+    long_args_array_pat().into_iter().map(FunctionArg::Pat).collect()
 }
 
 fn directive_part(dir: &'static str) -> Part {
@@ -1620,6 +2694,11 @@ fn func(id: &'static str, args: Vec<FA>, body: Vec<Part>) -> F {
 fn fn_arg_ident_pat(i: &'static str) -> FA {
     FunctionArg::Pat(
         Pat::Identifier(i)
+    )
+}
+fn fn_arg_ident_expr(i: &'static str) -> FA {
+    FunctionArg::Expr(
+        Expr::Ident(i)
     )
 }
 
@@ -2396,5 +3475,65 @@ fn template_element(raw: &'static str, tail: bool) -> TemplateElement<'static> {
         raw,
         cooked: &raw[1..end],
         tail
+    }
+}
+
+fn arrow_expr_body_part(args: Vec<FA>, body: Vec<Part>) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Expr(
+            Expr::ArrowFunction(
+                arrow_func(
+                    None, 
+                    args, 
+                    ArrowFunctionBody::FunctionBody(body), 
+                    false,
+                    false,
+                    false
+                )
+            )
+        )
+    )
+}
+
+fn arrow_expr_part(args: Vec<FA>, body: E) -> Part {
+    ProgramPart::Stmt(
+        Stmt::Expr(
+            Expr::ArrowFunction(
+                arrow_expr(args, body)
+            )
+        )
+    )
+}
+
+fn arrow_expr(
+    args: Vec<FA>,
+    body: E,
+) -> ArrowFunctionExpr<'static> {
+    arrow_func(
+        None,
+        args,
+        ArrowFunctionBody::Expr(Box::new(body)),
+        true,
+        false,
+        false,
+    )
+}
+
+type FAB = ArrowFunctionBody<'static>;
+fn arrow_func(
+    id: Option<&'static str>,
+    params: Vec<FA>,
+    body: FAB,
+    expr: bool,
+    gen: bool,
+    a: bool,
+) -> ArrowFunctionExpr<'static> {
+    ArrowFunctionExpr {
+        id,
+        params,
+        body,
+        expression: expr,
+        generator: gen,
+        is_async: a,
     }
 }
