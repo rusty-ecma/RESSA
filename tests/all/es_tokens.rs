@@ -1938,9 +1938,186 @@ lazy_static! {
                 vec![
                     empty_part()
                 ]
-            )
+            ),
+            assign_part(
+                assign_left_expr(
+                    array_expr(vec![
+                        Some(Expr::Ident("a"))
+                    ])
+                ),
+                array_expr(vec![
+                    Some(Expr::Spread(
+                        Box::new(
+                            array_expr(vec![
+                                Some(number_literal_expr("0"))
+                            ])
+                        )
+                    ))
+                ])
+            ),
+            assign_part(
+                assign_left_expr(
+                    obj_literal_expr(vec![
+                        obj_prop(
+                            obj_key_ident("a"),
+                            PropertyValue::None,
+                            PropertyKind::Init,
+                            false,
+                            false,
+                            true,
+                        )
+                    ])
+                ),
+                obj_literal_expr(vec![])
+            ),
+            try_part(vec![], Some(
+                CatchClause {
+                    param: Some(
+                        Pat::Array(vec![
+                            Some(ArrayPatPart::Pat(
+                                Pat::Identifier("e")
+                            ))
+                        ]
+                        )
+                    ),
+                    body: vec![]
+                }
+            ), None),
+            try_part(vec![], Some(
+                CatchClause {
+                    param: Some(
+                        Pat::Object(vec![
+                            ObjectPatPart::Assignment(
+                                Property {
+                                    key: obj_key_ident("e"),
+                                    value: PropertyValue::None,
+                                    kind: PropertyKind::Init,
+                                    method: false,
+                                    computed: false,
+                                    short_hand: true,
+                                }
+                            )
+                        ]
+                        )
+                    ),
+                    body: vec![]
+                }
+            ), None),
+            class_part(
+                "A",
+                None,
+                vec![],
+            ),
+            class_part(
+                "B", 
+                Some(new_expr(Expr::Ident("A"), vec![])), 
+                vec![
+                    class_prop(
+                        obj_key_ident("constructor"),
+                        anon_fn(long_args(), vec![
+                            call_part(Expr::Super, vec![
+                                Expr::MetaProperty(
+                                    MetaProperty {
+                                        meta: "new",
+                                        property: "target"
+                                    }
+                                )
+                            ]),
+                            ProgramPart::Stmt(
+                                Stmt::Expr(
+                                    Expr::TaggedTemplate(
+                                        TaggedTemplateExpr {
+                                            tag: Box::new(Expr::Call(
+                                                CallExpr {
+                                                    callee: Box::new(Expr::Super),
+                                                    arguments: vec![]
+                                                }
+                                            )),
+                                            quasi: template(vec![
+                                                template_element("`template`", true),
+                                            ], vec![])
+                                        }
+                                    )
+                                )
+                            ),
+                            arrow_expr_part(vec![], call_expr(Expr::Super, vec![
+                                Expr::This
+                            ])),
+                        ], 
+                        false,
+                    ),
+                    true),
+                    class_prop(
+                        obj_key_ident("m"),
+                        anon_fn(long_args(), vec![
+                            call_part(
+                                member_expr(
+                                    Expr::Super,
+                                    Expr::Ident("m"),
+                                    false,
+                                ),
+                                vec![]
+                            ),
+                            ProgramPart::Stmt(
+                                Stmt::Expr(
+                                    Expr::TaggedTemplate(
+                                        TaggedTemplateExpr {
+                                            tag: Box::new(
+                                                member_expr(Expr::Super, Expr::Ident("m"), false)
+                                            ),
+                                            quasi: template(vec![
+                                                template_element("`template`", true),
+                                            ], vec![])
+                                        }
+                                    )
+                                )
+                            ),
+                            arrow_expr_part(vec![], call_expr(
+                                member_expr(Expr::Super, Expr::Ident("m"), false),
+                                vec![
+                                    Expr::This
+                                ]
+                            )),
+                        ], false),
+                        false,
+                    )
+                ]
+            ),
         // ProgramPart::Stmt(Stmt::Empty)
     ];
+}
+type Prop = Property<'static>;
+fn class_part(i: &'static str, s: Option<E>, body: Vec<Prop>) -> Part {
+    ProgramPart::Decl(
+        Decl::Class(
+            Class {
+                id: Some(i),
+                super_class: s.map(Box::new),
+                body,
+            }
+        )
+    )
+}
+
+fn class_prop(
+    key: PK,
+    value: F,
+    ctor: bool,
+) -> Prop {
+    Property {
+        key,
+        value: PropertyValue::Expr(
+            Expr::Function(value)
+        ),
+        kind: if ctor {
+                PropertyKind::Ctor
+            } else  {
+                PropertyKind::Method
+            },
+        method: true,
+        short_hand: false,
+        computed: false,
+    }
 }
 
 fn long_gen_body() -> Vec<Part> {
@@ -2632,6 +2809,16 @@ fn empty_anon_fn(args: Vec<FA>) -> F {
         generator: false,
         is_async: false,
         body: vec![],
+        params: args
+    }
+}
+
+fn anon_fn(args: Vec<FA>, body: Vec<Part>, gen: bool) -> F {
+    Function {
+        id: None,
+        generator: gen,
+        is_async: false,
+        body,
         params: args
     }
 }
