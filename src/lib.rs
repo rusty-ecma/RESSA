@@ -57,7 +57,14 @@ mod error;
 pub use crate::comment_handler::CommentHandler;
 use crate::comment_handler::DefaultCommentHandler;
 pub use crate::error::Error;
-use resast::{prelude::VariableKind, ref_tree::prelude::*};
+use resast::ref_tree::stmt::CatchClause;
+use resast::{
+    prelude::{
+        AssignmentOperator, BinaryOperator, LogicalOperator, PropertyKind, UnaryOperator,
+        UpdateOperator, VariableKind,
+    },
+    ref_tree::prelude::*,
+};
 use std::{collections::HashSet, mem::replace};
 
 /// The current configuration options.
@@ -456,13 +463,8 @@ where
                     let _var = self.next_item()?;
                     let decls = self.parse_var_decl_list(false)?;
                     self.consume_semicolon()?;
-                    Ok(ProgramPart::Decl(
-                        Decl::Variable(
-                            VariableKind::Var,
-                            decls,
-                        )
-                    ))
-                },
+                    Ok(ProgramPart::Decl(Decl::Variable(VariableKind::Var, decls)))
+                }
                 _ => {
                     let stmt = self.parse_statement()?;
                     Ok(ProgramPart::Stmt(stmt))
@@ -1900,6 +1902,7 @@ where
                 method,
                 computed,
                 short_hand: false,
+                is_static,
             },
         ))
     }
@@ -1908,7 +1911,7 @@ where
     fn is_key(key: &PropertyKey, other: &str) -> bool {
         match key {
             PropertyKey::Literal(ref l) => match l {
-                Literal::String(ref s) => s == &other,
+                Literal::String(ref s) => &s[1..s.len() - 1] == other,
                 _ => false,
             },
             PropertyKey::Expr(ref e) => match e {
@@ -2532,6 +2535,7 @@ where
                 kind: PropertyKind::Get,
                 method: false,
                 short_hand: false,
+                is_static: false,
             })
         } else if at_set && at_qualified && !is_async {
             ObjectProperty::Property(Property {
@@ -2541,6 +2545,7 @@ where
                 kind: PropertyKind::Set,
                 method: false,
                 short_hand: false,
+                is_static: false,
             })
         } else if start.token.matches_punct(Punct::Asterisk) && at_qualified {
             ObjectProperty::Property(Property {
@@ -2550,6 +2555,7 @@ where
                 kind: PropertyKind::Init,
                 method: true,
                 short_hand: false,
+                is_static: false,
             })
         } else if let Some(key) = key {
             let kind = PropertyKind::Init;
@@ -2574,6 +2580,7 @@ where
                     kind,
                     method: false,
                     short_hand: false,
+                    is_static: false,
                 })
             } else if self.at_punct(Punct::OpenParen) {
                 ObjectProperty::Property(Property {
@@ -2587,6 +2594,7 @@ where
                     kind,
                     method: true,
                     short_hand: false,
+                    is_static: false,
                 })
             } else if start.token.is_ident() {
                 if self.at_punct(Punct::Equal) {
@@ -2603,6 +2611,7 @@ where
                         kind,
                         method: false,
                         short_hand: true,
+                        is_static: false,
                     })
                 } else {
                     ObjectProperty::Property(Property {
@@ -2612,6 +2621,7 @@ where
                         kind,
                         method: false,
                         short_hand: true,
+                        is_static: false,
                     })
                 }
             } else {
@@ -3036,6 +3046,7 @@ where
             short_hand,
             method,
             kind: PropertyKind::Init,
+            is_static: false,
         }))
     }
 
