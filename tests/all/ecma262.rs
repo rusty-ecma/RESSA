@@ -1,22 +1,38 @@
 #![cfg(test)]
 use super::{get_js_file, EverythingVersion, Lib};
 use env_logger;
-use resast::ProgramPart;
-use ressa::{Builder, Parser};
 
+use crate::es_tokens;
+use ressa::{Builder, Parser};
 #[test]
 fn es5() {
     let _ = env_logger::try_init();
     info!("ES5");
     let path = Lib::Everything(EverythingVersion::Es5).path();
     let js = get_js_file(&path).expect(&format!("Faield to get {:?}", path));
-    let _res: Vec<ProgramPart> = Parser::new(&js)
-        .expect("Failed to create parser")
-        .map(|i| match i {
-            Ok(i) => i,
-            Err(e) => panic!("Error parsing {:?}\n{}", path, e),
-        })
-        .collect();
+    let mut p = Parser::new(&js).expect("Failed to create parser");
+    let mut tokens = es_tokens::ES5.iter();
+    let mut i = 0;
+    while let Some(ref item) = p.next() {
+        if let Some(part) = tokens.next() {
+            let item = match item {
+                Ok(i) => i,
+                Err(e) => panic!("Error parsing {:?}\n{}", path, e),
+            };
+            if item != part {
+                let pos = p.next_position();
+                panic!(
+                    "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
+                    i, item, part, pos.start.line, pos.start.column
+                )
+            }
+        }
+        i += 1;
+    }
+    // for (i, (item, part)) in p.zip(es_tokens::ES5.iter()).enumerate() {
+
+    //     // assert_eq!((i, &item), (i, part));
+    // }
 }
 
 #[test]
@@ -26,10 +42,25 @@ fn es2015_script() {
     let path = Lib::Everything(EverythingVersion::Es2015Script).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
     let mut p = Parser::new(&js).expect("Failed to create parser");
-    let mut res = vec![];
-    while let Some(item) = p.next() {
-        let item = item.unwrap();
-        res.push(item);
+    let mut tokens = es_tokens::ES2015.iter();
+    let mut i = 0;
+    while let Some(ref item) = p.next() {
+        if let Some(part) = tokens.next() {
+            let item = match item {
+                Ok(i) => i,
+                Err(e) => panic!("Error parsing {:?}\n{}", path, e),
+            };
+            if item != part {
+                let pos = p.next_position();
+                ::std::fs::write("left.out", format!("{:#?}", item));
+                ::std::fs::write("right.out", format!("{:#?}", part));
+                panic!(
+                    "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
+                    i, item, part, pos.start.line, pos.start.column
+                )
+            }
+        }
+        i += 1;
     }
 }
 
@@ -39,17 +70,32 @@ fn es2015_module() {
     let _ = env_logger::try_init();
     let path = Lib::Everything(EverythingVersion::Es2015Module).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
-    let p = Builder::new()
+    let mut b = Builder::new();
+    let mut p = b
         .module(true)
-        .js(js)
+        .js(&js)
         .build()
         .expect("Failed to create parser");
-    let _res: Vec<ProgramPart> = p
-        .map(|i| match i {
-            Ok(i) => i,
-            Err(e) => panic!("Error parsing {:?}\n{}", path, e),
-        })
-        .collect();
+    let mut tokens = es_tokens::ESMOD.iter();
+    let mut i = 0;
+    while let Some(ref item) = p.next() {
+        if let Some(part) = tokens.next() {
+            let item = match item {
+                Ok(i) => i,
+                Err(e) => panic!("Error parsing {:?}\n{}", path, e),
+            };
+            if item != part {
+                let pos = p.next_position();
+                ::std::fs::write("parsed.out", format!("{:#?}", item));
+                ::std::fs::write("expected.out", format!("{:#?}", part));
+                panic!(
+                    "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
+                    i, item, part, pos.start.line, pos.start.column
+                )
+            }
+        }
+        i += 1;
+    }
     // only one default export is allowed so these must be run ad-hoc
     let js_list = vec![
         "export default function (){}",
@@ -69,7 +115,7 @@ fn es2015_module() {
             .js(export)
             .build()
             .expect("Failed to create parser");
-        let _res: Vec<ProgramPart> = p
+        let _res: Vec<_> = p
             .map(|i| match i {
                 Ok(i) => i,
                 Err(e) => panic!("Error parsing {}\n{}", export, e),

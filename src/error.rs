@@ -1,4 +1,4 @@
-use crate::Position;
+use ress::Position;
 use std::fmt::{Display, Formatter, Result};
 #[derive(Debug)]
 pub enum Error {
@@ -17,7 +17,7 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            Error::UnexpectedToken(ref pos, ref msg) => write!(f, "Unexpected Token at {}: {}", pos, msg),
+            Error::UnexpectedToken(ref pos, ref msg) => write!(f, "Unexpected Token at {}{}: {}", pos.line, pos.column, msg),
             Error::UnexpectedEoF => write!(f, "Unexpectedly found the end of the file"),
             Error::ParseAfterEoF => write!(f, "Parser attempted to get the next token after finding the end of the file"),
             Error::UnableToReinterpret(ref pos, ref from, ref to) => write!(f, "Unable to re-interpret from {} to {} at {}", from, to, pos),
