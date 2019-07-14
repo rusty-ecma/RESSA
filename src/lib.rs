@@ -18,24 +18,37 @@
 //!     let js = "function helloWorld() { alert('Hello world'); }";
 //!     let p = Parser::new(&js).unwrap();
 //!     let f = ProgramPart::decl(
-//!         Decl::Function(
-//!             Function {
-//!                 id: Some("helloWorld".to_string()),
+//!         Decl::Func(
+//!             Func {
+//!                 id: Some(Ident::from("helloWorld")),
 //!                 params: vec![],
-//!                 body: vec![
-//!                     ProgramPart::Stmt(
-//!                         Stmt::Expr(
-//!                             Expr::call(Expr::ident("alert"), vec![Expr::string("'Hello world'")])
+//!                 body: FuncBody(
+//!                     vec![
+//!                         ProgramPart::Stmt(
+//!                             Stmt::Expr(
+//!                                 Expr::Call(
+//!                                     CallExpr {
+//!                                         callee: Box::new(
+//!                                             Expr::ident_from("alert")
+//!                                         ),
+//!                                         arguments: vec![
+//!                                             Expr::Lit(
+//!                                                 Lit::single_string_from("Hello world")
+//!                                             )
+//!                                         ],
+//!                                     }
+//!                                 )
+//!                             )
 //!                         )
-//!                     )
-//!                 ],
+//!                     ]
+//!                 ),
 //!                 generator: false,
 //!                 is_async: false,
 //!             }
 //!         )
 //!     );
 //!     for part in p {
-//!         // assert_eq!(part.unwrap(), f);
+//!         assert_eq!(part.unwrap(), f);
 //!     }
 //! }
 //!```
@@ -57,14 +70,7 @@ mod error;
 pub use crate::comment_handler::CommentHandler;
 use crate::comment_handler::DefaultCommentHandler;
 pub use crate::error::Error;
-use resast::ref_tree::stmt::CatchClause;
-use resast::{
-    prelude::{
-        AssignmentOperator, BinaryOperator, LogicalOperator, PropertyKind, UnaryOperator,
-        UpdateOperator, VariableKind,
-    },
-    ref_tree::prelude::*,
-};
+use resast::prelude::*;
 use std::{collections::HashSet, mem::replace};
 
 /// The current configuration options.
@@ -108,7 +114,7 @@ struct Context<'a> {
     /// to labels only, not all identifiers. Errors
     /// at that level would need to be handled by
     /// the calling scope
-    label_set: HashSet<String>,
+    label_set: HashSet<&'a str>,
     /// If the current scope has a `'use strict';` directive
     /// in the prelude
     strict: bool,
@@ -338,13 +344,13 @@ where
     ///     let js = "function helloWorld() { alert('Hello world'); }";
     ///     let mut p = Parser::new(&js).unwrap();
     ///     let call = CallExpr {
-    ///         callee: Box::new(Expr::Ident(String::from("alert"))),
-    ///         arguments: vec![Expr::Literal(Literal::String(String::from("'Hello world'")))],
+    ///         callee: Box::new(Expr::ident_from("alert")),
+    ///         arguments: vec![Expr::Lit(Lit::single_string_from("Hello world"))],
     ///     };
-    ///     let expectation = Program::Script(vec![ProgramPart::Decl(Decl::Function(Function {
-    ///         id: Some("helloWorld".to_string()),
+    ///     let expectation = Program::Script(vec![ProgramPart::Decl(Decl::Func(Func {
+    ///         id: Some(Ident::from("helloWorld")),
     ///         params: vec![],
-    ///         body: vec![ProgramPart::Stmt(Stmt::Expr(Expr::Call(call)))],
+    ///         body: FuncBody(vec![ProgramPart::Stmt(Stmt::Expr(Expr::Call(call)))]),
     ///         generator: false,
     ///         is_async: false,
     ///     }))]);
@@ -386,18 +392,18 @@ where
         debug!("{}: parse_directive", self.look_ahead.span.start);
         let orig = self.look_ahead.clone();
         let expr = self.parse_expression()?;
-        if let Expr::Literal(lit) = expr {
-            if let Literal::String(s) = lit {
-                if !self.context.allow_strict_directive && s == "use strict" {
+        if let Expr::Lit(lit) = expr {
+            if let Lit::String(s) = lit {
+                if !self.context.allow_strict_directive && s.inner_matches("use strict") {
                     return self.unexpected_token_error(&orig, "use strict in an invalid location");
                 }
                 self.consume_semicolon()?;
                 return Ok(ProgramPart::Dir(Dir {
-                    dir: s.trim_matches(|c| c == '\'' || c == '"'),
-                    expr: Literal::String(s),
+                    dir: s.clone_inner(),
+                    expr: Lit::String(s),
                 }));
             } else {
-                return Ok(ProgramPart::Stmt(Stmt::Expr(Expr::Literal(lit))));
+                return Ok(ProgramPart::Stmt(Stmt::Expr(Expr::Lit(lit))));
             }
         } else {
             let stmt = ProgramPart::Stmt(Stmt::Expr(expr));
@@ -444,7 +450,7 @@ where
                 }
                 Keyword::Function => {
                     let func = self.parse_function_decl(true)?;
-                    let decl = Decl::Function(func);
+                    let decl = Decl::Func(func);
                     Ok(ProgramPart::Decl(decl))
                 }
                 Keyword::Class => {
@@ -463,7 +469,7 @@ where
                     let _var = self.next_item()?;
                     let decls = self.parse_var_decl_list(false)?;
                     self.consume_semicolon()?;
-                    Ok(ProgramPart::Decl(Decl::Variable(VariableKind::Var, decls)))
+                    Ok(ProgramPart::Decl(Decl::Var(VarKind::Var, decls)))
                 }
                 _ => {
                     let stmt = self.parse_statement()?;
@@ -570,22 +576,25 @@ where
             let imported = self.parse_var_ident(false)?;
             let local = if self.at_contextual_keyword("as") {
                 let _ = self.next_item();
-                Some(self.parse_var_ident(false)?)
+                self.parse_var_ident(false)?
             } else {
-                None
+                imported.clone()
             };
             (imported, local)
         } else {
             let imported = self.parse_ident_name()?;
             let local = if self.at_contextual_keyword("as") {
                 let _ = self.next_item()?;
-                Some(self.parse_var_ident(false)?)
+                self.parse_var_ident(false)?
             } else {
-                None
+                imported.clone()
             };
             (imported, local)
         };
-        Ok(ImportSpecifier::Normal(imported, local))
+        Ok(ImportSpecifier::Normal(NormalImportSpec {
+            imported,
+            local,
+        }))
     }
 
     #[inline]
@@ -614,7 +623,7 @@ where
         if self.at_keyword(Keyword::Default) {
             let _ = self.next_item()?;
             let decl = if self.at_keyword(Keyword::Function) {
-                let func = Decl::Function(self.parse_function_decl(true)?);
+                let func = Decl::Func(self.parse_function_decl(true)?);
                 DefaultExportDecl::Decl(func)
             } else if self.at_keyword(Keyword::Class) {
                 let class = Decl::Class(self.parse_class_decl(true)?);
@@ -622,7 +631,7 @@ where
             } else if self.at_contextual_keyword("async") {
                 if self.at_async_function() {
                     let func = self.parse_function_decl(true)?;
-                    let decl = Decl::Function(func);
+                    let decl = Decl::Func(func);
                     DefaultExportDecl::Decl(decl)
                 } else {
                     let expr = self.parse_assignment_expr()?;
@@ -663,7 +672,7 @@ where
                 Ok(ModExport::Named(decl))
             } else if self.look_ahead.token.matches_keyword(Keyword::Var) {
                 let _ = self.next_item()?;
-                let var = Decl::Variable(VariableKind::Var, self.parse_variable_decl_list(false)?);
+                let var = Decl::Var(VarKind::Var, self.parse_variable_decl_list(false)?);
                 let decl = NamedExportDecl::Decl(var);
                 self.consume_semicolon()?;
                 Ok(ModExport::Named(decl))
@@ -674,7 +683,7 @@ where
                 Ok(ModExport::Named(decl))
             } else if self.look_ahead.token.matches_keyword(Keyword::Function) {
                 let func = self.parse_function_decl(true)?;
-                let decl = Decl::Function(func);
+                let decl = Decl::Func(func);
                 let decl = NamedExportDecl::Decl(decl);
                 Ok(ModExport::Named(decl))
             } else {
@@ -685,7 +694,7 @@ where
             }
         } else if self.at_async_function() {
             let func = self.parse_function_decl(false)?;
-            let decl = Decl::Function(func);
+            let decl = Decl::Func(func);
             let decl = NamedExportDecl::Decl(decl);
             Ok(ModExport::Named(decl))
         } else {
@@ -723,18 +732,25 @@ where
         let local = self.parse_ident_name()?;
         let exported = if self.at_contextual_keyword("as") {
             let _ = self.next_item()?;
-            Some(self.parse_ident_name()?)
+            self.parse_ident_name()?
         } else {
-            None
+            local.clone()
         };
         Ok(ExportSpecifier { local, exported })
     }
 
     #[inline]
-    fn parse_module_specifier(&mut self) -> Res<Literal<'b>> {
+    fn parse_module_specifier(&mut self) -> Res<Lit<'b>> {
         let item = self.next_item()?;
         match &item.token {
-            Token::String(_) => Ok(Literal::String(self.get_string(&item.span)?)),
+            Token::String(ref sl) => Ok(match sl {
+                ress::prelude::StringLit::Double(ref s) => {
+                    resast::prelude::Lit::double_string_from(s)
+                }
+                ress::prelude::StringLit::Single(ref s) => {
+                    resast::prelude::Lit::single_string_from(s)
+                }
+            }),
             _ => self.expected_token_error(&item, &["[string]"]),
         }
     }
@@ -774,7 +790,7 @@ where
             Token::Ident(_) => {
                 if self.at_async_function() {
                     let f = self.parse_function_decl(true)?;
-                    Stmt::Expr(Expr::Function(f))
+                    Stmt::Expr(Expr::Func(f))
                 } else {
                     self.parse_labelled_statement()?
                 }
@@ -866,7 +882,7 @@ where
     }
 
     #[inline]
-    fn parse_var_decl_list(&mut self, in_for: bool) -> Res<Vec<VariableDecl<'b>>> {
+    fn parse_var_decl_list(&mut self, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
         let mut ret = vec![self.parse_var_decl(in_for)?];
         while self.at_punct(Punct::Comma) {
             let _ = self.next_item()?;
@@ -876,8 +892,8 @@ where
     }
 
     #[inline]
-    fn parse_var_decl(&mut self, in_for: bool) -> Res<VariableDecl<'b>> {
-        let (_, patt) = self.parse_pattern(Some(VariableKind::Var), &mut vec![])?;
+    fn parse_var_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
+        let (_, patt) = self.parse_pattern(Some(VarKind::Var), &mut vec![])?;
         if self.context.strict && Self::is_restricted(&patt) {
             //error
         }
@@ -892,7 +908,7 @@ where
         } else {
             None
         };
-        Ok(VariableDecl { id: patt, init })
+        Ok(VarDecl { id: patt, init })
     }
 
     #[inline]
@@ -1027,7 +1043,7 @@ where
         self.expect_keyword(Keyword::Return)?;
         // if we are at a semi-colon,or close curly brace or eof
         //the return doesn't have an arg. If we are at a line term
-        //we need to account for a string literal or template literal
+        //we need to account for a string Lit or template Lit
         //since they both can have new lines
 
         let ret = if self.at_return_arg() {
@@ -1082,7 +1098,7 @@ where
     fn parse_fn_stmt(&mut self) -> Res<Expr<'b>> {
         debug!("{}: parse_fn_stmt", self.look_ahead.span.start);
         let decl = self.parse_function_decl(true)?;
-        Ok(Expr::Function(decl))
+        Ok(Expr::Func(decl))
     }
 
     #[inline]
@@ -1093,9 +1109,9 @@ where
         let is_await = if self.at_keyword(Keyword::Await) {
             let _ = self.next_item()?;
             true
-        // for await ([lookahead ≠ let] LeftHandSideExpression [?Yield, ?Await] of AssignmentExpression [+In, ?Yield, ?Await]) Statement [?Yield, ?Await, ?Return]
-        // for await (var ForBinding [?Yield, ?Await] of AssignmentExpression [+In, ?Yield, ?Await]) Statement [?Yield, ?Await, ?Return]
-        // for await (ForDeclaration [?Yield, ?Await] of AssignmentExpression [+In, ?Yield, ?Await]) Statement[?Yield, ?Await, ?Return]
+        // for await ([lookahead ≠ let] LeftHandSideExpression [?Yield, ?Await] of AssignExpression [+In, ?Yield, ?Await]) Statement [?Yield, ?Await, ?Return]
+        // for await (var ForBinding [?Yield, ?Await] of AssignExpression [+In, ?Yield, ?Await]) Statement [?Yield, ?Await, ?Return]
+        // for await (ForDeclaration [?Yield, ?Await] of AssignExpression [+In, ?Yield, ?Await]) Statement[?Yield, ?Await, ?Return]
         } else {
             false
         };
@@ -1103,13 +1119,13 @@ where
         if self.at_punct(Punct::SemiColon) {
             // any semi-colon would mean standard C style for loop
             // for (;;) {}
-            let stmt = self.parse_for_loop(VariableKind::Var)?;
+            let stmt = self.parse_for_loop(VarKind::Var)?;
             return Ok(Stmt::For(stmt));
         }
 
         if self.at_keyword(Keyword::Var) {
             let _ = self.next_item()?;
-            let kind = VariableKind::Var;
+            let kind = VarKind::Var;
             let prev_in = self.context.allow_in;
             self.context.allow_in = false;
             let mut bindings = self.parse_variable_decl_list(true)?;
@@ -1142,8 +1158,8 @@ where
             let kind = self.next_item()?;
             let kind = match &kind.token {
                 Token::Keyword(ref k) => match k {
-                    Keyword::Const => VariableKind::Const,
-                    Keyword::Let => VariableKind::Let,
+                    Keyword::Const => VarKind::Const,
+                    Keyword::Let => VarKind::Let,
                     _ => unreachable!(),
                 },
                 _ => return self.expected_token_error(&kind, &["const", "let"]),
@@ -1152,11 +1168,11 @@ where
                 let _in = self.next_item()?;
                 //const or let becomes an ident
                 let k = match kind {
-                    VariableKind::Var => "var",
-                    VariableKind::Let => "let",
-                    VariableKind::Const => "const",
+                    VarKind::Var => "var",
+                    VarKind::Let => "let",
+                    VarKind::Const => "const",
                 };
-                let left = LoopLeft::Expr(Expr::Ident(k));
+                let left = LoopLeft::Expr(Expr::ident_from(k));
                 let right = self.parse_expression()?;
                 Ok(Stmt::ForIn(ForInStmt {
                     left,
@@ -1243,7 +1259,7 @@ where
     }
 
     #[inline]
-    fn parse_for_loop(&mut self, kind: VariableKind) -> Res<ForStmt<'b>> {
+    fn parse_for_loop(&mut self, kind: VarKind) -> Res<ForStmt<'b>> {
         debug!("{}: parse_for_loop", self.look_ahead.span.start);
         let init = if self.at_punct(Punct::SemiColon) {
             None
@@ -1342,19 +1358,19 @@ where
     }
 
     #[inline]
-    fn parse_break_stmt(&mut self) -> Res<Option<&'b str>> {
+    fn parse_break_stmt(&mut self) -> Res<Option<resast::Ident<'b>>> {
         debug!("{}: parse_break_stmt", self.look_ahead.span.start);
         self.parse_optionally_labeled_statement(Keyword::Break)
     }
 
     #[inline]
-    fn parse_continue_stmt(&mut self) -> Res<Option<&'b str>> {
+    fn parse_continue_stmt(&mut self) -> Res<Option<resast::Ident<'b>>> {
         debug!("{}: parse_continue_stmt", self.look_ahead.span.start);
         self.parse_optionally_labeled_statement(Keyword::Continue)
     }
 
     #[inline]
-    fn parse_optionally_labeled_statement(&mut self, k: Keyword) -> Res<Option<&'b str>> {
+    fn parse_optionally_labeled_statement(&mut self, k: Keyword) -> Res<Option<resast::Ident<'b>>> {
         debug!(
             "{}: parse_optionally_labeled_statement",
             self.look_ahead.span.start
@@ -1362,7 +1378,7 @@ where
         self.expect_keyword(k)?;
         let ret = if self.look_ahead.token.is_ident() && !self.context.has_line_term {
             let id = self.parse_var_ident(false)?;
-            if !self.context.label_set.contains(id) {
+            if !self.context.label_set.contains(&*id.name) {
                 //error: unknown label
             }
             Some(id)
@@ -1387,6 +1403,7 @@ where
     #[inline]
     fn parse_labelled_statement(&mut self) -> Res<Stmt<'b>> {
         debug!("parse_labelled_statement, {:?}", self.look_ahead.token);
+        let start = self.look_ahead.span;
         let ret = self.parse_expression()?;
         if Self::is_ident(&ret) && self.at_punct(Punct::Colon) {
             let _colon = self.next_item()?;
@@ -1395,8 +1412,8 @@ where
             } else {
                 return Err(self.reinterpret_error("expression", "ident"));
             };
-            if !self.context.label_set.insert(format!("${}", &id)) {
-                return Err(self.redecl_error(&id));
+            if !self.context.label_set.insert(self.get_string(&start)?) {
+                return Err(self.redecl_error(&id.name));
             }
             let body = if self.at_keyword(Keyword::Class) {
                 let class = self.next_item()?;
@@ -1413,12 +1430,12 @@ where
                 Stmt::Expr(expr)
             } else if self.at_keyword(Keyword::Function) {
                 let f = self.parse_function_decl(true)?;
-                let expr = Expr::Function(f);
+                let expr = Expr::Func(f);
                 Stmt::Expr(expr)
             } else {
                 self.parse_statement()?
             };
-            self.context.label_set.remove(&format!("${}", &id));
+            self.context.label_set.remove(&self.get_string(&start)?);
             Ok(Stmt::Labeled(LabeledStmt {
                 label: id,
                 body: Box::new(body),
@@ -1489,23 +1506,19 @@ where
         debug!("next: {:?} {}", next, self.context.allow_yield);
         let kind = match next.token {
             Token::Keyword(ref k) => match k {
-                Keyword::Let => VariableKind::Let,
-                Keyword::Const => VariableKind::Const,
+                Keyword::Let => VarKind::Let,
+                Keyword::Const => VarKind::Const,
                 _ => return self.expected_token_error(&next, &["let", "const"]),
             },
             _ => return self.expected_token_error(&next, &["let", "const"]),
         };
         let decl = self.parse_binding_list(kind, in_for)?;
         self.consume_semicolon()?;
-        Ok(Decl::Variable(kind, decl))
+        Ok(Decl::Var(kind, decl))
     }
 
     #[inline]
-    fn parse_binding_list(
-        &mut self,
-        kind: VariableKind,
-        in_for: bool,
-    ) -> Res<Vec<VariableDecl<'b>>> {
+    fn parse_binding_list(&mut self, kind: VarKind, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
         debug!("{}: parse_binding_list", self.look_ahead.span.start);
         let mut ret = vec![self.parse_lexical_binding(kind, in_for)?];
         while self.at_punct(Punct::Comma) {
@@ -1516,7 +1529,7 @@ where
     }
 
     #[inline]
-    fn parse_variable_decl_list(&mut self, in_for: bool) -> Res<Vec<VariableDecl<'b>>> {
+    fn parse_variable_decl_list(&mut self, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
         let mut ret = vec![self.parse_variable_decl(in_for)?];
         while self.at_punct(Punct::Comma) {
             let _ = self.next_item()?;
@@ -1526,9 +1539,9 @@ where
     }
 
     #[inline]
-    fn parse_variable_decl(&mut self, in_for: bool) -> Res<VariableDecl<'b>> {
+    fn parse_variable_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
         let start = self.look_ahead.clone();
-        let (_, id) = self.parse_pattern(Some(VariableKind::Var), &mut vec![])?;
+        let (_, id) = self.parse_pattern(Some(VarKind::Var), &mut vec![])?;
         if self.context.strict && Self::is_restricted(&id) && !self.config.tolerant {
             return self.unexpected_token_error(&start, "restricted word");
         }
@@ -1544,26 +1557,26 @@ where
         } else {
             None
         };
-        Ok(VariableDecl { id, init })
+        Ok(VarDecl { id, init })
     }
 
     #[inline]
     fn is_pat_ident(pat: &Pat) -> bool {
         match pat {
-            Pat::Identifier(_) => true,
+            Pat::Ident(_) => true,
             _ => false,
         }
     }
 
     #[inline]
-    fn parse_lexical_binding(&mut self, kind: VariableKind, in_for: bool) -> Res<VariableDecl<'b>> {
+    fn parse_lexical_binding(&mut self, kind: VarKind, in_for: bool) -> Res<VarDecl<'b>> {
         debug!("{}: parse_lexical_binding", self.look_ahead.span.start);
         let start = self.look_ahead.clone();
         let (_, id) = self.parse_pattern(Some(kind), &mut vec![])?;
         if self.context.strict && Self::is_restricted(&id) && !self.config.tolerant {
             return self.unexpected_token_error(&start, "restricted word");
         }
-        let init = if kind == VariableKind::Const {
+        let init = if kind == VarKind::Const {
             if !self.at_keyword(Keyword::In) && !self.at_contextual_keyword("of") {
                 if self.at_punct(Punct::Equal) {
                     let _ = self.next_item()?;
@@ -1586,19 +1599,19 @@ where
         } else {
             None
         };
-        Ok(VariableDecl { id, init })
+        Ok(VarDecl { id, init })
     }
 
     #[inline]
     fn is_restricted(id: &Pat) -> bool {
         match id {
-            Pat::Identifier(ref ident) => ident == &"eval" || ident == &"arguments",
+            Pat::Ident(ref ident) => ident.name == "eval" || ident.name == "arguments",
             _ => false,
         }
     }
 
     #[inline]
-    fn parse_function_decl(&mut self, opt_ident: bool) -> Res<Function<'b>> {
+    fn parse_function_decl(&mut self, opt_ident: bool) -> Res<Func<'b>> {
         debug!("{}: parse_function_decl", self.look_ahead.span.start);
         let is_async = if self.at_contextual_keyword("async") {
             let _ = self.next_item()?;
@@ -1659,7 +1672,7 @@ where
         self.context.allow_strict_directive = prev_allow_strict;
         self.context.r#await = prev_await;
         self.context.allow_yield = prev_yield;
-        Ok(Function {
+        Ok(Func {
             id,
             params,
             body,
@@ -1669,7 +1682,7 @@ where
     }
 
     #[inline]
-    fn parse_function_source_el(&mut self) -> Res<FunctionBody<'b>> {
+    fn parse_function_source_el(&mut self) -> Res<FuncBody<'b>> {
         debug!("{}: parse_function_source_el", self.look_ahead.span.start);
         self.expect_punct(Punct::OpenBrace)?;
         let mut body = self.parse_directive_prologues()?;
@@ -1692,7 +1705,7 @@ where
         self.context.in_iteration = prev_iter;
         self.context.in_switch = prev_switch;
         self.context.in_function_body = prev_in_fn;
-        Ok(body)
+        Ok(FuncBody(body))
     }
 
     #[inline]
@@ -1735,7 +1748,7 @@ where
     }
 
     #[inline]
-    fn parse_class_body(&mut self) -> Res<Vec<Property<'b>>> {
+    fn parse_class_body(&mut self) -> Res<Vec<Prop<'b>>> {
         debug!("{}: parse_class_body", self.look_ahead.span.start);
         let mut ret = vec![];
         let mut has_ctor = false;
@@ -1754,12 +1767,12 @@ where
     }
 
     #[inline]
-    fn parse_class_el(&mut self, has_ctor: bool) -> Res<(bool, Property<'b>)> {
+    fn parse_class_el(&mut self, has_ctor: bool) -> Res<(bool, Prop<'b>)> {
         debug!("{}: parse_class_el", self.look_ahead.span.start);
         let mut token = self.look_ahead.token.clone();
         let mut has_ctor = has_ctor;
-        let mut key: Option<PropertyKey> = None;
-        let mut value: Option<PropertyValue> = None;
+        let mut key: Option<PropKey> = None;
+        let mut value: Option<PropValue> = None;
         let mut computed = false;
         let mut is_static = false;
         let is_async = if self.at_contextual_keyword("async") {
@@ -1802,7 +1815,7 @@ where
             }
         }
 
-        let mut kind: Option<PropertyKind> = None;
+        let mut kind: Option<PropKind> = None;
         let mut method = false;
 
         let look_ahead_prop_key = Self::qualified_prop_name(&self.look_ahead.token);
@@ -1817,19 +1830,19 @@ where
             };
 
             if at_get {
-                kind = Some(PropertyKind::Get);
+                kind = Some(PropKind::Get);
                 computed = self.at_punct(Punct::OpenBracket);
                 self.context.allow_yield = false;
                 key = Some(self.parse_object_property_key()?);
                 value = Some(self.parse_getter_method()?);
             } else if at_set {
-                kind = Some(PropertyKind::Set);
+                kind = Some(PropKind::Set);
                 computed = self.at_punct(Punct::OpenBracket);
                 key = Some(self.parse_object_property_key()?);
                 value = Some(self.parse_setter_method()?);
             }
         } else if token.matches_punct(Punct::Asterisk) && look_ahead_prop_key {
-            kind = Some(PropertyKind::Init);
+            kind = Some(PropKind::Init);
             computed = self.at_punct(Punct::OpenBracket);
             key = Some(self.parse_object_property_key()?);
             value = Some(self.parse_generator_method()?);
@@ -1837,7 +1850,7 @@ where
         }
 
         if kind.is_none() && key.is_some() && self.at_punct(Punct::OpenParen) {
-            kind = Some(PropertyKind::Init);
+            kind = Some(PropKind::Init);
             method = true;
             value = Some(if is_async {
                 self.parse_async_property_method()?
@@ -1852,8 +1865,8 @@ where
             return self.expected_token_error(&self.look_ahead, &["method identifier"]);
         };
 
-        if kind == PropertyKind::Init {
-            kind = PropertyKind::Method;
+        if kind == PropKind::Init {
+            kind = PropKind::Method;
         }
 
         let key = if let Some(k) = key {
@@ -1866,7 +1879,7 @@ where
                 return self.expected_token_error(&self.look_ahead, &[]);
             }
             if !is_static && Self::is_key(&key, "constructor") {
-                if kind != PropertyKind::Method || !method {
+                if kind != PropKind::Method || !method {
                     return self
                         .expected_token_error(&self.look_ahead, &["[constructor declaration]"]);
                 }
@@ -1883,7 +1896,7 @@ where
                 } else {
                     has_ctor = true;
                 }
-                kind = PropertyKind::Ctor;
+                kind = PropKind::Ctor;
             }
         }
 
@@ -1895,7 +1908,7 @@ where
 
         Ok((
             has_ctor,
-            Property {
+            Prop {
                 key,
                 value,
                 kind,
@@ -1908,29 +1921,32 @@ where
     }
 
     #[inline]
-    fn is_key(key: &PropertyKey, other: &str) -> bool {
+    fn is_key(key: &PropKey, other: &str) -> bool {
         match key {
-            PropertyKey::Literal(ref l) => match l {
-                Literal::String(ref s) => &s[1..s.len() - 1] == other,
+            PropKey::Lit(ref l) => match l {
+                Lit::String(ref s) => match s {
+                    resast::prelude::StringLit::Single(ref s)
+                    | resast::prelude::StringLit::Double(ref s) => s == other,
+                },
                 _ => false,
             },
-            PropertyKey::Expr(ref e) => match e {
-                Expr::Ident(ref s) => s == &other,
+            PropKey::Expr(ref e) => match e {
+                Expr::Ident(ref s) => s.name == other,
                 _ => false,
             },
-            PropertyKey::Pat(ref p) => match p {
-                Pat::Identifier(ref s) => s == &other,
+            PropKey::Pat(ref p) => match p {
+                Pat::Ident(ref s) => s.name == other,
                 _ => false,
             },
         }
     }
 
     #[inline]
-    fn is_generator(val: &PropertyValue) -> bool {
+    fn is_generator(val: &PropValue) -> bool {
         match val {
-            PropertyValue::Expr(ref e) => match e {
-                Expr::Function(ref f) => f.generator,
-                Expr::ArrowFunction(ref f) => f.generator,
+            PropValue::Expr(ref e) => match e {
+                Expr::Func(ref f) => f.generator,
+                Expr::ArrowFunc(ref f) => f.generator,
                 _ => false,
             },
             _ => false,
@@ -1938,25 +1954,28 @@ where
     }
 
     #[inline]
-    fn is_static(key: &PropertyKey) -> bool {
+    fn is_static(key: &PropKey) -> bool {
         match key {
-            PropertyKey::Literal(ref l) => match l {
-                Literal::String(ref s) => s == &"static",
+            PropKey::Lit(ref l) => match l {
+                Lit::String(ref s) => match s {
+                    resast::prelude::StringLit::Single(ref s)
+                    | resast::prelude::StringLit::Double(ref s) => s == "static",
+                },
                 _ => false,
             },
-            PropertyKey::Expr(ref e) => match e {
-                Expr::Ident(ref s) => s == &"static",
+            PropKey::Expr(ref e) => match e {
+                Expr::Ident(ref s) => s.name == "static",
                 _ => false,
             },
-            PropertyKey::Pat(ref p) => match p {
-                Pat::Identifier(ref s) => s == &"static",
+            PropKey::Pat(ref p) => match p {
+                Pat::Ident(ref s) => s.name == "static",
                 _ => false,
             },
         }
     }
 
     #[inline]
-    fn parse_async_property_method(&mut self) -> Res<PropertyValue<'b>> {
+    fn parse_async_property_method(&mut self) -> Res<PropValue<'b>> {
         debug!(
             "{}: parse_property_method_async_fn",
             self.look_ahead.span.start
@@ -1969,36 +1988,36 @@ where
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
         self.context.r#await = prev_await;
-        let func = Function {
+        let func = Func {
             id: None,
             params: params.params,
             is_async: true,
             generator: false,
             body,
         };
-        Ok(PropertyValue::Expr(Expr::Function(func)))
+        Ok(PropValue::Expr(Expr::Func(func)))
     }
 
     #[inline]
-    fn parse_property_method(&mut self) -> Res<PropertyValue<'b>> {
+    fn parse_property_method(&mut self) -> Res<PropValue<'b>> {
         debug!("{}: parse_property_method", self.look_ahead.span.start);
         let prev_yield = self.context.allow_yield;
         self.context.allow_yield = false;
         let params = self.parse_formal_params()?;
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
-        let func = Function {
+        let func = Func {
             id: None,
             params: params.params,
             is_async: false,
             generator: false,
             body,
         };
-        Ok(PropertyValue::Expr(Expr::Function(func)))
+        Ok(PropValue::Expr(Expr::Func(func)))
     }
 
     #[inline]
-    fn parse_generator_method(&mut self) -> Res<PropertyValue<'b>> {
+    fn parse_generator_method(&mut self) -> Res<PropValue<'b>> {
         debug!("{}: pares_generator_method", self.look_ahead.span.start);
         let prev_yield = self.context.allow_yield;
         self.context.allow_yield = true;
@@ -2006,18 +2025,18 @@ where
         self.context.allow_yield = false;
         let body = self.parse_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
-        let func = Function {
+        let func = Func {
             id: None,
             params: params.params,
             is_async: false,
             generator: true,
             body,
         };
-        Ok(PropertyValue::Expr(Expr::Function(func)))
+        Ok(PropValue::Expr(Expr::Func(func)))
     }
 
     #[inline]
-    fn parse_getter_method(&mut self) -> Res<PropertyValue<'b>> {
+    fn parse_getter_method(&mut self) -> Res<PropValue<'b>> {
         debug!("{}: parse_getter_method", self.look_ahead.span.start);
         let is_gen = false;
         let prev_yield = self.context.allow_yield;
@@ -2028,7 +2047,7 @@ where
         }
         let body = self.parse_method_body(formal_params.simple, formal_params.found_restricted)?;
         self.context.allow_yield = prev_yield;
-        Ok(PropertyValue::Expr(Expr::Function(Function {
+        Ok(PropValue::Expr(Expr::Func(Func {
             id: None,
             params: formal_params.params,
             body,
@@ -2038,11 +2057,7 @@ where
     }
 
     #[inline]
-    fn parse_method_body(
-        &mut self,
-        simple: bool,
-        found_restricted: bool,
-    ) -> Res<Vec<ProgramPart<'b>>> {
+    fn parse_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<FuncBody<'b>> {
         debug!("{}: parse_method_body", self.look_ahead.span.start);
         self.context.is_assignment_target = false;
         self.context.is_binding_element = false;
@@ -2062,7 +2077,7 @@ where
     }
 
     #[inline]
-    fn parse_setter_method(&mut self) -> Res<PropertyValue<'b>> {
+    fn parse_setter_method(&mut self) -> Res<PropValue<'b>> {
         debug!("{}: parse_setter_method", self.look_ahead.span.start);
         let prev_allow = self.context.allow_yield;
         self.context.allow_yield = true;
@@ -2077,24 +2092,24 @@ where
             }
         }
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
-        let func = Function {
+        let func = Func {
             id: None,
             params: params.params,
             body,
             generator: false,
             is_async: false,
         };
-        Ok(PropertyValue::Expr(Expr::Function(func)))
+        Ok(PropValue::Expr(Expr::Func(func)))
     }
 
     #[inline]
-    fn is_rest(arg: &FunctionArg) -> bool {
+    fn is_rest(arg: &FuncArg) -> bool {
         match arg {
-            FunctionArg::Expr(ref e) => match e {
+            FuncArg::Expr(ref e) => match e {
                 Expr::Spread(_) => true,
                 _ => false,
             },
-            FunctionArg::Pat(ref p) => match p {
+            FuncArg::Pat(ref p) => match p {
                 Pat::RestElement(_) => true,
                 _ => false,
             },
@@ -2106,7 +2121,7 @@ where
         &mut self,
         simple: bool,
         found_restricted: bool,
-    ) -> Res<FunctionBody<'b>> {
+    ) -> Res<FuncBody<'b>> {
         debug!("{}: parse_property_method_fn", self.look_ahead.span.start);
         self.context.is_assignment_target = false;
         self.context.is_binding_element = false;
@@ -2137,7 +2152,7 @@ where
     }
 
     #[inline]
-    fn parse_object_property_key(&mut self) -> Res<PropertyKey<'b>> {
+    fn parse_object_property_key(&mut self) -> Res<PropKey<'b>> {
         debug!("{}: parse_object_property_key", self.look_ahead.span.start);
         let item = self.next_item()?;
         if item.token.is_string()
@@ -2146,23 +2161,26 @@ where
                 _ => false,
             }
         {
-            // if item.token.is_oct_literal() {
+            // if item.token.is_oct_Lit() {
             //     //FIXME: possible tolerable error
             // }
             let id = match &item.token {
-                Token::String(_) => Literal::String(self.get_string(&item.span)?),
+                Token::String(ref sl) => match sl {
+                    ress::prelude::StringLit::Single(s) => Lit::single_string_from(s),
+                    ress::prelude::StringLit::Double(s) => Lit::double_string_from(s),
+                },
                 Token::Number(_) => {
                     if self.at_big_int_flag() {
                         return self.unexpected_token_error(
                             &self.look_ahead,
-                            "BigInt cannot be uses as an object literal key",
+                            "BigInt cannot be uses as an object Lit key",
                         );
                     }
-                    Literal::Number(self.get_string(&item.span)?)
+                    Lit::number_from(self.get_string(&item.span)?)
                 }
-                _ => return Err(self.reinterpret_error("number or string", "literal")),
+                _ => return Err(self.reinterpret_error("number or string", "Lit")),
             };
-            Ok(PropertyKey::Literal(id))
+            Ok(PropKey::Lit(id))
         } else if item.token.is_ident()
             // || item.token.is_bool()
             || item.token.is_null()
@@ -2173,21 +2191,20 @@ where
             }
         {
             let id = self.get_string(&item.span)?;
-            Ok(PropertyKey::Expr(Expr::Ident(id)))
+            Ok(PropKey::Expr(Expr::ident_from(id)))
         } else if item.token.matches_punct(Punct::OpenBracket) {
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let key = self.parse_assignment_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-            let id = if Self::is_valid_property_key_literal(&key) {
+            let id = if Self::is_valid_property_key_lit(&key) {
                 match key {
-                    Expr::Literal(lit) => PropertyKey::Literal(lit),
+                    Expr::Lit(lit) => PropKey::Lit(lit),
                     _ => {
-                        return self
-                            .expected_token_error(&self.look_ahead, &["property key literal"]);
+                        return self.expected_token_error(&self.look_ahead, &["property key Lit"]);
                     }
                 }
             } else {
-                PropertyKey::Expr(key)
+                PropKey::Expr(key)
             };
             self.expect_punct(Punct::CloseBracket)?;
             Ok(id)
@@ -2208,10 +2225,10 @@ where
     }
 
     #[inline]
-    fn is_valid_property_key_literal(expr: &Expr) -> bool {
+    fn is_valid_property_key_lit(expr: &Expr) -> bool {
         match expr {
-            Expr::Literal(ref l) => match l {
-                Literal::String(_) | Literal::Number(_) | Literal::Boolean(_) => true,
+            Expr::Lit(ref l) => match l {
+                Lit::String(_) | Lit::Number(_) | Lit::Boolean(_) => true,
                 _ => false,
             },
             _ => false,
@@ -2234,10 +2251,10 @@ where
                 self.parse_function_expr()
             } else {
                 let ident = self.next_item()?;
-                Ok(Expr::Ident(self.get_string(&ident.span)?))
+                Ok(Expr::ident_from(self.get_string(&ident.span)?))
             }
         } else if self.look_ahead.token.is_number() || self.look_ahead.token.is_string() {
-            // if self.context.strict && self.look_ahead.token.is_oct_literal() {
+            // if self.context.strict && self.look_ahead.token.is_oct_Lit() {
             //     //FIXME: possible tolerable error
             // }
             self.context.is_assignment_target = false;
@@ -2251,29 +2268,40 @@ where
                         // Consume the ident
                         let _n = self.next_item();
                     }
-                    Literal::Number(self.scanner.str_for(&span).unwrap_or(""))
+                    let inner = self.get_string(&span)?;
+                    Lit::number_from(inner)
                 }
-                Token::String(_) => Literal::String(self.scanner.str_for(&item.span).unwrap_or("")),
+                Token::String(sl) => {
+                    let inner = match sl {
+                        ress::prelude::StringLit::Single(ref s) => {
+                            resast::prelude::StringLit::single_from(s)
+                        }
+                        ress::prelude::StringLit::Double(ref d) => {
+                            resast::prelude::StringLit::double_from(d)
+                        }
+                    };
+                    Lit::String(inner)
+                }
                 _ => unreachable!(),
             };
-            Ok(Expr::Literal(lit))
+            Ok(Expr::Lit(lit))
         } else if self.look_ahead.token.is_boolean() {
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let item = self.next_item()?;
             let lit = match item.token {
-                Token::Boolean(b) => Literal::Boolean(b.into()),
+                Token::Boolean(b) => Lit::Boolean(b.into()),
                 _ => unreachable!(),
             };
-            Ok(Expr::Literal(lit))
+            Ok(Expr::Lit(lit))
         } else if self.look_ahead.token.is_null() {
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let _ = self.next_item()?;
-            Ok(Expr::Literal(Literal::Null))
+            Ok(Expr::Lit(Lit::Null))
         } else if self.look_ahead.is_template() {
-            let lit = self.parse_template_literal()?;
-            Ok(Expr::Literal(Literal::Template(lit)))
+            let lit = self.parse_template_lit()?;
+            Ok(Expr::Lit(Lit::Template(lit)))
         } else if self.look_ahead.token.is_punct() {
             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
             let expr = if self.at_punct(Punct::OpenParen) {
@@ -2294,14 +2322,11 @@ where
             let lit = match regex.token {
                 Token::RegEx(r) => {
                     let flags = if let Some(f) = r.flags { f } else { "" };
-                    resast::ref_tree::prelude::RegEx {
-                        pattern: r.body,
-                        flags,
-                    }
+                    resast::prelude::RegEx::from(&r.body, flags)
                 }
                 _ => unreachable!(),
             };
-            Ok(Expr::Literal(Literal::RegEx(lit)))
+            Ok(Expr::Lit(Lit::RegEx(lit)))
         } else if self.look_ahead.token.is_keyword() {
             if (!self.context.strict
                 && ((self.context.allow_yield && self.at_keyword(Keyword::Yield))
@@ -2366,7 +2391,7 @@ where
             let mut params = vec![];
             if self.at_punct(Punct::Ellipsis) {
                 let (_, expr) = self.parse_rest_element(&mut params)?;
-                let arg = FunctionArg::Pat(expr);
+                let arg = FuncArg::Pat(expr);
                 self.expect_punct(Punct::CloseParen)?;
                 if !self.at_punct(Punct::EqualGreaterThan) {
                     self.expect_punct(Punct::EqualGreaterThan)?;
@@ -2387,7 +2412,7 @@ where
                         if self.at_punct(Punct::CloseParen) {
                             let _ = self.next_item()?;
                             return Ok(Expr::ArrowParamPlaceHolder(
-                                exprs.into_iter().map(FunctionArg::Expr).collect(),
+                                exprs.into_iter().map(FuncArg::Expr).collect(),
                                 false,
                             ));
                         } else if self.at_punct(Punct::Ellipsis) {
@@ -2395,9 +2420,9 @@ where
                                 return self.expected_token_error(&self.look_ahead, &["not ..."]);
                             }
                             let (_, rest) = self.parse_rest_element(&mut params)?;
-                            let mut args: Vec<FunctionArg> =
-                                exprs.into_iter().map(FunctionArg::Expr).collect();
-                            args.push(FunctionArg::Pat(rest));
+                            let mut args: Vec<FuncArg> =
+                                exprs.into_iter().map(FuncArg::Expr).collect();
+                            args.push(FuncArg::Pat(rest));
                             self.expect_punct(Punct::CloseParen)?;
                             return Ok(Expr::ArrowParamPlaceHolder(args, false));
                         } else {
@@ -2416,22 +2441,16 @@ where
                 if self.at_punct(Punct::EqualGreaterThan) {
                     if Self::is_ident(&ex) {
                         self.context.is_binding_element = false;
-                        return Ok(Expr::ArrowParamPlaceHolder(
-                            vec![FunctionArg::Expr(ex)],
-                            false,
-                        ));
+                        return Ok(Expr::ArrowParamPlaceHolder(vec![FuncArg::Expr(ex)], false));
                     }
                     if !self.context.is_binding_element {
                         return self.expected_token_error(&self.look_ahead, &["binding element"]);
                     }
                     if let Expr::Sequence(seq) = ex {
-                        let args = seq.into_iter().map(FunctionArg::Expr).collect();
+                        let args = seq.into_iter().map(FuncArg::Expr).collect();
                         return Ok(Expr::ArrowParamPlaceHolder(args, false));
                     } else {
-                        return Ok(Expr::ArrowParamPlaceHolder(
-                            vec![FunctionArg::Expr(ex)],
-                            false,
-                        ));
+                        return Ok(Expr::ArrowParamPlaceHolder(vec![FuncArg::Expr(ex)], false));
                     }
                 }
                 Ok(ex)
@@ -2477,7 +2496,7 @@ where
         while !self.at_punct(Punct::CloseBrace) {
             let prop = if self.at_punct(Punct::Ellipsis) {
                 let spread = self.parse_spread_element()?;
-                ObjectProperty::Spread(Box::new(spread))
+                ObjProp::Spread(spread)
             } else {
                 let (found_proto, prop) = self.parse_obj_prop(has_proto)?;
                 has_proto = has_proto || found_proto;
@@ -2489,11 +2508,11 @@ where
             }
         }
         self.expect_punct(Punct::CloseBrace)?;
-        Ok(Expr::Object(props))
+        Ok(Expr::Obj(props))
     }
 
     #[inline]
-    fn parse_obj_prop(&mut self, has_proto: bool) -> Res<(bool, ObjectProperty<'b>)> {
+    fn parse_obj_prop(&mut self, has_proto: bool) -> Res<(bool, ObjProp<'b>)> {
         debug!("{}: parse_obj_prop", self.look_ahead.span.start);
         let start = self.look_ahead.clone();
         let start_pos = self.look_ahead_position;
@@ -2513,9 +2532,9 @@ where
             let key = if is_async {
                 self.parse_object_property_key()?
             } else {
-                PropertyKey::Expr(Expr::Ident(
+                PropKey::Expr(Expr::Ident(resast::Ident::from(
                     &self.original[start.span.start..start.span.end],
-                ))
+                )))
             };
             (Some(key), is_async, computed)
         } else if self.at_punct(Punct::Asterisk) {
@@ -2528,37 +2547,37 @@ where
         };
         let at_qualified = self.at_qualified_prop_key();
         let prop = if at_get && at_qualified && !is_async {
-            ObjectProperty::Property(Property {
+            ObjProp::Prop(Prop {
                 computed: self.at_punct(Punct::OpenBracket),
                 key: self.parse_object_property_key()?,
                 value: self.parse_getter_method()?,
-                kind: PropertyKind::Get,
+                kind: PropKind::Get,
                 method: false,
                 short_hand: false,
                 is_static: false,
             })
         } else if at_set && at_qualified && !is_async {
-            ObjectProperty::Property(Property {
+            ObjProp::Prop(Prop {
                 computed: self.at_punct(Punct::OpenBracket),
                 key: self.parse_object_property_key()?,
                 value: self.parse_setter_method()?,
-                kind: PropertyKind::Set,
+                kind: PropKind::Set,
                 method: false,
                 short_hand: false,
                 is_static: false,
             })
         } else if start.token.matches_punct(Punct::Asterisk) && at_qualified {
-            ObjectProperty::Property(Property {
+            ObjProp::Prop(Prop {
                 computed: self.at_punct(Punct::OpenBracket),
                 key: self.parse_object_property_key()?,
                 value: self.parse_generator_method()?,
-                kind: PropertyKind::Init,
+                kind: PropKind::Init,
                 method: true,
                 short_hand: false,
                 is_static: false,
             })
         } else if let Some(key) = key {
-            let kind = PropertyKind::Init;
+            let kind = PropKind::Init;
             if self.at_punct(Punct::Colon) && !is_async {
                 if !computed && Self::is_proto_(&key) {
                     if has_proto {
@@ -2573,17 +2592,17 @@ where
                 let (prev_bind, prev_assign, prev_first) = self.get_cover_grammar_state();
                 let value = self.parse_assignment_expr()?;
                 self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
-                ObjectProperty::Property(Property {
+                ObjProp::Prop(Prop {
                     computed,
                     key,
-                    value: PropertyValue::Expr(value),
+                    value: PropValue::Expr(value),
                     kind,
                     method: false,
                     short_hand: false,
                     is_static: false,
                 })
             } else if self.at_punct(Punct::OpenParen) {
-                ObjectProperty::Property(Property {
+                ObjProp::Prop(Prop {
                     computed,
                     key,
                     value: if is_async {
@@ -2604,20 +2623,20 @@ where
                     let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
                     let inner = self.parse_assignment_expr()?;
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-                    ObjectProperty::Property(Property {
+                    ObjProp::Prop(Prop {
                         computed,
                         key,
-                        value: PropertyValue::Expr(inner),
+                        value: PropValue::Expr(inner),
                         kind,
                         method: false,
                         short_hand: true,
                         is_static: false,
                     })
                 } else {
-                    ObjectProperty::Property(Property {
+                    ObjProp::Prop(Prop {
                         computed,
                         key,
-                        value: PropertyValue::None,
+                        value: PropValue::None,
                         kind,
                         method: false,
                         short_hand: true,
@@ -2634,10 +2653,13 @@ where
     }
 
     #[inline]
-    fn is_proto_(key: &PropertyKey) -> bool {
+    fn is_proto_(key: &PropKey) -> bool {
         match key {
-            PropertyKey::Literal(ref l) => match l {
-                Literal::String(ref s) => s == &"_proto_",
+            PropKey::Lit(ref l) => match l {
+                Lit::String(ref s) => match s {
+                    resast::prelude::StringLit::Single(ref s)
+                    | resast::prelude::StringLit::Double(ref s) => s == "__proto__",
+                },
                 _ => false,
             },
             _ => false,
@@ -2658,8 +2680,8 @@ where
     }
 
     #[inline]
-    fn parse_template_literal(&mut self) -> Res<TemplateLiteral<'b>> {
-        debug!("{}: parse_template_literal", self.look_ahead.span.start);
+    fn parse_template_lit(&mut self) -> Res<TemplateLit<'b>> {
+        debug!("{}: parse_template_Lit", self.look_ahead.span.start);
         if !self.look_ahead.token.is_template_head() {
             return self
                 .expected_token_error(&self.look_ahead, &["template head", "template no sub"]);
@@ -2675,7 +2697,7 @@ where
             breaking = quasi.tail;
             quasis.push(quasi);
         }
-        Ok(TemplateLiteral {
+        Ok(TemplateLit {
             expressions,
             quasis,
         })
@@ -2693,7 +2715,7 @@ where
                 Template::Tail(c) => (c, true),
                 Template::NoSub(c) => (c, true),
             };
-            Ok(TemplateElement { raw, cooked, tail })
+            Ok(TemplateElement::from(tail, cooked, raw))
         } else {
             self.expected_token_error(&self.look_ahead, &["Template part"])
         }
@@ -2752,18 +2774,18 @@ where
         self.context.allow_strict_directive = prev_strict_dir;
         self.context.allow_yield = prev_yield;
         self.context.r#await = prev_await;
-        let func = Function {
+        let func = Func {
             id,
             params: formal_params.params,
             body,
             generator: is_gen,
             is_async,
         };
-        Ok(Expr::Function(func))
+        Ok(Expr::Func(func))
     }
 
     #[inline]
-    fn parse_fn_name(&mut self, is_gen: bool) -> Res<&'b str> {
+    fn parse_fn_name(&mut self, is_gen: bool) -> Res<resast::Ident<'b>> {
         debug!("{}: parse_fn_name", self.look_ahead.span.start);
         if self.context.strict && !is_gen && self.at_keyword(Keyword::Yield) {
             self.parse_ident_name()
@@ -2773,15 +2795,16 @@ where
     }
 
     #[inline]
-    fn parse_ident_name(&mut self) -> Res<&'b str> {
+    fn parse_ident_name(&mut self) -> Res<resast::Ident<'b>> {
         debug!("{}: parse_ident_name", self.look_ahead.span.start);
         let ident = self.next_item()?;
         let ret = self.get_string(&ident.span)?;
-        Ok(ret)
+
+        Ok(resast::Ident::from(ret))
     }
 
     #[inline]
-    fn parse_var_ident(&mut self, is_var: bool) -> Res<&'b str> {
+    fn parse_var_ident(&mut self, is_var: bool) -> Res<resast::Ident<'b>> {
         debug!("{}: parse_var_ident", self.look_ahead.span.start);
         let ident = self.next_item()?;
         if ident.token.matches_keyword(Keyword::Yield)
@@ -2800,8 +2823,11 @@ where
         {
             return self.expected_token_error(&ident, &["variable identifier"]);
         }
-        let i: &'b str = match ident.token {
-            Token::Ident(_) | Token::Keyword(_) => self.scanner.str_for(&ident.span).unwrap_or(""),
+        let i = match ident.token {
+            Token::Ident(_) | Token::Keyword(_) => {
+                let s = self.get_string(&ident.span)?;
+                resast::Ident::from(s)
+            }
             _ => self.expected_token_error(&ident, &["variable identifier"])?,
         };
         Ok(i)
@@ -2840,15 +2866,15 @@ where
     }
 
     #[inline]
-    fn parse_formal_param(&mut self, simple: bool) -> Res<(bool, bool, FunctionArg<'b>)> {
+    fn parse_formal_param(&mut self, simple: bool) -> Res<(bool, bool, FuncArg<'b>)> {
         debug!("{}: parse_formal_param", self.look_ahead.span.start);
         let mut params: Vec<Item<Token<&'b str>>> = Vec::new();
         let (found_restricted, param) = if self.at_punct(Punct::Ellipsis) {
             let (found_restricted, pat) = self.parse_rest_element(&mut params)?;
-            (found_restricted, FunctionArg::Pat(pat))
+            (found_restricted, FuncArg::Pat(pat))
         } else {
             let (found_restricted, pat) = self.parse_pattern_with_default(&mut params)?;
-            (found_restricted, FunctionArg::Pat(pat))
+            (found_restricted, FuncArg::Pat(pat))
         };
         let simple = simple && Self::is_simple(&param);
         Ok((simple, found_restricted, param))
@@ -2900,7 +2926,7 @@ where
             self.context.allow_yield = prev_yield;
             return Ok((
                 is_restricted,
-                Pat::Assignment(AssignmentPat {
+                Pat::Assign(AssignPat {
                     left: Box::new(ret),
                     right: Box::new(right),
                 }),
@@ -2912,33 +2938,33 @@ where
     #[inline]
     fn parse_pattern(
         &mut self,
-        kind: Option<VariableKind>,
+        kind: Option<VarKind>,
         params: &mut Vec<Item<Token<&'b str>>>,
     ) -> Res<(bool, Pat<'b>)> {
         debug!("{}: parse_pattern", self.look_ahead.span.start);
         if self.at_punct(Punct::OpenBracket) {
-            let kind = kind.unwrap_or(VariableKind::Var);
+            let kind = kind.unwrap_or(VarKind::Var);
             self.parse_array_pattern(params, kind)
         } else if self.at_punct(Punct::OpenBrace) {
             self.parse_object_pattern()
         } else {
             let is_var = if let Some(kind) = kind {
                 match kind {
-                    VariableKind::Const | VariableKind::Let => {
+                    VarKind::Const | VarKind::Let => {
                         if self.at_keyword(Keyword::Let) {
                             return self.expected_token_error(&self.look_ahead, &["identifier"]);
                         }
                         false
                     }
-                    VariableKind::Var => true,
+                    VarKind::Var => true,
                 }
             } else {
                 true
             };
             let ident = self.parse_var_ident(is_var)?;
-            let restricted = ident == "eval" || ident == "arguments";
+            let restricted = ident.name == "eval" || ident.name == "arguments";
             params.push(self.look_ahead.clone());
-            Ok((restricted, Pat::Identifier(ident)))
+            Ok((restricted, Pat::Ident(ident)))
         }
     }
 
@@ -2946,7 +2972,7 @@ where
     fn parse_array_pattern(
         &mut self,
         params: &mut Vec<Item<Token<&'b str>>>,
-        _kind: VariableKind,
+        _kind: VarKind,
     ) -> Res<(bool, Pat<'b>)> {
         debug!("{}: parse_array_pattern", self.look_ahead.span.start);
         self.expect_punct(Punct::OpenBracket)?;
@@ -2990,11 +3016,11 @@ where
             }
         }
         self.expect_punct(Punct::CloseBrace)?;
-        Ok((false, Pat::Object(body)))
+        Ok((false, Pat::Obj(body)))
     }
 
     #[inline]
-    fn parse_rest_prop(&mut self) -> Res<ObjectPatPart<'b>> {
+    fn parse_rest_prop(&mut self) -> Res<ObjPatPart<'b>> {
         debug!("{}: parse_rest_prop", self.look_ahead.span.start);
         self.expect_punct(Punct::Ellipsis)?;
         let (_, arg) = self.parse_pattern(None, &mut vec![])?;
@@ -3005,30 +3031,30 @@ where
             //unable to parse props after rest
         }
         let rest = Pat::RestElement(Box::new(arg));
-        let part = ObjectPatPart::Rest(Box::new(rest));
+        let part = ObjPatPart::Rest(Box::new(rest));
         Ok(part)
     }
 
     #[inline]
-    fn parse_property_pattern(&mut self) -> Res<ObjectPatPart<'b>> {
+    fn parse_property_pattern(&mut self) -> Res<ObjPatPart<'b>> {
         debug!("{}: parse_property_pattern", self.look_ahead.span.start);
         let mut computed = false;
         let mut short_hand = false;
         let method = false;
         let (key, value) = if self.look_ahead.token.is_ident() {
-            let key = PropertyKey::Expr(Expr::Ident(self.parse_var_ident(false)?));
+            let key = PropKey::Expr(Expr::Ident(self.parse_var_ident(false)?));
             let value = if self.at_punct(Punct::Equal) {
                 self.expect_punct(Punct::Equal)?;
                 short_hand = true;
                 let e = self.parse_assignment_expr()?;
-                PropertyValue::Expr(e)
+                PropValue::Expr(e)
             } else if !self.at_punct(Punct::Colon) {
                 short_hand = true;
-                PropertyValue::None
+                PropValue::None
             } else {
                 self.expect_punct(Punct::Colon)?;
                 let (_, p) = self.parse_pattern_with_default(&mut vec![])?;
-                PropertyValue::Pat(p)
+                PropValue::Pat(p)
             };
             (key, value)
         } else {
@@ -3036,16 +3062,16 @@ where
             let key = self.parse_object_property_key()?;
             self.expect_punct(Punct::Colon)?;
             let (_, v) = self.parse_pattern_with_default(&mut vec![])?;
-            let value = PropertyValue::Pat(v);
+            let value = PropValue::Pat(v);
             (key, value)
         };
-        Ok(ObjectPatPart::Assignment(Property {
+        Ok(ObjPatPart::Assign(Prop {
             key,
             value,
             computed,
             short_hand,
             method,
-            kind: PropertyKind::Init,
+            kind: PropKind::Init,
             is_static: false,
         }))
     }
@@ -3067,7 +3093,7 @@ where
             {
                 let arg = self.parse_primary_expression()?;
                 let arg = self.reinterpret_expr_as_pat(arg)?;
-                let arg = FunctionArg::Pat(arg);
+                let arg = FuncArg::Pat(arg);
                 current = Expr::ArrowParamPlaceHolder(vec![arg], true);
             }
             debug!(
@@ -3086,25 +3112,25 @@ where
                         self.context.allow_in = true;
                         let body = self.parse_function_source_el()?;
                         self.context.allow_in = prev_in;
-                        current = Expr::ArrowFunction(ArrowFunctionExpr {
+                        current = Expr::ArrowFunc(ArrowFuncExpr {
                             id: None,
                             expression: false,
                             generator: false,
                             is_async,
                             params,
-                            body: ArrowFunctionBody::FunctionBody(body),
+                            body: ArrowFuncBody::FuncBody(body),
                         });
                     } else {
                         let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                         let a = self.parse_assignment_expr()?;
                         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-                        current = Expr::ArrowFunction(ArrowFunctionExpr {
+                        current = Expr::ArrowFunc(ArrowFuncExpr {
                             id: None,
                             expression: true,
                             generator: false,
                             is_async,
                             params,
-                            body: ArrowFunctionBody::Expr(Box::new(a)),
+                            body: ArrowFuncBody::Expr(Box::new(a)),
                         });
                     };
                 }
@@ -3116,17 +3142,19 @@ where
                 if self.context.strict && Self::is_ident(&current) {
                     if let Expr::Ident(ref i) = current {
                         if Self::is_restricted_word(i) || Self::is_strict_reserved(i) {
-                            return self
-                                .expected_token_error(&self.look_ahead, &[&format!("not {}", i)]);
+                            return self.expected_token_error(
+                                &self.look_ahead,
+                                &[&format!("not {}", i.name)],
+                            );
                         }
                     }
                 }
                 let left = if !self.at_punct(Punct::Equal) {
                     self.context.is_assignment_target = false;
                     self.context.is_binding_element = false;
-                    AssignmentLeft::Expr(Box::new(current))
+                    AssignLeft::Expr(Box::new(current))
                 } else {
-                    AssignmentLeft::Expr(Box::new(current))
+                    AssignLeft::Expr(Box::new(current))
                 };
                 let item = self.next_item()?;
                 let op = match item.token {
@@ -3157,7 +3185,7 @@ where
                 let right = self.parse_assignment_expr()?;
                 self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                 self.context.first_covert_initialized_name_error = None;
-                return Ok(Expr::Assignment(AssignmentExpr {
+                return Ok(Expr::Assign(AssignExpr {
                     operator: op,
                     left,
                     right: Box::new(right),
@@ -3170,28 +3198,28 @@ where
     #[inline]
     fn is_async(expr: &Expr) -> bool {
         match expr {
-            Expr::Function(ref f) => f.is_async,
-            Expr::ArrowFunction(ref f) => f.is_async,
+            Expr::Func(ref f) => f.is_async,
+            Expr::ArrowFunc(ref f) => f.is_async,
             Expr::ArrowParamPlaceHolder(_, b) => *b,
             _ => false,
         }
     }
 
-    fn assignment_operator(p: Punct) -> Option<AssignmentOperator> {
+    fn assignment_operator(p: Punct) -> Option<AssignOp> {
         match p {
-            Punct::Equal => Some(AssignmentOperator::Equal),
-            Punct::PlusEqual => Some(AssignmentOperator::PlusEqual),
-            Punct::DashEqual => Some(AssignmentOperator::MinusEqual),
-            Punct::AsteriskEqual => Some(AssignmentOperator::TimesEqual),
-            Punct::ForwardSlashEqual => Some(AssignmentOperator::DivEqual),
-            Punct::PercentEqual => Some(AssignmentOperator::ModEqual),
-            Punct::DoubleLessThanEqual => Some(AssignmentOperator::LeftShiftEqual),
-            Punct::DoubleGreaterThanEqual => Some(AssignmentOperator::RightShiftEqual),
-            Punct::TripleGreaterThanEqual => Some(AssignmentOperator::UnsignedRightShiftEqual),
-            Punct::PipeEqual => Some(AssignmentOperator::OrEqual),
-            Punct::CaretEqual => Some(AssignmentOperator::XOrEqual),
-            Punct::AmpersandEqual => Some(AssignmentOperator::AndEqual),
-            Punct::DoubleAsteriskEqual => Some(AssignmentOperator::PowerOfEqual),
+            Punct::Equal => Some(AssignOp::Equal),
+            Punct::PlusEqual => Some(AssignOp::PlusEqual),
+            Punct::DashEqual => Some(AssignOp::MinusEqual),
+            Punct::AsteriskEqual => Some(AssignOp::TimesEqual),
+            Punct::ForwardSlashEqual => Some(AssignOp::DivEqual),
+            Punct::PercentEqual => Some(AssignOp::ModEqual),
+            Punct::DoubleLessThanEqual => Some(AssignOp::LeftShiftEqual),
+            Punct::DoubleGreaterThanEqual => Some(AssignOp::RightShiftEqual),
+            Punct::TripleGreaterThanEqual => Some(AssignOp::UnsignedRightShiftEqual),
+            Punct::PipeEqual => Some(AssignOp::OrEqual),
+            Punct::CaretEqual => Some(AssignOp::XOrEqual),
+            Punct::AmpersandEqual => Some(AssignOp::AndEqual),
+            Punct::DoubleAsteriskEqual => Some(AssignOp::PowerOfEqual),
             _ => None,
         }
     }
@@ -3207,9 +3235,9 @@ where
     fn reinterpret_as_cover_formals_list(
         &mut self,
         expr: Expr<'b>,
-    ) -> Res<Option<Vec<FunctionArg<'b>>>> {
+    ) -> Res<Option<Vec<FuncArg<'b>>>> {
         let (mut params, async_arrow) = if Self::is_ident(&expr) {
-            (vec![FunctionArg::Expr(expr)], false)
+            (vec![FuncArg::Expr(expr)], false)
         } else if let Expr::ArrowParamPlaceHolder(params, is_async) = expr {
             (params, is_async)
         } else {
@@ -3221,24 +3249,28 @@ where
             .map(|p| {
                 if Self::is_assignment(&p) {
                     match &p {
-                        FunctionArg::Pat(ref p) => {
-                            if let Pat::Assignment(ref a) = p {
+                        FuncArg::Pat(ref p) => {
+                            if let Pat::Assign(ref a) = p {
                                 if let Expr::Yield(ref y) = &*a.right {
                                     if y.argument.is_some() {
                                         invalid_param = true;
                                     } else {
-                                        return FunctionArg::Pat(Pat::Identifier("yield"));
+                                        return FuncArg::Pat(Pat::Ident(resast::Ident::from(
+                                            "yield",
+                                        )));
                                     }
                                 }
                             }
                         }
-                        FunctionArg::Expr(ref e) => {
-                            if let Expr::Assignment(ref a) = e {
+                        FuncArg::Expr(ref e) => {
+                            if let Expr::Assign(ref a) = e {
                                 if let Expr::Yield(ref y) = &*a.right {
                                     if y.argument.is_some() {
                                         invalid_param = true;
                                     } else {
-                                        return FunctionArg::Expr(Expr::Ident("yield"));
+                                        return FuncArg::Expr(Expr::Ident(resast::Ident::from(
+                                            "yield",
+                                        )));
                                     }
                                 }
                             }
@@ -3261,7 +3293,7 @@ where
         }
         if self.context.strict && !self.context.allow_yield {
             for param in params.iter() {
-                if let FunctionArg::Expr(ref e) = param {
+                if let FuncArg::Expr(ref e) = param {
                     if let Expr::Yield(_) = e {
                         return self.expected_token_error(
                             &self.look_ahead,
@@ -3275,40 +3307,40 @@ where
     }
 
     #[inline]
-    fn is_await(arg: &FunctionArg) -> bool {
+    fn is_await(arg: &FuncArg) -> bool {
         match arg {
-            FunctionArg::Expr(ref e) => match e {
-                Expr::Ident(ref i) => i == &"await",
+            FuncArg::Expr(ref e) => match e {
+                Expr::Ident(ref i) => &i.name == &"await",
                 _ => false,
             },
-            FunctionArg::Pat(ref p) => match p {
-                Pat::Identifier(ref i) => i == &"await",
+            FuncArg::Pat(ref p) => match p {
+                Pat::Ident(ref i) => &i.name == &"await",
                 _ => false,
             },
         }
     }
 
     #[inline]
-    fn is_assignment(arg: &FunctionArg) -> bool {
+    fn is_assignment(arg: &FuncArg) -> bool {
         match arg {
-            FunctionArg::Pat(ref p) => match p {
-                Pat::Assignment(_) => true,
+            FuncArg::Pat(ref p) => match p {
+                Pat::Assign(_) => true,
                 _ => false,
             },
-            FunctionArg::Expr(ref e) => match e {
-                Expr::Assignment(_) => true,
+            FuncArg::Expr(ref e) => match e {
+                Expr::Assign(_) => true,
                 _ => false,
             },
         }
     }
     #[inline]
-    pub fn is_simple(arg: &FunctionArg) -> bool {
+    pub fn is_simple(arg: &FuncArg) -> bool {
         match arg {
-            FunctionArg::Pat(ref p) => match p {
-                Pat::Identifier(_) => true,
+            FuncArg::Pat(ref p) => match p {
+                Pat::Ident(_) => true,
                 _ => false,
             },
-            FunctionArg::Expr(ref e) => match e {
+            FuncArg::Expr(ref e) => match e {
                 Expr::Ident(_) => true,
                 _ => false,
             },
@@ -3334,31 +3366,31 @@ where
             Expr::Spread(s) => Ok(Pat::RestElement(Box::new(
                 self.reinterpret_expr_as_pat(*s)?,
             ))),
-            Expr::Object(o) => {
+            Expr::Obj(o) => {
                 let mut patts = vec![];
                 for expr in o {
                     match expr {
-                        ObjectProperty::Property(p) => patts.push(ObjectPatPart::Assignment(p)),
-                        ObjectProperty::Spread(s) => {
-                            let p = self.reinterpret_expr_as_pat(*s)?;
-                            patts.push(ObjectPatPart::Rest(Box::new(p)));
+                        ObjProp::Prop(p) => patts.push(ObjPatPart::Assign(p)),
+                        ObjProp::Spread(s) => {
+                            let p = self.reinterpret_expr_as_pat(s)?;
+                            patts.push(ObjPatPart::Rest(Box::new(p)));
                         }
                     }
                 }
-                Ok(Pat::Object(patts))
+                Ok(Pat::Obj(patts))
             }
-            Expr::Assignment(a) => {
+            Expr::Assign(a) => {
                 let left = match a.left {
-                    AssignmentLeft::Pat(p) => p,
-                    AssignmentLeft::Expr(e) => self.reinterpret_expr_as_pat(*e)?,
+                    AssignLeft::Pat(p) => p,
+                    AssignLeft::Expr(e) => self.reinterpret_expr_as_pat(*e)?,
                 };
-                let ret = AssignmentPat {
+                let ret = AssignPat {
                     left: Box::new(left),
                     right: a.right,
                 };
-                Ok(Pat::Assignment(ret))
+                Ok(Pat::Assign(ret))
             }
-            Expr::Ident(i) => Ok(Pat::Identifier(i)),
+            Expr::Ident(i) => Ok(Pat::Ident(i)),
             _ => Err(self.reinterpret_error("expression", "pattern")),
         }
     }
@@ -3545,7 +3577,7 @@ where
             let right = self.parse_exponentiation_expression()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             return Ok(Expr::Binary(BinaryExpr {
-                operator: BinaryOperator::PowerOf,
+                operator: BinaryOp::PowerOf,
                 left: Box::new(left),
                 right: Box::new(right),
             }));
@@ -3592,63 +3624,63 @@ where
         }
     }
 
-    fn unary_operator(token: &Token<&str>) -> Option<UnaryOperator> {
+    fn unary_operator(token: &Token<&str>) -> Option<UnaryOp> {
         match token {
             Token::Punct(ref p) => match p {
-                Punct::Dash => Some(UnaryOperator::Minus),
-                Punct::Plus => Some(UnaryOperator::Plus),
-                Punct::Bang => Some(UnaryOperator::Not),
-                Punct::Tilde => Some(UnaryOperator::Tilde),
+                Punct::Dash => Some(UnaryOp::Minus),
+                Punct::Plus => Some(UnaryOp::Plus),
+                Punct::Bang => Some(UnaryOp::Not),
+                Punct::Tilde => Some(UnaryOp::Tilde),
                 _ => None,
             },
             Token::Keyword(ref k) => match k {
-                Keyword::TypeOf => Some(UnaryOperator::TypeOf),
-                Keyword::Void => Some(UnaryOperator::Void),
-                Keyword::Delete => Some(UnaryOperator::Delete),
+                Keyword::TypeOf => Some(UnaryOp::TypeOf),
+                Keyword::Void => Some(UnaryOp::Void),
+                Keyword::Delete => Some(UnaryOp::Delete),
                 _ => None,
             },
             _ => None,
         }
     }
 
-    fn binary_operator(token: &Token<&str>) -> Option<BinaryOperator> {
+    fn binary_operator(token: &Token<&str>) -> Option<BinaryOp> {
         match token {
             Token::Keyword(ref key) => match key {
-                Keyword::InstanceOf => Some(BinaryOperator::InstanceOf),
-                Keyword::In => Some(BinaryOperator::In),
+                Keyword::InstanceOf => Some(BinaryOp::InstanceOf),
+                Keyword::In => Some(BinaryOp::In),
                 _ => None,
             },
             Token::Punct(ref p) => match p {
-                Punct::DoubleEqual => Some(BinaryOperator::Equal),
-                Punct::BangEqual => Some(BinaryOperator::NotEqual),
-                Punct::TripleEqual => Some(BinaryOperator::StrictEqual),
-                Punct::BangDoubleEqual => Some(BinaryOperator::StrictNotEqual),
-                Punct::LessThan => Some(BinaryOperator::LessThan),
-                Punct::LessThanEqual => Some(BinaryOperator::LessThanEqual),
-                Punct::GreaterThan => Some(BinaryOperator::GreaterThan),
-                Punct::GreaterThanEqual => Some(BinaryOperator::GreaterThanEqual),
-                Punct::DoubleLessThan => Some(BinaryOperator::LeftShift),
-                Punct::DoubleGreaterThan => Some(BinaryOperator::RightShift),
-                Punct::TripleGreaterThan => Some(BinaryOperator::UnsignedRightShift),
-                Punct::Plus => Some(BinaryOperator::Plus),
-                Punct::Dash => Some(BinaryOperator::Minus),
-                Punct::Asterisk => Some(BinaryOperator::Times),
-                Punct::ForwardSlash => Some(BinaryOperator::Over),
-                Punct::Percent => Some(BinaryOperator::Mod),
-                Punct::Ampersand => Some(BinaryOperator::And),
-                Punct::Pipe => Some(BinaryOperator::Or),
-                Punct::Caret => Some(BinaryOperator::XOr),
+                Punct::DoubleEqual => Some(BinaryOp::Equal),
+                Punct::BangEqual => Some(BinaryOp::NotEqual),
+                Punct::TripleEqual => Some(BinaryOp::StrictEqual),
+                Punct::BangDoubleEqual => Some(BinaryOp::StrictNotEqual),
+                Punct::LessThan => Some(BinaryOp::LessThan),
+                Punct::LessThanEqual => Some(BinaryOp::LessThanEqual),
+                Punct::GreaterThan => Some(BinaryOp::GreaterThan),
+                Punct::GreaterThanEqual => Some(BinaryOp::GreaterThanEqual),
+                Punct::DoubleLessThan => Some(BinaryOp::LeftShift),
+                Punct::DoubleGreaterThan => Some(BinaryOp::RightShift),
+                Punct::TripleGreaterThan => Some(BinaryOp::UnsignedRightShift),
+                Punct::Plus => Some(BinaryOp::Plus),
+                Punct::Dash => Some(BinaryOp::Minus),
+                Punct::Asterisk => Some(BinaryOp::Times),
+                Punct::ForwardSlash => Some(BinaryOp::Over),
+                Punct::Percent => Some(BinaryOp::Mod),
+                Punct::Ampersand => Some(BinaryOp::And),
+                Punct::Pipe => Some(BinaryOp::Or),
+                Punct::Caret => Some(BinaryOp::XOr),
                 _ => None,
             },
             _ => None,
         }
     }
 
-    fn logical_operator(token: &Token<&str>) -> Option<LogicalOperator> {
+    fn logical_operator(token: &Token<&str>) -> Option<LogicalOp> {
         match token {
             Token::Punct(ref p) => match p {
-                Punct::DoubleAmpersand => Some(LogicalOperator::And),
-                Punct::DoublePipe => Some(LogicalOperator::Or),
+                Punct::DoubleAmpersand => Some(LogicalOp::And),
+                Punct::DoublePipe => Some(LogicalOp::Or),
                 _ => None,
             },
             _ => None,
@@ -3671,8 +3703,8 @@ where
             let op = self.next_item()?;
             let operator = match op.token {
                 Token::Punct(ref p) => match p {
-                    Punct::DoublePlus => UpdateOperator::Increment,
-                    Punct::DoubleDash => UpdateOperator::Decrement,
+                    Punct::DoublePlus => UpdateOp::Increment,
+                    Punct::DoubleDash => UpdateOp::Decrement,
                     _ => unreachable!("Already validated that the next token would be ++ or --"),
                 },
                 _ => unreachable!("Already validated that the next token would be ++ or --"),
@@ -3724,9 +3756,9 @@ where
                 let prefix = false;
                 let ret = UpdateExpr {
                     operator: if op.token.matches_punct(Punct::DoublePlus) {
-                        UpdateOperator::Increment
+                        UpdateOp::Increment
                     } else if op.token.matches_punct(Punct::DoubleDash) {
-                        UpdateOperator::Decrement
+                        UpdateOp::Decrement
                     } else {
                         return self.expected_token_error(&op, &["++", "--"]);
                     },
@@ -3792,7 +3824,7 @@ where
                 };
                 expr = Expr::Member(member);
             } else if self.look_ahead.is_template() {
-                let quasi = self.parse_template_literal()?;
+                let quasi = self.parse_template_lit()?;
                 expr = Expr::TaggedTemplate(TaggedTemplateExpr {
                     tag: Box::new(expr),
                     quasi,
@@ -3867,7 +3899,7 @@ where
                 };
                 //TODO: check for bad import call
                 if async_arrow && self.at_punct(Punct::EqualGreaterThan) {
-                    let args = args.into_iter().map(FunctionArg::Expr).collect();
+                    let args = args.into_iter().map(FuncArg::Expr).collect();
                     expr = Expr::ArrowParamPlaceHolder(args, true);
                 } else {
                     let inner = CallExpr {
@@ -3892,7 +3924,7 @@ where
                 debug!(target: "look_ahead", "{:?}", member);
                 expr = Expr::Member(member);
             } else if self.look_ahead.token.is_template_head() {
-                let quasi = self.parse_template_literal()?;
+                let quasi = self.parse_template_lit()?;
                 let temp = TaggedTemplateExpr {
                     tag: Box::new(expr),
                     quasi,
@@ -4001,9 +4033,9 @@ where
         if self.at_punct(Punct::Period) {
             let _ = self.next_item()?;
             if self.at_contextual_keyword("target") && self.context.in_function_body {
-                let property: &'b str = self.parse_ident_name()?;
-                Ok(Expr::MetaProperty(MetaProperty {
-                    meta: "new",
+                let property = self.parse_ident_name()?;
+                Ok(Expr::MetaProp(MetaProp {
+                    meta: resast::Ident::from("new"),
                     property,
                 }))
             } else {
@@ -4364,26 +4396,26 @@ where
     /// a special meaning and will cause problems
     /// if used in the wrong scope
     #[inline]
-    fn is_restricted_word(word: &str) -> bool {
-        word == "eval" || word == "arguments"
+    fn is_restricted_word(word: &resast::Ident) -> bool {
+        &word.name == "eval" || &word.name == "arguments"
     }
     /// Check if this &str is in the list of reserved
     /// words in the context of 'use strict'
     #[inline]
-    fn is_strict_reserved(word: &str) -> bool {
-        word == "implements"
-            || word == "interface"
-            || word == "package"
-            || word == "private"
-            || word == "protected"
-            || word == "public"
-            || word == "static"
-            || word == "yield"
-            || word == "let"
+    fn is_strict_reserved(word: &resast::Ident) -> bool {
+        word.name == "implements"
+            || word.name == "interface"
+            || word.name == "package"
+            || word.name == "private"
+            || word.name == "protected"
+            || word.name == "public"
+            || word.name == "static"
+            || word.name == "yield"
+            || word.name == "let"
     }
     /// Tests if the parser is currently at the
     /// start of an expression. This consists of a
-    /// subset of punctuation, keywords or a regex literal
+    /// subset of punctuation, keywords or a regex Lit
     #[inline]
     fn is_start_of_expr(&self) -> bool {
         let mut ret = true;
@@ -4533,7 +4565,7 @@ where
 #[allow(unused)]
 struct FormalParams<'a> {
     simple: bool,
-    params: Vec<FunctionArg<'a>>,
+    params: Vec<FuncArg<'a>>,
     strict: bool,
     found_restricted: bool,
 }
@@ -4541,7 +4573,7 @@ struct FormalParams<'a> {
 #[allow(unused)]
 struct CoverFormalListOptions<'a> {
     simple: bool,
-    params: Vec<FunctionArg<'a>>,
+    params: Vec<FuncArg<'a>>,
     stricted: bool,
     first_restricted: Option<Expr<'a>>,
 }

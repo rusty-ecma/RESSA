@@ -22,7 +22,7 @@ fn main() {
     let js = "function helloWorld() { alert('Hello world'); }";
     let p = Parser::new(&js).unwrap();
     let f = ProgramPart::decl(
-        Decl::Function(
+        Decl::Func(
             Function {
                 id: Some("helloWorld".to_string()),
                 params: vec![],
