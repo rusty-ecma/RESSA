@@ -1972,7 +1972,7 @@ lazy_static! {
                         ]
                         )
                     ),
-                    body: vec![]
+                    body: BlockStmt(vec![])
                 }
             ), None),
             try_part(vec![], Some(
@@ -1993,7 +1993,7 @@ lazy_static! {
                         ]
                         )
                     ),
-                    body: vec![]
+                    body: BlockStmt(vec![])
                 }
             ), None),
             class_part(
@@ -3867,7 +3867,7 @@ lazy_static! {
                         ]
                         )
                     ),
-                    body: vec![]
+                    body: BlockStmt(vec![])
                 }
             ), None),
             try_part(vec![], Some(
@@ -3888,7 +3888,7 @@ lazy_static! {
                         ]
                         )
                     ),
-                    body: vec![]
+                    body: BlockStmt(vec![])
                 }
             ), None),
             class_part(
@@ -5335,7 +5335,7 @@ fn sequence(seq: Vec<E>) -> Part {
 }
 
 fn block_part(body: Vec<Part>) -> Part {
-    ProgramPart::Stmt(Stmt::Block(body))
+    ProgramPart::Stmt(Stmt::Block(BlockStmt(body)))
 }
 
 fn variable_decl_part(kind: VarKind, decls: Vec<VarDecl<'static>>) -> Part {
@@ -5482,14 +5482,14 @@ fn try_(
     finalizer: Option<Vec<Part>>,
 ) -> TryStmt<'static> {
     TryStmt {
-        block,
+        block: BlockStmt(block),
         handler,
-        finalizer,
+        finalizer: finalizer.map(BlockStmt),
     }
 }
 
 fn catch_(param: Option<P>, body: Vec<Part>) -> CatchClause<'static> {
-    CatchClause { param, body }
+    CatchClause { param, body: BlockStmt(body) }
 }
 
 fn throw_part(e: E) -> Part {

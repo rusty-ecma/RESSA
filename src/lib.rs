@@ -1496,7 +1496,7 @@ where
             ret.push(part);
         }
         self.expect_punct(Punct::CloseBrace)?;
-        Ok(ret)
+        Ok(BlockStmt(ret))
     }
 
     #[inline]
