@@ -71,6 +71,7 @@ pub use crate::comment_handler::CommentHandler;
 use crate::comment_handler::DefaultCommentHandler;
 pub use crate::error::Error;
 use resast::prelude::*;
+use resast::ClassBody;
 use std::{collections::HashSet, mem::replace};
 
 /// The current configuration options.
@@ -1748,7 +1749,7 @@ where
     }
 
     #[inline]
-    fn parse_class_body(&mut self) -> Res<Vec<Prop<'b>>> {
+    fn parse_class_body(&mut self) -> Res<ClassBody<'b>> {
         debug!("{}: parse_class_body", self.look_ahead.span.start);
         let mut ret = vec![];
         let mut has_ctor = false;
@@ -1763,7 +1764,7 @@ where
             }
         }
         self.expect_punct(Punct::CloseBrace)?;
-        Ok(ret)
+        Ok(ClassBody(ret))
     }
 
     #[inline]
@@ -4107,6 +4108,7 @@ where
     }
     /// Set the state back to the previous state
     /// isolating the previous state
+    #[inline]
     fn set_isolate_cover_grammar_state(
         &mut self,
         prev_bind: bool,
