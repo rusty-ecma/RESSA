@@ -2622,23 +2622,11 @@ where
                     let _ = self.next_item()?;
                     let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
                     let inner = self.parse_assignment_expr()?;
-                    let value = if let Expr::Ident(_) = inner {
-                        PropValue::Pat(
-                            Pat::Assign(
-                                AssignPat {
-                                    left: Box::new(Pat::Ident(resast::Ident::from(self.get_string(&start.span)?))),
-                                    right: Box::new(inner),
-                                }
-                            )
-                        )
-                    } else {
-                        PropValue::Expr(inner)
-                    };
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     ObjProp::Prop(Prop {
                         computed,
                         key,
-                        value,
+                        value: PropValue::Expr(inner),
                         kind,
                         method: false,
                         short_hand: true,
