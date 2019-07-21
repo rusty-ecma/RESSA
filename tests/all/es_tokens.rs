@@ -4272,7 +4272,7 @@ fn class_decl(i: &'static str, s: Option<E>, body: Vec<PR>) -> Decl<'static> {
     Decl::Class(Class {
         id: Some(Ident::from(i)),
         super_class: s.map(Box::new),
-        body,
+        body: resast::ClassBody(body),
     })
 }
 
