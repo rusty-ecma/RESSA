@@ -82,8 +82,8 @@ fn es2015_module() {
             };
             if item != part {
                 let pos = p.next_position();
-                ::std::fs::write("parsed.out", format!("{:#?}", item));
-                ::std::fs::write("expected.out", format!("{:#?}", part));
+                let _ = ::std::fs::write("parsed.out", format!("{:#?}", item));
+                let _ = ::std::fs::write("expected.out", format!("{:#?}", part));
                 panic!(
                     "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
                     i, item, part, pos.start.line, pos.start.column
