@@ -2,6 +2,7 @@
 use flate2::read::GzDecoder;
 use ressa::{Error, Parser};
 use std::path::Path;
+use walkdir::WalkDir;
 
 #[test]
 fn moz_central() {
@@ -25,9 +26,10 @@ fn moz_central() {
 
 fn walk(path: &Path) -> Vec<(String, bool)> {
     let mut ret = Vec::new();
-    for file_path in path.read_dir().unwrap().map(|e| e.unwrap().path()) {
-        if file_path.is_file() {
-            let test = if let Some(ext) = file_path.extension() {
+    for file_path in WalkDir::new(path).into_iter() {
+        let file_path = file_path.unwrap();
+        if file_path.path().is_file() {
+            let test = if let Some(ext) = file_path.path().extension() {
                 ext == "js"
             } else {
                 false
@@ -35,7 +37,7 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
             if !test {
                 continue;
             }
-            if let Err(e) = run(&file_path) {
+            if let Err(e) = run(&file_path.path()) {
                 let loc = match &e {
                     Error::InvalidGetterParams(ref pos)
                     | Error::InvalidSetterParams(ref pos)
@@ -45,17 +47,17 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                     | Error::UnableToReinterpret(ref pos, _, _)
                     | Error::UnexpectedToken(ref pos, _) => format!(
                         "{}:{}:{}",
-                        &file_path.to_str().unwrap(),
+                        &file_path.path().to_str().unwrap(),
                         pos.line,
                         pos.column
                     ),
-                    _ => format!("{}", file_path.display()),
+                    _ => format!("{}", file_path.path().display()),
                 };
                 let mut msg = format!("Parse Failure {}\n\t{}", e, loc);
                 let white_list = match ::std::process::Command::new(
-                    "C:\\Users\\rmasen\\projects\\ressa\\node_modules\\.bin\\esparse.cmd",
+                    "node_modules/.bin/esparse.cmd",
                 )
-                .arg(file_path.clone())
+                .arg(file_path.path())
                 .output()
                 {
                     Ok(op) => {
@@ -70,17 +72,16 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                             ));
                             Some(msg2)
                         } else {
-                            if let Some(name) = file_path.file_name() {
-                                let mut out_path =
-                                    Path::new("C:\\Users\\rmasen\\projects\\ressa\\failures")
-                                        .join(name);
-                                out_path.set_extension("json");
-                                ::std::fs::write(
-                                    &out_path,
-                                    String::from_utf8_lossy(&op.stdout).to_string(),
-                                )
-                                .unwrap();
-                            }
+                            let name = file_path.file_name();
+                            let mut out_path =
+                                Path::new("failures")
+                                    .join(name);
+                            out_path.set_extension("json");
+                            ::std::fs::write(
+                                &out_path,
+                                String::from_utf8_lossy(&op.stdout).to_string(),
+                            )
+                            .unwrap();
                             None
                         }
                     }
@@ -96,9 +97,7 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                 };
                 ret.push((msg, white_list));
             }
-        } else if file_path.is_dir() {
-            ret.extend(walk(&file_path))
-        }
+        } 
     }
     ret
 }

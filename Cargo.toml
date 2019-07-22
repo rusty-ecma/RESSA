@@ -19,13 +19,12 @@ backtrace = "0"
 reqwest = { version = "0.9", optional = true}
 flate2 = { version = "1", optional = true}
 tar = { version = "0.4", optional = true}
-rayon = { version = "1", optional = true}
-
+walkdir = { version = "2", optional = true }
 [features]
 default = []
 major_libs = []
 debug_look_ahead = []
-moz_central = ["reqwest", "flate2", "tar", "rayon"]
+moz_central = ["reqwest", "flate2", "tar", "walkdir"]
 
 [dev-dependencies]
 term-painter = "0.2.4"
