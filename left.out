@@ -1,11 +1,1373 @@
 Stmt(
     Expr(
-        Lit(
-            String(
-                Single(
-                    "",
+        Obj(
+            [
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        value: Expr(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                        kind: Init,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
                 ),
-            ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "0.",
+                            ),
+                        ),
+                        value: Expr(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                        kind: Init,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "0.0",
+                            ),
+                        ),
+                        value: Expr(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                        kind: Init,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                ".0",
+                            ),
+                        ),
+                        value: Expr(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                        kind: Init,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "0e0",
+                            ),
+                        ),
+                        value: Expr(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                        kind: Init,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "0x0",
+                            ),
+                        ),
+                        value: Expr(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                        kind: Init,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        value: Expr(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                        kind: Init,
+                        method: false,
+                        computed: true,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Get,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [
+                                        Pat(
+                                            Ident(
+                                                Ident {
+                                                    name: "a",
+                                                },
+                                            ),
+                                        ),
+                                    ],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Set,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            String(
+                                Single(
+                                    "y",
+                                ),
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Get,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            String(
+                                Double(
+                                    "y",
+                                ),
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [
+                                        Pat(
+                                            Ident(
+                                                Ident {
+                                                    name: "a",
+                                                },
+                                            ),
+                                        ),
+                                    ],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Set,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Get,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [
+                                        Pat(
+                                            Ident(
+                                                Ident {
+                                                    name: "a",
+                                                },
+                                            ),
+                                        ),
+                                    ],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Set,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Expr(
+                            Ident(
+                                Ident {
+                                    name: "var",
+                                },
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Get,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Expr(
+                            Ident(
+                                Ident {
+                                    name: "var",
+                                },
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [
+                                        Pat(
+                                            Ident(
+                                                Ident {
+                                                    name: "a",
+                                                },
+                                            ),
+                                        ),
+                                    ],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Set,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Get,
+                        method: false,
+                        computed: true,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [
+                                        Pat(
+                                            Ident(
+                                                Ident {
+                                                    name: "a",
+                                                },
+                                            ),
+                                        ),
+                                    ],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Set,
+                        method: false,
+                        computed: true,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "1",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: true,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Expr(
+                            Ident(
+                                Ident {
+                                    name: "a",
+                                },
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            String(
+                                Single(
+                                    "b",
+                                ),
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            String(
+                                Double(
+                                    "c",
+                                ),
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                ".1",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "1.",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "1e1",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Expr(
+                            Ident(
+                                Ident {
+                                    name: "var",
+                                },
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [
+                                        Pat(
+                                            Ident(
+                                                Ident {
+                                                    name: "a",
+                                                },
+                                            ),
+                                        ),
+                                        Pat(
+                                            Assign(
+                                                AssignPat {
+                                                    left: Ident(
+                                                        Ident {
+                                                            name: "b",
+                                                        },
+                                                    ),
+                                                    right: Lit(
+                                                        Number(
+                                                            "0",
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                        Pat(
+                                            Array(
+                                                [
+                                                    Some(
+                                                        Pat(
+                                                            Ident(
+                                                                Ident {
+                                                                    name: "c",
+                                                                },
+                                                            ),
+                                                        ),
+                                                    ),
+                                                    None,
+                                                    Some(
+                                                        Pat(
+                                                            Assign(
+                                                                AssignPat {
+                                                                    left: Ident(
+                                                                        Ident {
+                                                                            name: "d",
+                                                                        },
+                                                                    ),
+                                                                    right: Lit(
+                                                                        Number(
+                                                                            "0",
+                                                                        ),
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        ),
+                                                    ),
+                                                    Some(
+                                                        Pat(
+                                                            RestElement(
+                                                                Ident(
+                                                                    Ident {
+                                                                        name: "e",
+                                                                    },
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ],
+                                            ),
+                                        ),
+                                        Pat(
+                                            Obj(
+                                                [
+                                                    Assign(
+                                                        Prop {
+                                                            key: Pat(
+                                                                Ident(
+                                                                    Ident {
+                                                                        name: "f",
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            value: None,
+                                                            kind: Init,
+                                                            method: false,
+                                                            computed: false,
+                                                            short_hand: true,
+                                                            is_static: false,
+                                                        },
+                                                    ),
+                                                    Assign(
+                                                        Prop {
+                                                            key: Pat(
+                                                                Ident(
+                                                                    Ident {
+                                                                        name: "g",
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            value: Pat(
+                                                                Ident(
+                                                                    Ident {
+                                                                        name: "h",
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            kind: Init,
+                                                            method: false,
+                                                            computed: false,
+                                                            short_hand: false,
+                                                            is_static: false,
+                                                        },
+                                                    ),
+                                                    Assign(
+                                                        Prop {
+                                                            key: Pat(
+                                                                Ident(
+                                                                    Ident {
+                                                                        name: "i",
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            value: Pat(
+                                                                Assign(
+                                                                    AssignPat {
+                                                                        left: Ident(
+                                                                            Ident {
+                                                                                name: "i",
+                                                                            },
+                                                                        ),
+                                                                        right: Lit(
+                                                                            Number(
+                                                                                "0",
+                                                                            ),
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            kind: Init,
+                                                            method: false,
+                                                            computed: false,
+                                                            short_hand: true,
+                                                            is_static: false,
+                                                        },
+                                                    ),
+                                                    Assign(
+                                                        Prop {
+                                                            key: Pat(
+                                                                Ident(
+                                                                    Ident {
+                                                                        name: "i",
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            value: Pat(
+                                                                Assign(
+                                                                    AssignPat {
+                                                                        left: Ident(
+                                                                            Ident {
+                                                                                name: "j",
+                                                                            },
+                                                                        ),
+                                                                        right: Lit(
+                                                                            Number(
+                                                                                "0",
+                                                                            ),
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            ),
+                                                            kind: Init,
+                                                            method: false,
+                                                            computed: false,
+                                                            short_hand: false,
+                                                            is_static: false,
+                                                        },
+                                                    ),
+                                                ],
+                                            ),
+                                        ),
+                                        Pat(
+                                            RestElement(
+                                                Ident(
+                                                    Ident {
+                                                        name: "k",
+                                                    },
+                                                ),
+                                            ),
+                                        ),
+                                    ],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Expr(
+                            Ident(
+                                Ident {
+                                    name: "in",
+                                },
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [
+                                        Pat(
+                                            Array(
+                                                [
+                                                    Some(
+                                                        Pat(
+                                                            Ident(
+                                                                Ident {
+                                                                    name: "a",
+                                                                },
+                                                            ),
+                                                        ),
+                                                    ),
+                                                    Some(
+                                                        Pat(
+                                                            Assign(
+                                                                AssignPat {
+                                                                    left: Ident(
+                                                                        Ident {
+                                                                            name: "b",
+                                                                        },
+                                                                    ),
+                                                                    right: Lit(
+                                                                        Number(
+                                                                            "0",
+                                                                        ),
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        ),
+                                                    ),
+                                                    Some(
+                                                        Pat(
+                                                            Array(
+                                                                [
+                                                                    Some(
+                                                                        Pat(
+                                                                            Ident(
+                                                                                Ident {
+                                                                                    name: "c",
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                    ),
+                                                                    None,
+                                                                    Some(
+                                                                        Pat(
+                                                                            Assign(
+                                                                                AssignPat {
+                                                                                    left: Ident(
+                                                                                        Ident {
+                                                                                            name: "d",
+                                                                                        },
+                                                                                    ),
+                                                                                    right: Lit(
+                                                                                        Number(
+                                                                                            "0",
+                                                                                        ),
+                                                                                    ),
+                                                                                },
+                                                                            ),
+                                                                        ),
+                                                                    ),
+                                                                    Some(
+                                                                        Pat(
+                                                                            RestElement(
+                                                                                Ident(
+                                                                                    Ident {
+                                                                                        name: "e",
+                                                                                    },
+                                                                                ),
+                                                                            ),
+                                                                        ),
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                        ),
+                                                    ),
+                                                    Some(
+                                                        Pat(
+                                                            Obj(
+                                                                [
+                                                                    Assign(
+                                                                        Prop {
+                                                                            key: Pat(
+                                                                                Ident(
+                                                                                    Ident {
+                                                                                        name: "f",
+                                                                                    },
+                                                                                ),
+                                                                            ),
+                                                                            value: None,
+                                                                            kind: Init,
+                                                                            method: false,
+                                                                            computed: false,
+                                                                            short_hand: true,
+                                                                            is_static: false,
+                                                                        },
+                                                                    ),
+                                                                    Assign(
+                                                                        Prop {
+                                                                            key: Pat(
+                                                                                Ident(
+                                                                                    Ident {
+                                                                                        name: "g",
+                                                                                    },
+                                                                                ),
+                                                                            ),
+                                                                            value: Pat(
+                                                                                Ident(
+                                                                                    Ident {
+                                                                                        name: "h",
+                                                                                    },
+                                                                                ),
+                                                                            ),
+                                                                            kind: Init,
+                                                                            method: false,
+                                                                            computed: false,
+                                                                            short_hand: false,
+                                                                            is_static: false,
+                                                                        },
+                                                                    ),
+                                                                    Assign(
+                                                                        Prop {
+                                                                            key: Pat(
+                                                                                Ident(
+                                                                                    Ident {
+                                                                                        name: "i",
+                                                                                    },
+                                                                                ),
+                                                                            ),
+                                                                            value: Pat(
+                                                                                Assign(
+                                                                                    AssignPat {
+                                                                                        left: Ident(
+                                                                                            Ident {
+                                                                                                name: "i",
+                                                                                            },
+                                                                                        ),
+                                                                                        right: Lit(
+                                                                                            Number(
+                                                                                                "0",
+                                                                                            ),
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                            ),
+                                                                            kind: Init,
+                                                                            method: false,
+                                                                            computed: false,
+                                                                            short_hand: true,
+                                                                            is_static: false,
+                                                                        },
+                                                                    ),
+                                                                    Assign(
+                                                                        Prop {
+                                                                            key: Pat(
+                                                                                Ident(
+                                                                                    Ident {
+                                                                                        name: "i",
+                                                                                    },
+                                                                                ),
+                                                                            ),
+                                                                            value: Pat(
+                                                                                Assign(
+                                                                                    AssignPat {
+                                                                                        left: Ident(
+                                                                                            Ident {
+                                                                                                name: "j",
+                                                                                            },
+                                                                                        ),
+                                                                                        right: Lit(
+                                                                                            Number(
+                                                                                                "0",
+                                                                                            ),
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                            ),
+                                                                            kind: Init,
+                                                                            method: false,
+                                                                            computed: false,
+                                                                            short_hand: false,
+                                                                            is_static: false,
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                        ),
+                                                    ),
+                                                    Some(
+                                                        Pat(
+                                                            RestElement(
+                                                                Ident(
+                                                                    Ident {
+                                                                        name: "k",
+                                                                    },
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ],
+                                            ),
+                                        ),
+                                    ],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: false,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Set,
+                        method: false,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Expr(
+                            Ident(
+                                Ident {
+                                    name: "d",
+                                },
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: true,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            String(
+                                Single(
+                                    "e",
+                                ),
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: true,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            String(
+                                Double(
+                                    "f",
+                                ),
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: true,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "2",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: true,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                ".2",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: true,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "3.",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: true,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Lit(
+                            Number(
+                                "2e2",
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: true,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+                Prop(
+                    Prop {
+                        key: Expr(
+                            Ident(
+                                Ident {
+                                    name: "in",
+                                },
+                            ),
+                        ),
+                        value: Expr(
+                            Func(
+                                Func {
+                                    id: None,
+                                    params: [],
+                                    body: FuncBody(
+                                        [],
+                                    ),
+                                    generator: true,
+                                    is_async: false,
+                                },
+                            ),
+                        ),
+                        kind: Init,
+                        method: true,
+                        computed: false,
+                        short_hand: false,
+                        is_static: false,
+                    },
+                ),
+            ],
         ),
     ),
 )

@@ -38,3 +38,42 @@ fn doc1() {
         assert_eq!(part.unwrap(), f);
     }
 }
+
+#[test]
+fn arrow_func_args() {
+    let js = "(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k) => {;};";
+    let mut parser = Parser::new(&js).unwrap();
+    let parsed = parser.parse().unwrap();
+    // assert_eq!(
+    //     parsed, 
+    //     Program::Script(
+    //         vec![   
+    //             ProgramPart::Stmt(
+    //                 Stmt::Expr(
+    //                     Expr::ArrowFunc(
+    //                         ArrowFuncExpr {
+    //                             body: ArrowFuncBody::FuncBody(FuncBody(vec![
+    //                                 ProgramPart::Stmt(
+    //                                     Stmt::Empty
+    //                                 )
+    //                             ])),
+    //                             expression: false,
+    //                             generator: false,
+    //                             id: None,
+    //                             is_async: false,
+    //                             params: vec![
+    //                                 FuncArg::Expr(Expr::Ident(Ident::from("a"))),
+    //                                 FuncArg::Pat(Pat::Assign(AssignPat {
+    //                                     left: Box::new(Pat::Ident(Ident::from("b"))),
+    //                                     right: Box::new(Expr::Lit(Lit::number_from("0")))
+    //                                 })),
+    //                                 FuncArg::Pat(Pat::)
+    //                             ]
+    //                         }
+    //                     )
+    //                 )
+    //             )
+    //         ]
+    //     )
+    // )
+}

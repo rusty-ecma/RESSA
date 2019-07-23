@@ -3043,12 +3043,17 @@ where
         let mut short_hand = false;
         let method = false;
         let (key, value) = if self.look_ahead.token.is_ident() {
-            let key = PropKey::Expr(Expr::Ident(self.parse_var_ident(false)?));
+            let ident = self.parse_var_ident(false)?;
+            let key = PropKey::Pat(Pat::Ident(ident.clone()));
             let value = if self.at_punct(Punct::Equal) {
                 self.expect_punct(Punct::Equal)?;
                 short_hand = true;
+                
                 let e = self.parse_assignment_expr()?;
-                PropValue::Expr(e)
+                PropValue::Pat(Pat::Assign(AssignPat {
+                    left: Box::new(Pat::Ident(ident.clone())),
+                    right: Box::new(e)
+                }))
             } else if !self.at_punct(Punct::Colon) {
                 short_hand = true;
                 PropValue::None
@@ -3245,47 +3250,82 @@ where
             return Ok(None);
         };
         let mut invalid_param = false;
-        params = params
-            .into_iter()
-            .map(|p| {
-                if Self::is_assignment(&p) {
-                    match &p {
-                        FuncArg::Pat(ref p) => {
-                            if let Pat::Assign(ref a) = p {
-                                if let Expr::Yield(ref y) = &*a.right {
-                                    if y.argument.is_some() {
-                                        invalid_param = true;
-                                    } else {
-                                        return FuncArg::Pat(Pat::Ident(resast::Ident::from(
-                                            "yield",
-                                        )));
-                                    }
-                                }
-                            }
-                        }
-                        FuncArg::Expr(ref e) => {
-                            if let Expr::Assign(ref a) = e {
-                                if let Expr::Yield(ref y) = &*a.right {
-                                    if y.argument.is_some() {
-                                        invalid_param = true;
-                                    } else {
-                                        return FuncArg::Expr(Expr::Ident(resast::Ident::from(
-                                            "yield",
-                                        )));
-                                    }
+        let mut params2 = Vec::with_capacity(params.len());
+        for param in params {
+            if Self::is_assignment(&param) {
+                match &param {
+                    FuncArg::Pat(ref p) => {
+                        if let Pat::Assign(ref a) = p {
+                            if let Expr::Yield(ref y) = &*a.right {
+                                if y.argument.is_some() {
+                                    invalid_param = true;
+                                } else {
+                                    params2.push(FuncArg::Pat(Pat::Ident(resast::Ident::from(
+                                        "yield",
+                                    ))));
+                                    continue;
                                 }
                             }
                         }
                     }
-                    p
-                } else if async_arrow && Self::is_await(&p) {
-                    invalid_param = true;
-                    p
-                } else {
-                    p
+                    FuncArg::Expr(ref e) => {
+                        if let Expr::Assign(ref a) = e {
+                            if let Expr::Yield(ref y) = &*a.right {
+                                if y.argument.is_some() {
+                                    invalid_param = true;
+                                } else {
+                                    params2.push(FuncArg::Expr(Expr::Ident(resast::Ident::from(
+                                        "yield",
+                                    ))));
+                                    continue;
+                                }
+                            }
+                        }
+                    }
                 }
-            })
-            .collect();
+                params2.push(param)
+            } else if async_arrow && Self::is_await(&param) {
+                invalid_param = true;
+                params2.push(param)
+            } else if let FuncArg::Expr(e) = param {
+                if Self::is_reinterpret_target(&e) {
+                    params2.push(
+                        FuncArg::Pat(
+                            self.reinterpret_expr_as_pat(e)?
+                        )
+                    );
+                }
+            } else if let FuncArg::Pat(p) = param {
+                match p {
+                    Pat::Obj(o) => {
+                        let mut new_props = Vec::with_capacity(o.len());
+                        for part in o {
+                            match part {
+                                ObjPatPart::Assign(p) => {
+                                        new_props.push(
+                                            ObjPatPart::Assign(
+                                                self.reinterpret_prop(p)?
+                                            )
+                                    )
+                                },
+                                ObjPatPart::Rest(r) => {
+                                    new_props.push(
+                                        ObjPatPart::Rest(
+                                            r
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        params2.push(FuncArg::Pat(Pat::Obj(new_props)))
+                    },
+                    _ => params2.push(FuncArg::Pat(p.clone()))
+                }
+            } else {
+                params2.push(param)
+            }
+        }
+        
         if invalid_param {
             return self.expected_token_error(
                 &self.look_ahead,
@@ -3293,7 +3333,7 @@ where
             );
         }
         if self.context.strict && !self.context.allow_yield {
-            for param in params.iter() {
+            for param in params2.iter() {
                 if let FuncArg::Expr(ref e) = param {
                     if let Expr::Yield(_) = e {
                         return self.expected_token_error(
@@ -3304,7 +3344,7 @@ where
                 }
             }
         }
-        Ok(Some(params))
+        Ok(Some(params2))
     }
 
     #[inline]
@@ -3352,16 +3392,20 @@ where
         debug!("{}: reinterpret_expr_as_pat", self.look_ahead.span.start);
         match ex {
             Expr::Array(a) => {
-                let parts = a
-                    .into_iter()
-                    .map(|e| {
-                        if let Some(e) = e {
-                            Some(ArrayPatPart::Expr(e))
+                let mut parts = Vec::with_capacity(a.len());
+                for e in a {
+                    if let Some(ex) = e {
+                        let part = if Self::is_reinterpret_target(&ex) {
+                            let pat = self.reinterpret_expr_as_pat(ex)?;
+                            ArrayPatPart::Pat(pat)
                         } else {
-                            None
-                        }
-                    })
-                    .collect();
+                            ArrayPatPart::Expr(ex)
+                        };
+                        parts.push(Some(part));
+                    } else {
+                        parts.push(None);
+                    }
+                }
                 Ok(Pat::Array(parts))
             }
             Expr::Spread(s) => Ok(Pat::RestElement(Box::new(
@@ -3371,7 +3415,10 @@ where
                 let mut patts = vec![];
                 for expr in o {
                     match expr {
-                        ObjProp::Prop(p) => patts.push(ObjPatPart::Assign(p)),
+                        ObjProp::Prop(p) => {
+                            let prop = self.reinterpret_prop(p)?;
+                            patts.push(ObjPatPart::Assign(prop))
+                        },
                         ObjProp::Spread(s) => {
                             let p = self.reinterpret_expr_as_pat(s)?;
                             patts.push(ObjPatPart::Rest(Box::new(p)));
@@ -3392,8 +3439,47 @@ where
                 Ok(Pat::Assign(ret))
             }
             Expr::Ident(i) => Ok(Pat::Ident(i)),
-            _ => Err(self.reinterpret_error("expression", "pattern")),
+            _ => Err(self.reinterpret_error(&format!("expression: {:?}", ex), "pattern")),
         }
+    }
+
+    #[inline]
+    fn is_reinterpret_target(ex: &Expr) -> bool {
+        match ex {
+            Expr::Ident(_) => true,
+            Expr::Spread(_) => true,
+            Expr::Obj(_) => true,
+            Expr::Array(_) => true,
+            Expr::Assign(_) => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
+    fn reinterpret_prop(&self, p: Prop<'b>) -> Res<Prop<'b>> {
+        Ok(Prop {
+            key: p.key,
+            computed: p.computed,
+            is_static: p.is_static,
+            kind: p.kind,
+            short_hand: p.short_hand,
+            method: p.method,
+            value: match p.value {
+                PropValue::Expr(e) => {
+                    if Self::is_reinterpret_target(&e) {
+                        PropValue::Pat(
+                            self.reinterpret_expr_as_pat(
+                                e
+                            )?
+                        )
+                    } else {
+                        PropValue::Expr(e)
+                    }
+                },
+                PropValue::Pat(p) => PropValue::Pat(p),
+                PropValue::None => PropValue::None,
+            }
+        })
     }
 
     #[inline]
