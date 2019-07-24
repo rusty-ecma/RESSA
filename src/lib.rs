@@ -2421,8 +2421,22 @@ where
                                 return self.expected_token_error(&self.look_ahead, &["not ..."]);
                             }
                             let (_, rest) = self.parse_rest_element(&mut params)?;
-                            let mut args: Vec<FuncArg> =
-                                exprs.into_iter().map(FuncArg::Expr).collect();
+                            let mut args = Vec::with_capacity(exprs.len()+1);
+                            for ex in exprs {
+                                if Self::is_reinterpret_target(&ex) {
+                                    args.push(
+                                        FuncArg::Pat(
+                                            self.reinterpret_expr_as_pat(ex)?
+                                        )
+                                    );
+                                } else {
+                                    args.push(
+                                        FuncArg::Expr(
+                                            ex
+                                        )
+                                    );
+                                }
+                            }
                             args.push(FuncArg::Pat(rest));
                             self.expect_punct(Punct::CloseParen)?;
                             return Ok(Expr::ArrowParamPlaceHolder(args, false));
@@ -2623,11 +2637,20 @@ where
                     let _ = self.next_item()?;
                     let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
                     let inner = self.parse_assignment_expr()?;
+                    let value = if Self::is_reinterpret_target(&inner) {
+                        PropValue::Pat(
+                            self.reinterpret_expr_as_pat(inner)?
+                        )
+                    } else {
+                        PropValue::Expr(
+                            inner
+                        )
+                    };
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     ObjProp::Prop(Prop {
                         computed,
                         key,
-                        value: PropValue::Expr(inner),
+                        value,
                         kind,
                         method: false,
                         short_hand: true,
@@ -3242,7 +3265,7 @@ where
         &mut self,
         expr: Expr<'b>,
     ) -> Res<Option<Vec<FuncArg<'b>>>> {
-        let (mut params, async_arrow) = if Self::is_ident(&expr) {
+        let (params, async_arrow) = if Self::is_ident(&expr) {
             (vec![FuncArg::Expr(expr)], false)
         } else if let Expr::ArrowParamPlaceHolder(params, is_async) = expr {
             (params, is_async)
