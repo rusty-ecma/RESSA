@@ -2637,10 +2637,12 @@ where
                     let _ = self.next_item()?;
                     let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
                     let inner = self.parse_assignment_expr()?;
-                    let value = if Self::is_reinterpret_target(&inner) {
-                        PropValue::Pat(
-                            self.reinterpret_expr_as_pat(inner)?
-                        )
+                    let value = if let Token::Ident(_) = &start.token {
+                        let p = AssignPat {
+                            left: Box::new(Pat::Ident(resast::Ident::from(self.get_string(&start.span)?))),
+                            right: Box::new(inner)
+                        };
+                        PropValue::Pat(Pat::Assign(p))
                     } else {
                         PropValue::Expr(
                             inner
@@ -2657,7 +2659,7 @@ where
                         is_static: false,
                     })
                 } else {
-                    ObjProp::Prop(Prop {
+                    let prop = self.reinterpret_prop(Prop {
                         computed,
                         key,
                         value: PropValue::None,
@@ -2665,7 +2667,8 @@ where
                         method: false,
                         short_hand: true,
                         is_static: false,
-                    })
+                    })?;
+                    ObjProp::Prop(prop)
                 }
             } else {
                 return self.expected_token_error(&start, &["object property value"]);
@@ -3182,6 +3185,10 @@ where
                     self.context.is_assignment_target = false;
                     self.context.is_binding_element = false;
                     AssignLeft::Expr(Box::new(current))
+                } else if !Self::is_ident(&current) && Self::is_reinterpret_target(&current) {
+                    AssignLeft::Pat(
+                        self.reinterpret_expr_as_pat(current)?
+                    )
                 } else {
                     AssignLeft::Expr(Box::new(current))
                 };
@@ -3480,28 +3487,48 @@ where
 
     #[inline]
     fn reinterpret_prop(&self, p: Prop<'b>) -> Res<Prop<'b>> {
-        Ok(Prop {
-            key: p.key,
-            computed: p.computed,
-            is_static: p.is_static,
-            kind: p.kind,
-            short_hand: p.short_hand,
-            method: p.method,
-            value: match p.value {
-                PropValue::Expr(e) => {
-                    if Self::is_reinterpret_target(&e) {
-                        PropValue::Pat(
-                            self.reinterpret_expr_as_pat(
-                                e
-                            )?
-                        )
-                    } else {
-                        PropValue::Expr(e)
-                    }
-                },
-                PropValue::Pat(p) => PropValue::Pat(p),
-                PropValue::None => PropValue::None,
+        let Prop {
+            key,
+            computed,
+            is_static,
+            kind,
+            short_hand,
+            method,
+            value,
+        } = p;
+
+        let key = if let PropKey::Expr(expr) = key {
+            if Self::is_reinterpret_target(&expr) {
+                PropKey::Pat(
+                    self.reinterpret_expr_as_pat(expr)?
+                )
+            } else {
+                PropKey::Expr(expr)
             }
+        } else {
+            key
+        };
+        let value = if let PropValue::Expr(expr) = value {
+            if Self::is_reinterpret_target(&expr) {
+                PropValue::Pat(
+                    self.reinterpret_expr_as_pat(
+                        expr
+                    )?
+                )
+            } else {
+                PropValue::Expr(expr)
+            }
+        } else {
+            value
+        };
+        Ok(Prop {
+            key,
+            computed,
+            is_static,
+            kind,
+            short_hand,
+            method,
+            value,
         })
     }
 
