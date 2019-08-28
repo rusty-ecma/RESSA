@@ -960,7 +960,7 @@ lazy_static! {
         obj_lit_part(vec![]),
         obj_lit_part(vec![
             obj_prop(
-                obj_key_ident("x"),
+                obj_key_ident_pat("x"),
                 PropValue::None,
                 PropKind::Init,
                 false,
@@ -1011,7 +1011,7 @@ lazy_static! {
                 fn_arg_ident_pat("a")
             ]),
             obj_prop(
-                obj_key_ident("var"),
+                obj_key_ident_expr("var"),
                 obj_value_fn(empty_anon_fn(vec![])),
                 PropKind::Get,
                 false,
@@ -1019,7 +1019,7 @@ lazy_static! {
                 false,
             ),
             obj_prop(
-                obj_key_ident("var"),
+                obj_key_ident_expr("var"),
                 obj_value_fn(empty_anon_fn(vec![
                     fn_arg_ident_pat("a")
                 ])),
@@ -1071,18 +1071,18 @@ lazy_static! {
                     )
                 )
             ]),
-            empty_generator_prop(obj_key_ident("d")),
+            empty_generator_prop(obj_key_ident_expr("d")),
             empty_generator_prop(obj_key_string_single("e")),
             empty_generator_prop(obj_key_string_double("f")),
             empty_generator_prop(obj_key_number("2")),
             empty_generator_prop(obj_key_number(".2")),
             empty_generator_prop(obj_key_number("3.")),
             empty_generator_prop(obj_key_number("2e2")),
-            empty_generator_prop(obj_key_ident("in")),
+            empty_generator_prop(obj_key_ident_expr("in")),
         ]),
         obj_lit_part(vec![
             obj_prop(
-                obj_key_ident("__proto__"),
+                obj_key_ident_expr("__proto__"),
                 PropValue::Expr(null_lit_expr()),
                 PropKind::Init,
                 false,
@@ -1848,28 +1848,28 @@ lazy_static! {
                 empty_part()
             ]),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ], Expr::ident_from("x")),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ], assign_expr(
                 assign_left_ident("x"),
                 number_lit_expr("0"))),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x")
+                fn_arg_ident_pat("x")
             ], Expr::ArrowFunc(arrow_expr(vec![
-                fn_arg_ident_expr("y")
+                fn_arg_ident_pat("y")
             ], Expr::ident_from("x")))),
             arrow_expr_body_part(vec![
-                fn_arg_ident_expr("x")
+                fn_arg_ident_pat("x")
             ], vec![
                 ident_stmt("x")
             ]),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident("x"),
+                        obj_key_ident_pat("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -1879,20 +1879,20 @@ lazy_static! {
                 ])
             ),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ], Expr::ident_from("x")),
             arrow_expr_body_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ],vec![
                 ProgramPart::Stmt(
                     return_ident_stmt("x")
                 )
             ]),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident("x"),
+                        obj_key_ident_pat("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -1902,21 +1902,24 @@ lazy_static! {
                 ])
             ),
             arrow_expr_part(vec![
-                FuncArg::Expr(
-                    Expr::Obj(vec![
-                        obj_prop(
-                            obj_key_ident("x"),
-                            PropValue::None,
-                            PropKind::Init,
-                            false,
-                            false,
-                            true,
+                FuncArg::Pat(
+                    Pat::Obj(vec![
+                        ObjPatPart::Assign(
+                            Prop {
+                                key: obj_key_ident_pat("x"),
+                                value: PropValue::None,
+                                kind: PropKind::Init,
+                                method: false,
+                                computed: false,
+                                short_hand: true,
+                                is_static: false,
+                            }
                         )
                     ])
                 ),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident("x"),
+                        obj_key_ident_pat("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -1926,15 +1929,17 @@ lazy_static! {
                 ])
             ),
             arrow_expr_body_part(
-                long_args_array_expr(),
+                long_args_array_pat().into_iter().map(|p| FuncArg::Pat(p)).collect(),
                 vec![
                     empty_part()
                 ]
             ),
             assign_part(
-                assign_left_expr(
-                    array_expr(vec![
-                        Some(Expr::ident_from("a"))
+                AssignLeft::Pat(
+                    Pat::Array(vec![
+                        Some(ArrayPatPart::Pat(
+                            Pat::ident_from("a")
+                        ))
                     ])
                 ),
                 array_expr(vec![
@@ -1948,15 +1953,18 @@ lazy_static! {
                 ])
             ),
             assign_part(
-                assign_left_expr(
-                    obj_lit_expr(vec![
-                        obj_prop(
-                            obj_key_ident("a"),
-                            PropValue::None,
-                            PropKind::Init,
-                            false,
-                            false,
-                            true,
+                AssignLeft::Pat(
+                    Pat::Obj(vec![
+                        ObjPatPart::Assign(
+                            Prop {
+                                key: obj_key_ident_pat("a"),
+                                value: PropValue::None,
+                                kind: PropKind::Init,
+                                method: false,
+                                computed: false,
+                                short_hand: true,
+                                is_static: false,
+                            }
                         )
                     ])
                 ),
@@ -1981,7 +1989,7 @@ lazy_static! {
                         Pat::Obj(vec![
                             ObjPatPart::Assign(
                                 Prop {
-                                    key: obj_key_ident("e"),
+                                    key: obj_key_ident_pat("e"),
                                     value: PropValue::None,
                                     kind: PropKind::Init,
                                     method: false,
@@ -2006,7 +2014,7 @@ lazy_static! {
                 Some(new_expr(Expr::ident_from("A"), vec![])),
                 vec![
                     class_prop(
-                        obj_key_ident("constructor"),
+                        obj_key_ident_expr("constructor"),
                         anon_fn(long_args(), vec![
                             call_part(Expr::Super, vec![
                                 Expr::MetaProp(
@@ -2042,7 +2050,7 @@ lazy_static! {
                     true,
                     false),
                     class_prop(
-                        obj_key_ident("m"),
+                        obj_key_ident_expr("m"),
                         anon_fn(long_args(), vec![
                             call_part(
                                 member_expr(
@@ -2077,7 +2085,7 @@ lazy_static! {
                         false,
                     ),
                     class_prop(
-                        obj_key_ident("a"),
+                        obj_key_ident_expr("a"),
                         anon_fn(vec![], vec![], false),
                         false,
                         true,
@@ -2101,7 +2109,7 @@ lazy_static! {
                         true
                     ),
                     class_prop(
-                        obj_key_ident("c"),
+                        obj_key_ident_expr("c"),
                         anon_fn(vec![], vec![
                             yield_part(None, false),
                         ], true),
@@ -2133,7 +2141,7 @@ lazy_static! {
                         true
                     ),
                     class_prop(
-                        obj_key_ident("var"),
+                        obj_key_ident_expr("var"),
                         anon_fn(vec![], vec![
 
                         ], false),
@@ -2141,14 +2149,14 @@ lazy_static! {
                         true
                     ),
                     class_prop(
-                        obj_key_ident("in"),
+                        obj_key_ident_expr("in"),
                         anon_fn(vec![], vec![
                         ], true),
                         false,
                         true
                     ),
                     class_prop_getter(
-                        obj_key_ident("e"),
+                        obj_key_ident_expr("e"),
                         anon_fn(vec![], vec![], false),
                         true,
                         false,
@@ -2172,7 +2180,7 @@ lazy_static! {
                         true
                     ),
                     class_prop_setter(
-                        obj_key_ident("g"),
+                        obj_key_ident_expr("g"),
                         anon_fn(vec![
                             fn_arg_ident_pat("a")
                         ], vec![], false),
@@ -2204,13 +2212,13 @@ lazy_static! {
                         true,
                     ),
                     class_prop_getter(
-                        obj_key_ident("if"),
+                        obj_key_ident_expr("if"),
                         anon_fn(vec![], vec![], false),
                         true,
                         false,
                     ),
                     class_prop_setter(
-                        obj_key_ident("if"),
+                        obj_key_ident_expr("if"),
                         anon_fn(vec![
                             fn_arg_ident_pat("a")
                         ], vec![], false),
@@ -2218,7 +2226,7 @@ lazy_static! {
                         false,
                     ),
                     class_prop(
-                        obj_key_ident("a"),
+                        obj_key_ident_expr("a"),
                         anon_fn(vec![], vec![], false),
                         false,
                         false,
@@ -2242,7 +2250,7 @@ lazy_static! {
                         false,
                     ),
                     class_prop(
-                        obj_key_ident("c"),
+                        obj_key_ident_expr("c"),
                         anon_fn(vec![], vec![
                             yield_part(None, false)
                         ], true),
@@ -2274,14 +2282,14 @@ lazy_static! {
                         false,
                     ),
                     class_prop(
-                        obj_key_ident("var"),
+                        obj_key_ident_expr("var"),
                         anon_fn(vec![], vec![
                         ], false),
                         false,
                         false,
                     ),
                     class_prop(
-                        obj_key_ident("in"),
+                        obj_key_ident_expr("in"),
                         anon_fn(vec![], vec![
                             yield_part(None, false)
                         ], true),
@@ -2289,7 +2297,7 @@ lazy_static! {
                         false,
                     ),
                     class_prop_getter(
-                        obj_key_ident("e"),
+                        obj_key_ident_expr("e"),
                         anon_fn(vec![], vec![], false),
                         false,
                         false,
@@ -2313,7 +2321,7 @@ lazy_static! {
                         true,
                     ),
                     class_prop_setter(
-                        obj_key_ident("g"),
+                        obj_key_ident_expr("g"),
                         anon_fn(vec![fn_arg_ident_pat("a")], vec![], false),
                         false,
                         false,
@@ -2337,14 +2345,14 @@ lazy_static! {
                         true,
                     ),
                     class_prop_getter(
-                        obj_key_ident("if"),
+                        obj_key_ident_expr("if"),
                         anon_fn(vec![], vec![
                         ], false),
                         false,
                         false,
                     ),
                     class_prop_setter(
-                        obj_key_ident("if"),
+                        obj_key_ident_expr("if"),
                         anon_fn(vec![fn_arg_ident_pat("f")], vec![], false),
                         false,
                         false,
@@ -2358,7 +2366,6 @@ lazy_static! {
                     call_part(Expr::Super, vec![])
                 ], false), true, false),
             ])
-        // ProgramPart::Stmt(Stmt::Empty)
     ];
 }
 lazy_static! {
@@ -2842,7 +2849,7 @@ lazy_static! {
         obj_lit_part(vec![]),
         obj_lit_part(vec![
             obj_prop(
-                obj_key_ident("x"),
+                obj_key_ident_pat("x"),
                 PropValue::None,
                 PropKind::Init,
                 false,
@@ -2893,7 +2900,7 @@ lazy_static! {
                 fn_arg_ident_pat("a")
             ]),
             obj_prop(
-                obj_key_ident("var"),
+                obj_key_ident_expr("var"),
                 obj_value_fn(empty_anon_fn(vec![])),
                 PropKind::Get,
                 false,
@@ -2901,7 +2908,7 @@ lazy_static! {
                 false,
             ),
             obj_prop(
-                obj_key_ident("var"),
+                obj_key_ident_expr("var"),
                 obj_value_fn(empty_anon_fn(vec![
                     fn_arg_ident_pat("a")
                 ])),
@@ -2953,18 +2960,18 @@ lazy_static! {
                     )
                 )
             ]),
-            empty_generator_prop(obj_key_ident("d")),
+            empty_generator_prop(obj_key_ident_expr("d")),
             empty_generator_prop(obj_key_string_single("e")),
             empty_generator_prop(obj_key_string_double("f")),
             empty_generator_prop(obj_key_number("2")),
             empty_generator_prop(obj_key_number(".2")),
             empty_generator_prop(obj_key_number("3.")),
             empty_generator_prop(obj_key_number("2e2")),
-            empty_generator_prop(obj_key_ident("in")),
+            empty_generator_prop(obj_key_ident_expr("in")),
         ]),
         obj_lit_part(vec![
             obj_prop(
-                obj_key_ident("__proto__"),
+                obj_key_ident_expr("__proto__"),
                 PropValue::Expr(null_lit_expr()),
                 PropKind::Init,
                 false,
@@ -3079,7 +3086,7 @@ lazy_static! {
                 ),
                 vec![]
             ),
-            call_ident_part("x", vec![]), //100
+            call_ident_part("x", vec![]),
             call_part(
                 call_ident_expr("x", vec![]),
                 vec![],
@@ -3743,28 +3750,28 @@ lazy_static! {
                 empty_part()
             ]),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ], Expr::ident_from("x")),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ], assign_expr(
                 assign_left_ident("x"),
                 number_lit_expr("0"))),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x")
+                fn_arg_ident_pat("x")
             ], Expr::ArrowFunc(arrow_expr(vec![
-                fn_arg_ident_expr("y")
+                fn_arg_ident_pat("y")
             ], Expr::ident_from("x")))),
             arrow_expr_body_part(vec![
-                fn_arg_ident_expr("x")
+                fn_arg_ident_pat("x")
             ], vec![
                 ident_stmt("x")
             ]),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident("x"),
+                        obj_key_ident_pat("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -3774,20 +3781,20 @@ lazy_static! {
                 ])
             ),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ], Expr::ident_from("x")),
             arrow_expr_body_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ],vec![
                 ProgramPart::Stmt(
                     return_ident_stmt("x")
                 )
             ]),
             arrow_expr_part(vec![
-                fn_arg_ident_expr("x"),
+                fn_arg_ident_pat("x"),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident("x"),
+                        obj_key_ident_pat("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -3797,21 +3804,24 @@ lazy_static! {
                 ])
             ),
             arrow_expr_part(vec![
-                FuncArg::Expr(
-                    Expr::Obj(vec![
-                        obj_prop(
-                            obj_key_ident("x"),
-                            PropValue::None,
-                            PropKind::Init,
-                            false,
-                            false,
-                            true,
+                FuncArg::Pat(
+                    Pat::Obj(vec![
+                        ObjPatPart::Assign(
+                            Prop {
+                                computed: false,
+                                is_static: false,
+                                kind: PropKind::Init,
+                                short_hand: true,
+                                key: obj_key_ident_pat("x"),
+                                value: PropValue::None,
+                                method: false,
+                            }
                         )
                     ])
                 ),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident("x"),
+                        obj_key_ident_pat("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -3821,15 +3831,19 @@ lazy_static! {
                 ])
             ),
             arrow_expr_body_part(
-                long_args_array_expr(),
+                long_args_array_pat().into_iter().map(|p| FuncArg::Pat(p)).collect(),
                 vec![
                     empty_part()
                 ]
             ),
             assign_part(
-                assign_left_expr(
-                    array_expr(vec![
-                        Some(Expr::ident_from("a"))
+                AssignLeft::Pat(
+                    Pat::Array(vec![
+                        Some(
+                            ArrayPatPart::Pat(
+                                Pat::ident_from("a")
+                            )
+                        )
                     ])
                 ),
                 array_expr(vec![
@@ -3843,15 +3857,18 @@ lazy_static! {
                 ])
             ),
             assign_part(
-                assign_left_expr(
-                    obj_lit_expr(vec![
-                        obj_prop(
-                            obj_key_ident("a"),
-                            PropValue::None,
-                            PropKind::Init,
-                            false,
-                            false,
-                            true,
+                AssignLeft::Pat(
+                    Pat::Obj(vec![
+                        ObjPatPart::Assign(
+                            Prop {
+                                key: obj_key_ident_pat("a"),
+                                value: PropValue::None,
+                                kind: PropKind::Init,
+                                method: false,
+                                short_hand: true,
+                                is_static: false,
+                                computed: false,
+                            }
                         )
                     ])
                 ),
@@ -3876,7 +3893,7 @@ lazy_static! {
                         Pat::Obj(vec![
                             ObjPatPart::Assign(
                                 Prop {
-                                    key: obj_key_ident("e"),
+                                    key: obj_key_ident_pat("e"),
                                     value: PropValue::None,
                                     kind: PropKind::Init,
                                     method: false,
@@ -3901,7 +3918,7 @@ lazy_static! {
                 Some(new_expr(Expr::ident_from("A"), vec![])),
                 vec![
                     class_prop(
-                        obj_key_ident("constructor"),
+                        obj_key_ident_expr("constructor"),
                         anon_fn(long_args(), vec![
                             call_part(Expr::Super, vec![
                                 Expr::MetaProp(
@@ -3937,7 +3954,7 @@ lazy_static! {
                     true,
                     false),
                     class_prop(
-                        obj_key_ident("m"),
+                        obj_key_ident_expr("m"),
                         anon_fn(long_args(), vec![
                             call_part(
                                 member_expr(
@@ -3972,7 +3989,7 @@ lazy_static! {
                         false,
                     ),
                     class_prop(
-                        obj_key_ident("a"),
+                        obj_key_ident_expr("a"),
                         anon_fn(vec![], vec![], false),
                         false,
                         true,
@@ -3996,7 +4013,7 @@ lazy_static! {
                         true
                     ),
                     class_prop(
-                        obj_key_ident("c"),
+                        obj_key_ident_expr("c"),
                         anon_fn(vec![], vec![
                             yield_part(None, false),
                         ], true),
@@ -4028,7 +4045,7 @@ lazy_static! {
                         true
                     ),
                     class_prop(
-                        obj_key_ident("var"),
+                        obj_key_ident_expr("var"),
                         anon_fn(vec![], vec![
 
                         ], false),
@@ -4036,14 +4053,14 @@ lazy_static! {
                         true
                     ),
                     class_prop(
-                        obj_key_ident("in"),
+                        obj_key_ident_expr("in"),
                         anon_fn(vec![], vec![
                         ], true),
                         false,
                         true
                     ),
                     class_prop_getter(
-                        obj_key_ident("e"),
+                        obj_key_ident_expr("e"),
                         anon_fn(vec![], vec![], false),
                         true,
                         false,
@@ -4067,7 +4084,7 @@ lazy_static! {
                         true
                     ),
                     class_prop_setter(
-                        obj_key_ident("g"),
+                        obj_key_ident_expr("g"),
                         anon_fn(vec![
                             fn_arg_ident_pat("a")
                         ], vec![], false),
@@ -4099,13 +4116,13 @@ lazy_static! {
                         true,
                     ),
                     class_prop_getter(
-                        obj_key_ident("if"),
+                        obj_key_ident_expr("if"),
                         anon_fn(vec![], vec![], false),
                         true,
                         false,
                     ),
                     class_prop_setter(
-                        obj_key_ident("if"),
+                        obj_key_ident_expr("if"),
                         anon_fn(vec![
                             fn_arg_ident_pat("a")
                         ], vec![], false),
@@ -4113,7 +4130,7 @@ lazy_static! {
                         false,
                     ),
                     class_prop(
-                        obj_key_ident("a"),
+                        obj_key_ident_expr("a"),
                         anon_fn(vec![], vec![], false),
                         false,
                         false,
@@ -4137,7 +4154,7 @@ lazy_static! {
                         false,
                     ),
                     class_prop(
-                        obj_key_ident("c"),
+                        obj_key_ident_expr("c"),
                         anon_fn(vec![], vec![
                             yield_part(None, false)
                         ], true),
@@ -4169,14 +4186,14 @@ lazy_static! {
                         false,
                     ),
                     class_prop(
-                        obj_key_ident("var"),
+                        obj_key_ident_expr("var"),
                         anon_fn(vec![], vec![
                         ], false),
                         false,
                         false,
                     ),
                     class_prop(
-                        obj_key_ident("in"),
+                        obj_key_ident_expr("in"),
                         anon_fn(vec![], vec![
                             yield_part(None, false)
                         ], true),
@@ -4184,7 +4201,7 @@ lazy_static! {
                         false,
                     ),
                     class_prop_getter(
-                        obj_key_ident("e"),
+                        obj_key_ident_expr("e"),
                         anon_fn(vec![], vec![], false),
                         false,
                         false,
@@ -4208,7 +4225,7 @@ lazy_static! {
                         true,
                     ),
                     class_prop_setter(
-                        obj_key_ident("g"),
+                        obj_key_ident_expr("g"),
                         anon_fn(vec![fn_arg_ident_pat("a")], vec![], false),
                         false,
                         false,
@@ -4232,14 +4249,14 @@ lazy_static! {
                         true,
                     ),
                     class_prop_getter(
-                        obj_key_ident("if"),
+                        obj_key_ident_expr("if"),
                         anon_fn(vec![], vec![
                         ], false),
                         false,
                         false,
                     ),
                     class_prop_setter(
-                        obj_key_ident("if"),
+                        obj_key_ident_expr("if"),
                         anon_fn(vec![fn_arg_ident_pat("f")], vec![], false),
                         false,
                         false,
@@ -4403,7 +4420,7 @@ fn long_args_array_pat() -> Vec<P> {
         ]),
         Pat::Obj(vec![
             ObjPatPart::Assign(Prop {
-                key: obj_key_ident("f"),
+                key: obj_key_ident_pat("f"),
                 value: PropValue::None,
                 kind: PropKind::Init,
                 method: false,
@@ -4413,7 +4430,7 @@ fn long_args_array_pat() -> Vec<P> {
             }),
             // g: h
             ObjPatPart::Assign(Prop {
-                key: obj_key_ident("g"),
+                key: obj_key_ident_pat("g"),
                 value: PropValue::Pat(Pat::ident_from("h")),
                 kind: PropKind::Init,
                 method: false,
@@ -4423,8 +4440,11 @@ fn long_args_array_pat() -> Vec<P> {
             }),
             //i = 0,
             ObjPatPart::Assign(Prop {
-                key: obj_key_ident("i"),
-                value: obj_value_number("0"),
+                key: obj_key_ident_pat("i"),
+                value: PropValue::Pat(Pat::Assign(AssignPat {
+                    left: Box::new(Pat::ident_from("i")),
+                    right: Box::new(number_lit_expr("0")),
+                })),
                 kind: PropKind::Init,
                 method: false,
                 computed: false,
@@ -4433,7 +4453,7 @@ fn long_args_array_pat() -> Vec<P> {
             }),
             // i: j = 0
             ObjPatPart::Assign(Prop {
-                key: obj_key_ident("i"),
+                key: obj_key_ident_pat("i"),
                 value: PropValue::Pat(Pat::Assign(AssignPat {
                     left: Box::new(Pat::ident_from("j")),
                     right: Box::new(number_lit_expr("0")),
@@ -4468,7 +4488,7 @@ fn long_args_array_expr() -> Vec<FA> {
         ])),
         FuncArg::Expr(Expr::Obj(vec![
             obj_prop(
-                obj_key_ident("f"),
+                obj_key_ident_expr("f"),
                 PropValue::None,
                 PropKind::Init,
                 false,
@@ -4476,7 +4496,7 @@ fn long_args_array_expr() -> Vec<FA> {
                 true,
             ),
             obj_prop(
-                obj_key_ident("g"),
+                obj_key_ident_expr("g"),
                 PropValue::Expr(Expr::ident_from("h")),
                 PropKind::Init,
                 false,
@@ -4484,7 +4504,7 @@ fn long_args_array_expr() -> Vec<FA> {
                 false,
             ),
             obj_prop(
-                obj_key_ident("i"),
+                obj_key_ident_expr("i"),
                 obj_value_number("0"),
                 PropKind::Init,
                 false,
@@ -4492,7 +4512,7 @@ fn long_args_array_expr() -> Vec<FA> {
                 true,
             ),
             obj_prop(
-                obj_key_ident("i"),
+                obj_key_ident_expr("i"),
                 PropValue::Expr(Expr::Assign(AssignExpr {
                     operator: AssignOp::Equal,
                     left: AssignLeft::Expr(Box::new(Expr::ident_from("j"))),
@@ -4810,7 +4830,7 @@ type PK = PropKey<'static>;
 type PV = PropValue<'static>;
 fn obj_prop_ident_number(ident: &'static str, number: &'static str) -> OP {
     obj_prop(
-        obj_key_ident(ident),
+        obj_key_ident_expr(ident),
         obj_value_number(number),
         PropKind::Init,
         false,
@@ -4920,7 +4940,7 @@ fn fn_arg_ident_expr(i: &'static str) -> FA {
 }
 
 fn obj_prop_ident_fn(i: &'static str, f: Func<'static>, kind: PropKind) -> OP {
-    obj_prop(obj_key_ident(i), obj_value_fn(f), kind, true, false, false)
+    obj_prop(obj_key_ident_expr(i), obj_value_fn(f), kind, true, false, false)
 }
 fn obj_prop_dstr_fn(i: &'static str, f: Func<'static>, kind: PropKind) -> OP {
     obj_prop(
@@ -4947,7 +4967,7 @@ fn obj_prop_number_fn(n: &'static str, f: Func<'static>, kind: PropKind) -> OP {
 }
 fn obj_prop_ident_getter(i: &'static str) -> OP {
     obj_prop(
-        obj_key_ident(i),
+        obj_key_ident_expr(i),
         obj_value_fn(empty_anon_fn(vec![])),
         PropKind::Get,
         false,
@@ -4989,7 +5009,7 @@ fn obj_prop_number_getter(n: &'static str) -> OP {
 
 fn obj_prop_ident_setter(i: &'static str, args: Vec<FA>) -> OP {
     obj_prop(
-        obj_key_ident(i),
+        obj_key_ident_expr(i),
         obj_value_fn(empty_anon_fn(args)),
         PropKind::Set,
         false,
@@ -5051,11 +5071,17 @@ fn obj_value_number(n: &'static str) -> PV {
 fn obj_value_fn(f: Func<'static>) -> PV {
     PropValue::Expr(Expr::Func(f))
 }
-fn obj_key_ident(i: &'static str) -> PK {
+fn obj_key_ident_expr(i: &'static str) -> PK {
     obj_prop_key_expr(Expr::ident_from(i))
+}
+fn obj_key_ident_pat(i: &'static str) -> PK {
+    obj_prop_key_pat(Pat::ident_from(i))
 }
 fn obj_prop_key_expr(expr: E) -> PK {
     PropKey::Expr(expr)
+}
+fn obj_prop_key_pat(pat: P) -> PK {
+    PropKey::Pat(pat)
 }
 fn obj_key_number(n: &'static str) -> PK {
     obj_prop_key_lit(number_lit(n))
@@ -5124,6 +5150,7 @@ fn member(obj: E, prop: E, computed: bool) -> MemberExpr<'static> {
 fn assign_part(left: AssignLeft<'static>, right: E) -> Part {
     ProgramPart::Stmt(assign_stmt(left, right))
 }
+
 
 fn assign_stmt(left: AssignLeft<'static>, right: E) -> S {
     Stmt::Expr(assign_expr(left, right))

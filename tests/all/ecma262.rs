@@ -51,8 +51,8 @@ fn es2015_script() {
                 let _ = ::std::fs::write("left.out", format!("{:#?}", item));
                 let _ = ::std::fs::write("right.out", format!("{:#?}", part));
                 panic!(
-                    "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
-                    i, item, part, pos.start.line, pos.start.column
+                    "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
+                    i, path, pos.start.line, pos.start.column, item, part,
                 )
             }
         }
@@ -85,8 +85,8 @@ fn es2015_module() {
                 let _ = ::std::fs::write("parsed.out", format!("{:#?}", item));
                 let _ = ::std::fs::write("expected.out", format!("{:#?}", part));
                 panic!(
-                    "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
-                    i, item, part, pos.start.line, pos.start.column
+                    "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
+                    i, path, pos.start.line, pos.start.column, item, part,
                 )
             }
         }
