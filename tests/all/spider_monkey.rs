@@ -15,11 +15,16 @@ fn moz_central() {
         .iter()
         .filter(|(_, white_list)| !white_list)
         .count();
-    for (msg, white_list) in failures {
-        let prefix = if white_list { "W- " } else { "" };
-        eprintln!("{}{}", prefix, msg);
+    for (msg, _) in failures.iter().filter(|(_, white_list)| *white_list) {
+        eprintln!("W-{}", msg);
     }
     if fail_count > 0 {
+        eprintln!("----------");
+        eprintln!("FAILURES");
+        eprintln!("----------");
+        for (msg, _) in failures.iter().filter(|(_, white_list)| !white_list) {
+            eprintln!("{}", msg);
+        }
         panic!("Failed to parse {} moz_central files", fail_count);
     }
 }
