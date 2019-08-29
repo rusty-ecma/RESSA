@@ -4468,65 +4468,6 @@ fn long_args_array_pat() -> Vec<P> {
         Pat::RestElement(Box::new(Pat::ident_from("k"))),
     ]
 }
-fn long_args_array_expr() -> Vec<FA> {
-    vec![
-        FuncArg::Expr(Expr::ident_from("a")),
-        FuncArg::Expr(Expr::Assign(AssignExpr {
-            operator: AssignOp::Equal,
-            left: AssignLeft::Expr(Box::new(Expr::ident_from("b"))),
-            right: Box::new(number_lit_expr("0")),
-        })),
-        FuncArg::Expr(array_expr(vec![
-            Some(Expr::ident_from("c")),
-            None,
-            Some(Expr::Assign(AssignExpr {
-                operator: AssignOp::Equal,
-                left: AssignLeft::Expr(Box::new(Expr::ident_from("d"))),
-                right: Box::new(number_lit_expr("0")),
-            })),
-            Some(Expr::Spread(Box::new(Expr::ident_from("e")))),
-        ])),
-        FuncArg::Expr(Expr::Obj(vec![
-            obj_prop(
-                obj_key_ident_expr("f"),
-                PropValue::None,
-                PropKind::Init,
-                false,
-                false,
-                true,
-            ),
-            obj_prop(
-                obj_key_ident_expr("g"),
-                PropValue::Expr(Expr::ident_from("h")),
-                PropKind::Init,
-                false,
-                false,
-                false,
-            ),
-            obj_prop(
-                obj_key_ident_expr("i"),
-                obj_value_number("0"),
-                PropKind::Init,
-                false,
-                false,
-                true,
-            ),
-            obj_prop(
-                obj_key_ident_expr("i"),
-                PropValue::Expr(Expr::Assign(AssignExpr {
-                    operator: AssignOp::Equal,
-                    left: AssignLeft::Expr(Box::new(Expr::ident_from("j"))),
-                    right: Box::new(number_lit_expr("0")),
-                })),
-                PropKind::Init,
-                false,
-                false,
-                false,
-            ),
-        ])),
-        FuncArg::Pat(Pat::RestElement(Box::new(Pat::ident_from("k")))),
-    ]
-}
 
 fn long_args() -> Vec<FA> {
     long_args_array_pat()
@@ -4935,9 +4876,6 @@ fn func_generator(id: &'static str, args: Vec<FA>, body: Vec<Part>) -> F {
 fn fn_arg_ident_pat(i: &'static str) -> FA {
     FuncArg::Pat(Pat::ident_from(i))
 }
-fn fn_arg_ident_expr(i: &'static str) -> FA {
-    FuncArg::Expr(Expr::ident_from(i))
-}
 
 fn obj_prop_ident_fn(i: &'static str, f: Func<'static>, kind: PropKind) -> OP {
     obj_prop(obj_key_ident_expr(i), obj_value_fn(f), kind, true, false, false)
@@ -4986,16 +4924,6 @@ fn obj_prop_str_getter_single(s: &'static str) -> OP {
         false,
     )
 }
-fn obj_prop_str_getter_double(s: &'static str) -> OP {
-    obj_prop(
-        obj_key_string_double(s),
-        obj_value_fn(empty_anon_fn(vec![])),
-        PropKind::Get,
-        false,
-        false,
-        false,
-    )
-}
 fn obj_prop_number_getter(n: &'static str) -> OP {
     obj_prop(
         obj_key_number(n),
@@ -5017,16 +4945,7 @@ fn obj_prop_ident_setter(i: &'static str, args: Vec<FA>) -> OP {
         false,
     )
 }
-fn obj_prop_str_setter_single(i: &'static str, args: Vec<FA>) -> OP {
-    obj_prop(
-        obj_key_string_single(i),
-        obj_value_fn(empty_anon_fn(args)),
-        PropKind::Set,
-        false,
-        false,
-        false,
-    )
-}
+
 fn obj_prop_str_setter_double(i: &'static str, args: Vec<FA>) -> OP {
     obj_prop(
         obj_key_string_double(i),
