@@ -43,7 +43,7 @@ fn doc1() {
 fn arrow_func_args() {
     let js = "(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k) => {;};";
     let mut parser = Parser::new(&js).unwrap();
-    let parsed = parser.parse().unwrap();
+    let _parsed = parser.parse().unwrap();
     // assert_eq!(
     //     parsed, 
     //     Program::Script(
@@ -76,4 +76,19 @@ fn arrow_func_args() {
     //         ]
     //     )
     // )
+}
+
+#[test]
+fn destructuring_default() {
+    let _ = env_logger::try_init();
+    let js = "[a = {y: 2}, a.x = 1] = [];";
+    let mut parser = Parser::new(js).expect("failed to create parser");
+    parser.parse().expect("failed to parser js");
+}
+#[test]
+fn destructuring_obj() {
+    let _ = env_logger::try_init();
+    let js = "0, [...{} [throwlhs()]] = iterable;";
+    let mut parser = Parser::new(js).expect("failed to create parser");
+    parser.parse().expect("failed to parser js");
 }
