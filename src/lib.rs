@@ -3477,10 +3477,13 @@ where
     fn is_reinterpret_target(ex: &Expr) -> bool {
         match ex {
             Expr::Ident(_) => true,
-            Expr::Spread(_) => true,
+            Expr::Spread(ref s) => Self::is_reinterpret_target(s),
             Expr::Obj(_) => true,
             Expr::Array(_) => true,
-            Expr::Assign(_) => true,
+            Expr::Assign(ref a) => match a.left {
+                AssignLeft::Expr(ref expr) => Self::is_reinterpret_target(expr),
+                _ => true
+            }
             _ => false,
         }
     }
