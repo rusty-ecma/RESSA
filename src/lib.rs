@@ -96,7 +96,7 @@ struct Context<'a> {
     /// If `yield` is allowed as an identifier
     allow_yield: bool,
     /// If await is allowed as an identifier
-    r#await: bool,
+    allow_await: bool,
     /// If we have found any possible naming errors
     /// which are not yet resolved
     first_covert_initialized_name_error: Option<Item<Token<&'a str>>>,
@@ -140,7 +140,7 @@ impl<'a> Default for Context<'a> {
         trace!("default context",);
         Self {
             is_module: false,
-            r#await: false,
+            allow_await: false,
             allow_in: true,
             allow_strict_directive: true,
             allow_yield: true,
@@ -1648,9 +1648,9 @@ where
         } else {
             (None, None)
         };
-        let prev_await = self.context.r#await;
+        let prev_await = self.context.allow_await;
         let prev_yield = self.context.allow_yield;
-        self.context.r#await = is_async;
+        self.context.allow_await = is_async;
         self.context.allow_yield = !is_gen;
 
         let formal_params = self.parse_formal_params()?;
@@ -1670,7 +1670,7 @@ where
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow_strict;
-        self.context.r#await = prev_await;
+        self.context.allow_await = prev_await;
         self.context.allow_yield = prev_yield;
         Ok(Func {
             id,
@@ -1981,13 +1981,13 @@ where
             self.look_ahead.span.start
         );
         let prev_yield = self.context.allow_yield;
-        let prev_await = self.context.r#await;
+        let prev_await = self.context.allow_await;
         self.context.allow_yield = false;
-        self.context.r#await = true;
+        self.context.allow_await = true;
         let params = self.parse_formal_params()?;
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
-        self.context.r#await = prev_await;
+        self.context.allow_await = prev_await;
         let func = Func {
             id: None,
             params: params.params,
@@ -2239,7 +2239,7 @@ where
     fn parse_primary_expression(&mut self) -> Res<Expr<'b>> {
         debug!("{}: parse_primary_expression", self.look_ahead.span.start);
         if self.look_ahead.token.is_ident() {
-            if ((self.context.is_module || self.context.r#await) && self.at_keyword(Keyword::Await))
+            if ((self.context.is_module || self.context.allow_await) && self.at_keyword(Keyword::Await))
                 && !self.config.tolerant
             {
                 return self.unexpected_token_error(
@@ -2751,9 +2751,9 @@ where
         if is_gen {
             let _ = self.next_item()?;
         }
-        let prev_await = self.context.r#await;
+        let prev_await = self.context.allow_await;
         let prev_yield = self.context.allow_yield;
-        self.context.r#await = is_async;
+        self.context.allow_await = is_async;
         self.context.allow_yield = !is_gen;
         let mut found_restricted = false;
         let id = if !self.at_punct(Punct::OpenParen) {
@@ -2791,7 +2791,7 @@ where
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_strict_dir;
         self.context.allow_yield = prev_yield;
-        self.context.r#await = prev_await;
+        self.context.allow_await = prev_await;
         let func = Func {
             id,
             params: formal_params.params,
@@ -2836,7 +2836,7 @@ where
             if self.context.strict || ident.token.matches_keyword(Keyword::Let) || !is_var {
                 return self.expected_token_error(&ident, &["variable identifier"]);
             }
-        } else if (self.context.is_module || self.context.r#await)
+        } else if (self.context.is_module || self.context.allow_await)
             && &self.original[ident.span.start..ident.span.end] == "await"
         {
             return self.expected_token_error(&ident, &["variable identifier"]);
@@ -3726,7 +3726,7 @@ where
                 operator,
                 argument: Box::new(arg),
             }))
-        } else if self.context.r#await && self.at_keyword(Keyword::Await) {
+        } else if self.context.allow_await && self.at_keyword(Keyword::Await) {
             self.parse_await_expr()
         } else {
             self.parse_update_expr()
