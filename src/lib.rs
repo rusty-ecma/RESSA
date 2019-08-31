@@ -2282,7 +2282,6 @@ where
                     };
                     Lit::String(inner)
                 }
-                Token::String(_) => Literal::String(self.scanner.str_for(&item.span).unwrap_or("")),
                 _ => unreachable!(),
             };
             Ok(Expr::Lit(lit))
