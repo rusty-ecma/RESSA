@@ -16,7 +16,7 @@ cache:
     - moz-central
 before_cache:
   - rm -rf /home/travis/.cargo/registry
-  # - |
+  - |
     if [[ "$TRAVIS_RUST_VERSION" == stable ]]; then
       bash <(curl https://raw.githubusercontent.com/xd009642/tarpaulin/master/travis-install.sh)
     fi
