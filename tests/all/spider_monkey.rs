@@ -1,8 +1,12 @@
 #![cfg(test)]
 use flate2::read::GzDecoder;
-use ressa::{Error, Parser};
+use ressa::{Error, Builder};
 use std::path::Path;
 use walkdir::WalkDir;
+#[cfg(windows)]
+static ESPARSE: &str = "node_modules/.bin/esparse.cmd";
+#[cfg(not(windows))]
+static ESPARSE: &str = "node_modules/.bin/esparse";
 
 #[test]
 fn moz_central() {
@@ -60,7 +64,7 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                 };
                 let mut msg = format!("Parse Failure {}\n\t{}", e, loc);
                 let white_list = match ::std::process::Command::new(
-                    "node_modules/.bin/esparse.cmd",
+                    ESPARSE,
                 )
                 .arg(file_path.path())
                 .output()
@@ -121,7 +125,7 @@ fn run(file: &Path) -> Result<(), Error> {
         }
     }
     let module = contents.starts_with("// |jit-test| module");
-    let mut b = ressa::Builder::new();
+    let mut b = Builder::new();
     let parser = b.js(&contents).module(module).build()?;
     for part in parser {
         let _part = part?;
