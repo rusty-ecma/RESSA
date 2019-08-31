@@ -9,5 +9,8 @@
     "react-dom": "^16.4.2",
     "vue": "^2.5.17",
     "everything.js": "^1.0.3"
+  },
+  "dependencies": {
+    "acorn": "^6.2.0"
   }
 }

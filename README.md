@@ -22,9 +22,8 @@ use resast::ref_tree::prelude::*;
 fn main() {
     let js = "function helloWorld() { alert('Hello world'); }";
     let p = Parser::new(&js).unwrap();
-
-    let f = ProgramPart::Decl(
-        Decl::Function(
+    let f = ProgramPart::decl(
+        Decl::Func(
             Function {
                 id: Some("helloWorld"),
                 params: vec![],

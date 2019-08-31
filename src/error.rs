@@ -11,7 +11,7 @@ pub enum Error {
     InvalidGetterParams(Position),
     InvalidSetterParams(Position),
     NonStrictFeatureInStrictContext(Position, String),
-    Other(Box<::std::error::Error>),
+    Other(Box<dyn ::std::error::Error>),
 }
 
 impl Display for Error {

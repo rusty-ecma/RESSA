@@ -1,6 +1,6 @@
 [package]
 name = "ressa"
-version = "0.5.2"
+version = "0.7.0-beta-6"
 authors = ["Robert Masen <r@robertmasen.pizza>"]
 repository = "https://github.com/FreeMasen/RESSA"
 description = "An ECMAscript parser"
@@ -11,20 +11,19 @@ categories = ["parsing", "text-processing", "web-programming"]
 edition = "2018"
 
 [dependencies]
-ress = "0.7.1"
-resast = "0.3.0"
+ress = "0.7.3"
+resast = "0.4.0"
 log = "0.4"
 backtrace = "0"
 reqwest = { version = "0.9", optional = true}
 flate2 = { version = "1", optional = true}
 tar = { version = "0.4", optional = true}
-rayon = { version = "1", optional = true}
-
+walkdir = { version = "2", optional = true }
 [features]
 default = []
 major_libs = []
 debug_look_ahead = []
-moz_central = ["reqwest", "flate2", "tar", "rayon"]
+moz_central = ["reqwest", "flate2", "tar", "walkdir"]
 
 [dev-dependencies]
 term-painter = "0.2.4"

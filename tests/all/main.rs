@@ -4,8 +4,6 @@ extern crate log;
 #[cfg(feature = "moz_central")]
 extern crate flate2;
 #[cfg(feature = "moz_central")]
-extern crate rayon;
-#[cfg(feature = "moz_central")]
 extern crate reqwest;
 extern crate ress;
 extern crate ressa;

@@ -22,17 +22,13 @@ fn es5() {
             if item != part {
                 let pos = p.next_position();
                 panic!(
-                    "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
+                    "Error, part {} doesn't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
                     i, item, part, pos.start.line, pos.start.column
                 )
             }
         }
         i += 1;
     }
-    // for (i, (item, part)) in p.zip(es_tokens::ES5.iter()).enumerate() {
-
-    //     // assert_eq!((i, &item), (i, part));
-    // }
 }
 
 #[test]
@@ -52,11 +48,11 @@ fn es2015_script() {
             };
             if item != part {
                 let pos = p.next_position();
-                ::std::fs::write("left.out", format!("{:#?}", item));
-                ::std::fs::write("right.out", format!("{:#?}", part));
+                let _ = ::std::fs::write("left.out", format!("{:#?}", item));
+                let _ = ::std::fs::write("right.out", format!("{:#?}", part));
                 panic!(
-                    "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
-                    i, item, part, pos.start.line, pos.start.column
+                    "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
+                    i, path, pos.start.line, pos.start.column, item, part,
                 )
             }
         }
@@ -86,11 +82,11 @@ fn es2015_module() {
             };
             if item != part {
                 let pos = p.next_position();
-                ::std::fs::write("parsed.out", format!("{:#?}", item));
-                ::std::fs::write("expected.out", format!("{:#?}", part));
+                let _ = ::std::fs::write("parsed.out", format!("{:#?}", item));
+                let _ = ::std::fs::write("expected.out", format!("{:#?}", part));
                 panic!(
-                    "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
-                    i, item, part, pos.start.line, pos.start.column
+                    "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
+                    i, path, pos.start.line, pos.start.column, item, part,
                 )
             }
         }
