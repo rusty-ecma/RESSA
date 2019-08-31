@@ -1,6 +1,6 @@
 #![cfg(test)]
 use flate2::read::GzDecoder;
-use ressa::{Error, Builder};
+use ressa::{Builder, Error};
 use std::path::Path;
 use walkdir::WalkDir;
 #[cfg(windows)]
@@ -63,11 +63,9 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                     _ => format!("{}", file_path.path().display()),
                 };
                 let mut msg = format!("Parse Failure {}\n\t{}", e, loc);
-                let white_list = match ::std::process::Command::new(
-                    ESPARSE,
-                )
-                .arg(file_path.path())
-                .output()
+                let white_list = match ::std::process::Command::new(ESPARSE)
+                    .arg(file_path.path())
+                    .output()
                 {
                     Ok(op) => {
                         if !op.status.success() {
@@ -82,9 +80,7 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                             Some(msg2)
                         } else {
                             let name = file_path.file_name();
-                            let mut out_path =
-                                Path::new("failures")
-                                    .join(name);
+                            let mut out_path = Path::new("failures").join(name);
                             out_path.set_extension("json");
                             ::std::fs::write(
                                 &out_path,
@@ -106,7 +102,7 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                 };
                 ret.push((msg, white_list));
             }
-        } 
+        }
     }
     ret
 }

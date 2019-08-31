@@ -2422,20 +2422,12 @@ where
                                 return self.expected_token_error(&self.look_ahead, &["not ..."]);
                             }
                             let (_, rest) = self.parse_rest_element(&mut params)?;
-                            let mut args = Vec::with_capacity(exprs.len()+1);
+                            let mut args = Vec::with_capacity(exprs.len() + 1);
                             for ex in exprs {
                                 if Self::is_reinterpret_target(&ex) {
-                                    args.push(
-                                        FuncArg::Pat(
-                                            self.reinterpret_expr_as_pat(ex)?
-                                        )
-                                    );
+                                    args.push(FuncArg::Pat(self.reinterpret_expr_as_pat(ex)?));
                                 } else {
-                                    args.push(
-                                        FuncArg::Expr(
-                                            ex
-                                        )
-                                    );
+                                    args.push(FuncArg::Expr(ex));
                                 }
                             }
                             args.push(FuncArg::Pat(rest));
@@ -2640,14 +2632,14 @@ where
                     let inner = self.parse_assignment_expr()?;
                     let value = if let Token::Ident(_) = &start.token {
                         let p = AssignPat {
-                            left: Box::new(Pat::Ident(resast::Ident::from(self.get_string(&start.span)?))),
-                            right: Box::new(inner)
+                            left: Box::new(Pat::Ident(resast::Ident::from(
+                                self.get_string(&start.span)?,
+                            ))),
+                            right: Box::new(inner),
                         };
                         PropValue::Pat(Pat::Assign(p))
                     } else {
-                        PropValue::Expr(
-                            inner
-                        )
+                        PropValue::Expr(inner)
                     };
                     self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     ObjProp::Prop(Prop {
@@ -3075,11 +3067,11 @@ where
             let value = if self.at_punct(Punct::Equal) {
                 self.expect_punct(Punct::Equal)?;
                 short_hand = true;
-                
+
                 let e = self.parse_assignment_expr()?;
                 PropValue::Pat(Pat::Assign(AssignPat {
                     left: Box::new(Pat::Ident(ident.clone())),
-                    right: Box::new(e)
+                    right: Box::new(e),
                 }))
             } else if !self.at_punct(Punct::Colon) {
                 short_hand = true;
@@ -3187,9 +3179,7 @@ where
                     self.context.is_binding_element = false;
                     AssignLeft::Expr(Box::new(current))
                 } else if !Self::is_ident(&current) && Self::is_reinterpret_target(&current) {
-                    AssignLeft::Pat(
-                        self.reinterpret_expr_as_pat(current)?
-                    )
+                    AssignLeft::Pat(self.reinterpret_expr_as_pat(current)?)
                 } else {
                     AssignLeft::Expr(Box::new(current))
                 };
@@ -3320,11 +3310,7 @@ where
                 params2.push(param)
             } else if let FuncArg::Expr(e) = param {
                 if Self::is_reinterpret_target(&e) {
-                    params2.push(
-                        FuncArg::Pat(
-                            self.reinterpret_expr_as_pat(e)?
-                        )
-                    );
+                    params2.push(FuncArg::Pat(self.reinterpret_expr_as_pat(e)?));
                 }
             } else if let FuncArg::Pat(p) = param {
                 match p {
@@ -3333,30 +3319,20 @@ where
                         for part in o {
                             match part {
                                 ObjPatPart::Assign(p) => {
-                                        new_props.push(
-                                            ObjPatPart::Assign(
-                                                self.reinterpret_prop(p)?
-                                            )
-                                    )
-                                },
-                                ObjPatPart::Rest(r) => {
-                                    new_props.push(
-                                        ObjPatPart::Rest(
-                                            r
-                                        )
-                                    )
+                                    new_props.push(ObjPatPart::Assign(self.reinterpret_prop(p)?))
                                 }
+                                ObjPatPart::Rest(r) => new_props.push(ObjPatPart::Rest(r)),
                             }
                         }
                         params2.push(FuncArg::Pat(Pat::Obj(new_props)))
-                    },
-                    _ => params2.push(FuncArg::Pat(p.clone()))
+                    }
+                    _ => params2.push(FuncArg::Pat(p.clone())),
                 }
             } else {
                 params2.push(param)
             }
         }
-        
+
         if invalid_param {
             return self.expected_token_error(
                 &self.look_ahead,
@@ -3449,7 +3425,7 @@ where
                         ObjProp::Prop(p) => {
                             let prop = self.reinterpret_prop(p)?;
                             patts.push(ObjPatPart::Assign(prop))
-                        },
+                        }
                         ObjProp::Spread(s) => {
                             let p = self.reinterpret_expr_as_pat(s)?;
                             patts.push(ObjPatPart::Rest(Box::new(p)));
@@ -3483,8 +3459,8 @@ where
             Expr::Array(_) => true,
             Expr::Assign(ref a) => match a.left {
                 AssignLeft::Expr(ref expr) => Self::is_reinterpret_target(expr),
-                _ => true
-            }
+                _ => true,
+            },
             _ => false,
         }
     }
@@ -3503,9 +3479,7 @@ where
 
         let key = if let PropKey::Expr(expr) = key {
             if Self::is_reinterpret_target(&expr) {
-                PropKey::Pat(
-                    self.reinterpret_expr_as_pat(expr)?
-                )
+                PropKey::Pat(self.reinterpret_expr_as_pat(expr)?)
             } else {
                 PropKey::Expr(expr)
             }
@@ -3514,11 +3488,7 @@ where
         };
         let value = if let PropValue::Expr(expr) = value {
             if Self::is_reinterpret_target(&expr) {
-                PropValue::Pat(
-                    self.reinterpret_expr_as_pat(
-                        expr
-                    )?
-                )
+                PropValue::Pat(self.reinterpret_expr_as_pat(expr)?)
             } else {
                 PropValue::Expr(expr)
             }

@@ -4878,7 +4878,14 @@ fn fn_arg_ident_pat(i: &'static str) -> FA {
 }
 
 fn obj_prop_ident_fn(i: &'static str, f: Func<'static>, kind: PropKind) -> OP {
-    obj_prop(obj_key_ident_expr(i), obj_value_fn(f), kind, true, false, false)
+    obj_prop(
+        obj_key_ident_expr(i),
+        obj_value_fn(f),
+        kind,
+        true,
+        false,
+        false,
+    )
 }
 fn obj_prop_dstr_fn(i: &'static str, f: Func<'static>, kind: PropKind) -> OP {
     obj_prop(
@@ -5069,7 +5076,6 @@ fn member(obj: E, prop: E, computed: bool) -> MemberExpr<'static> {
 fn assign_part(left: AssignLeft<'static>, right: E) -> Part {
     ProgramPart::Stmt(assign_stmt(left, right))
 }
-
 
 fn assign_stmt(left: AssignLeft<'static>, right: E) -> S {
     Stmt::Expr(assign_expr(left, right))
@@ -5435,7 +5441,10 @@ fn try_(
 }
 
 fn catch_(param: Option<P>, body: Vec<Part>) -> CatchClause<'static> {
-    CatchClause { param, body: BlockStmt(body) }
+    CatchClause {
+        param,
+        body: BlockStmt(body),
+    }
 }
 
 fn throw_part(e: E) -> Part {

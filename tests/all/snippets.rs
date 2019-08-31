@@ -4,36 +4,16 @@ use ressa::*;
 fn doc1() {
     let js = "function helloWorld() { alert('Hello world'); }";
     let p = Parser::new(&js).unwrap();
-    let f = ProgramPart::decl(
-        Decl::Func(
-            Func {
-                id: Some(Ident::from("helloWorld")),
-                params: vec![],
-                body: FuncBody(
-                    vec![
-                        ProgramPart::Stmt(
-                            Stmt::Expr(
-                                Expr::Call(
-                                    CallExpr {
-                                        callee: Box::new(
-                                            Expr::ident_from("alert")
-                                        ),
-                                        arguments: vec![
-                                            Expr::Lit(
-                                                Lit::single_string_from("Hello world")
-                                            )
-                                        ],
-                                    }
-                                )
-                            )
-                        )
-                    ]
-                ),
-                generator: false,
-                is_async: false,
-            }
-        )
-    );
+    let f = ProgramPart::decl(Decl::Func(Func {
+        id: Some(Ident::from("helloWorld")),
+        params: vec![],
+        body: FuncBody(vec![ProgramPart::Stmt(Stmt::Expr(Expr::Call(CallExpr {
+            callee: Box::new(Expr::ident_from("alert")),
+            arguments: vec![Expr::Lit(Lit::single_string_from("Hello world"))],
+        })))]),
+        generator: false,
+        is_async: false,
+    }));
     for part in p {
         assert_eq!(part.unwrap(), f);
     }
@@ -45,9 +25,9 @@ fn arrow_func_args() {
     let mut parser = Parser::new(&js).unwrap();
     let _parsed = parser.parse().unwrap();
     // assert_eq!(
-    //     parsed, 
+    //     parsed,
     //     Program::Script(
-    //         vec![   
+    //         vec![
     //             ProgramPart::Stmt(
     //                 Stmt::Expr(
     //                     Expr::ArrowFunc(
