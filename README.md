@@ -17,19 +17,24 @@ this means that you can evaluate your JS in pieces from top to bottom. These pie
 ### Iterator Example
 ```rust
 use ressa::Parser;
-use resast::prelude::*;
+use resast::ref_tree::prelude::*;
+
 fn main() {
     let js = "function helloWorld() { alert('Hello world'); }";
     let p = Parser::new(&js).unwrap();
-    let f = ProgramPart::decl(
+
+    let f = ProgramPart::Decl(
         Decl::Function(
             Function {
-                id: Some("helloWorld".to_string()),
+                id: Some("helloWorld"),
                 params: vec![],
                 body: vec![
                     ProgramPart::Stmt(
                         Stmt::Expr(
-                            Expr::call(Expr::ident("alert"), vec![Expr::string("'Hello world'")])
+                            Expr::Call(CallExpr {
+                                callee: Box::new(Expr::Ident("alert")),
+                                arguments: vec![Expr::Literal(Literal::String("'Hello world'"))],
+                            })
                         )
                     )
                 ],
@@ -51,7 +56,7 @@ Another way to interact with a `Parser` would be to utilize the `parse` method. 
 use ressa::{
     Parser,
 };
-use resast::prelude::*;
+use resast::ref_tree::prelude::*;
 fn main() {
     let js = "
 function Thing() {
