@@ -2,8 +2,7 @@ extern crate ressa;
 use ressa::*;
 fn main() {
     let js = include_str!("simple.js");
-    let mut builder = Builder::new();
-    let mut p = builder
+    let mut p = Parser::builder()
         .module(false)
         .tolerant(false)
         .js(js)

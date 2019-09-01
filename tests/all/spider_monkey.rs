@@ -20,7 +20,7 @@ fn moz_central() {
         .filter(|(_, white_list)| !white_list)
         .count();
     for (msg, _) in failures.iter().filter(|(_, white_list)| *white_list) {
-        eprintln!("W-{}", msg);
+        println!("W-{}", msg);
     }
     if fail_count > 0 {
         eprintln!("----------");
@@ -48,13 +48,22 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
             }
             if let Err(e) = run(&file_path.path()) {
                 let loc = match &e {
-                    Error::InvalidGetterParams(ref pos)
+                    Error::UnexpectedToken(ref pos, _)
+                    | Error::UnableToReinterpret(ref pos, _, _)
+                    | Error::Redecl(ref pos, _)
+                    | Error::OperationError(ref pos, _)
+                    | Error::InvalidGetterParams(ref pos)
                     | Error::InvalidSetterParams(ref pos)
                     | Error::NonStrictFeatureInStrictContext(ref pos, _)
-                    | Error::OperationError(ref pos, _)
-                    | Error::Redecl(ref pos, _)
-                    | Error::UnableToReinterpret(ref pos, _, _)
-                    | Error::UnexpectedToken(ref pos, _) => format!(
+                    | Error::InvalidImportError(ref pos)
+                    | Error::InvalidExportError(ref pos)
+                    | Error::InvalidUseOfContextualKeyword(ref pos, _)
+                    | Error::TryWithNoCatchOrFinally(ref pos)
+                    | Error::InvalidCatchArg(ref pos)
+                    | Error::ThrowWithNoArg(ref pos)
+                    | Error::UnknownOptionalLabel(ref pos, _, _)
+                    | Error::InvalidOptionalLabel(ref pos)
+                    | Error::UseOfModuleFeatureOutsideOfModule(ref pos, _) => format!(
                         "{}:{}:{}",
                         &file_path.path().to_str().unwrap(),
                         pos.line,
@@ -62,7 +71,7 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                     ),
                     _ => format!("{}", file_path.path().display()),
                 };
-                let mut msg = format!("Parse Failure {}\n\t{}", e, loc);
+                let mut msg = format!("Parse Failure {}\n\t\"{}\"", e, loc);
                 let white_list = match ::std::process::Command::new(ESPARSE)
                     .arg(file_path.path())
                     .output()

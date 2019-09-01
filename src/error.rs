@@ -1,16 +1,25 @@
-use ress::Position;
+use ress::{tokens::Keyword, Position};
 use std::fmt::{Display, Formatter, Result};
 #[derive(Debug)]
 pub enum Error {
-    UnexpectedToken(Position, String),
     UnexpectedEoF,
     ParseAfterEoF,
+    UnexpectedToken(Position, String),
     UnableToReinterpret(Position, String, String),
     Redecl(Position, String),
     OperationError(Position, String),
     InvalidGetterParams(Position),
     InvalidSetterParams(Position),
     NonStrictFeatureInStrictContext(Position, String),
+    InvalidImportError(Position),
+    InvalidExportError(Position),
+    InvalidUseOfContextualKeyword(Position, String),
+    TryWithNoCatchOrFinally(Position),
+    InvalidCatchArg(Position),
+    ThrowWithNoArg(Position),
+    UnknownOptionalLabel(Position, Keyword, String),
+    InvalidOptionalLabel(Position),
+    UseOfModuleFeatureOutsideOfModule(Position, String),
     Other(Box<dyn ::std::error::Error>),
 }
 
@@ -26,6 +35,15 @@ impl Display for Error {
             Error::InvalidGetterParams(ref pos) => write!(f, "Found a getter method that takes arguments at {}, getter methods cannot take arguments", pos),
             Error::InvalidSetterParams(ref pos) => write!(f, "Found a setter method that takes more or less than 1 argument at {}, setter methods must take only one argument", pos),
             Error::NonStrictFeatureInStrictContext(ref pos, ref name) => write!(f, "Attempting to use non-strict feature {} in a strict context at {}", name, pos),
+            Error::InvalidImportError(ref pos) => write!(f, "Inavlid use of es6 import syntax at {}", pos),
+            Error::InvalidExportError(ref pos) => write!(f, "Inavlid use of es6 export syntax at {}", pos),
+            Error::InvalidUseOfContextualKeyword(ref pos, ref ident) => write!(f, "Inavlid use of contextual keyword {} at {}", pos, ident),
+            Error::TryWithNoCatchOrFinally(ref pos) => write!(f, "Try catch block must have catch or finally clause at {}", pos),
+            Error::InvalidCatchArg(ref pos) => write!(f, "Catch block with parentheses must have 1 argument: {}", pos),
+            Error::ThrowWithNoArg(ref pos) => write!(f, "Throw statements without an argument {}", pos),
+            Error::UnknownOptionalLabel(ref pos, ref key, ref label) => write!(f, "Attempt to {0} {1} but {1} is unknown in this scope at {2}", key.to_string(), label, pos),
+            Error::InvalidOptionalLabel(ref pos) => write!(f, "Attempt to break with no label is not allowed unless in an iteration or switch: {}", pos),
+            Error::UseOfModuleFeatureOutsideOfModule(ref pos, ref feature) => write!(f, "Used {} at {} which is only available inside of an es6 module", feature, pos),
             Error::Other(ref e) => write!(f, "{}", e),
         }
     }
@@ -42,3 +60,4 @@ impl From<::std::io::Error> for Error {
         Error::Other(Box::new(other))
     }
 }
+impl ::std::error::Error for Error {}

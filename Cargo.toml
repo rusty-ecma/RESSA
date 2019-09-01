@@ -32,8 +32,9 @@ walkdir = "2"
 serde_derive = "1"
 serde = "1"
 lazy_static = "1"
-criterion = "0.2"
+criterion = "0.3"
 env_logger = "0.6"
+term = "0.6"
 
 [[bench]]
 name = "major_libs"

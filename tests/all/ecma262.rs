@@ -3,7 +3,7 @@ use super::{get_js_file, EverythingVersion, Lib};
 use env_logger;
 
 use crate::es_tokens;
-use ressa::{Builder, Parser};
+use ressa::Parser;
 #[test]
 fn es5() {
     let _ = env_logger::try_init();
@@ -66,8 +66,7 @@ fn es2015_module() {
     let _ = env_logger::try_init();
     let path = Lib::Everything(EverythingVersion::Es2015Module).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
-    let mut b = Builder::new();
-    let mut p = b
+    let mut p = Parser::builder()
         .module(true)
         .js(&js)
         .build()
@@ -105,8 +104,7 @@ fn es2015_module() {
         "export default (0, 1);",
     ];
     for export in js_list {
-        let mut b = Builder::new();
-        let p = b
+        let p = Parser::builder()
             .module(true)
             .js(export)
             .build()

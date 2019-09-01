@@ -39,6 +39,7 @@ function dd(infile, outfile, bytesize) {
                 process.exit();
             }
         });
+        // TODO: Add color formatting
         dd.stderr.on('data', function(data) {
             console.log('dd.stderr.on("data", ' + data);
             if (typeof data != 'string') data = data.toString('utf8');
@@ -86,7 +87,7 @@ if (process.argv[4]) {
 
 dd(ifile, ofile, bs);
 
-
+//FIXME nothing used after this
 var gen = function*() {
     yield 'one';
     yield 'two';

@@ -12,12 +12,14 @@ extern crate tar;
 #[macro_use]
 extern crate lazy_static;
 
+mod comment_handler;
 mod ecma262;
 mod es_tokens;
 mod major_libs;
 mod snippets;
 #[cfg(feature = "moz_central")]
 mod spider_monkey;
+
 use std::{fs::read_to_string, io::Error};
 
 #[derive(Clone, Copy, Debug)]

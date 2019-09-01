@@ -179,7 +179,7 @@ impl<'b> Builder<'b> {
     /// Enable or disable error tolerance with a builder
     /// pattern
     /// default: `false`
-    pub fn tolerant(&mut self, value: bool) -> &mut Self {
+    pub fn tolerant(mut self, value: bool) -> Self {
         self.set_tolerant(value);
         self
     }
@@ -191,7 +191,7 @@ impl<'b> Builder<'b> {
     /// Set the parsing context to module or script
     /// with a builder pattern
     /// default: `false` (script)
-    pub fn module(&mut self, value: bool) -> &mut Self {
+    pub fn module(mut self, value: bool) -> Self {
         self.set_module(value);
         self
     }
@@ -202,17 +202,29 @@ impl<'b> Builder<'b> {
     }
     /// Set the js text that this parser would operate
     /// on with a builder pattern
-    pub fn js(&mut self, js: &'b str) -> &mut Self {
+    pub fn js(mut self, js: &'b str) -> Self {
         self.set_js(js);
         self
     }
     /// Complete the builder pattern returning
     /// `Result<Parser, Error>`
-    pub fn build(&self) -> Res<Parser<DefaultCommentHandler>> {
+    pub fn build(self) -> Res<Parser<'b, DefaultCommentHandler>> {
         let is_module = self.is_module;
         let tolerant = self.tolerant;
         let scanner = Scanner::new(self.js);
         Parser::build(tolerant, is_module, scanner, DefaultCommentHandler, self.js)
+    }
+}
+
+impl<'b> Builder<'b> {
+    pub fn with_comment_handler<CH>(self, handler: CH) -> Res<Parser<'b, CH>>
+    where
+        CH: CommentHandler<'b>,
+    {
+        let is_module = self.is_module;
+        let tolerant = self.tolerant;
+        let scanner = Scanner::new(self.js);
+        Parser::build(tolerant, is_module, scanner, handler, self.js)
     }
 }
 
@@ -226,10 +238,7 @@ impl<'b> Builder<'b> {
 /// `ProgramPart` collection will be the inner data. Since modern
 /// js allows for both `Module`s as well as `Script`s, these will be
 /// the two `enum` variants.
-pub struct Parser<'a, CH>
-where
-    CH: CommentHandler<'a> + Sized,
-{
+pub struct Parser<'a, CH> {
     /// The current parsing context
     context: Context<'a>,
     /// The configuration provided by the user
@@ -257,7 +266,7 @@ where
     /// unless you are using the `debug_look_ahead` feature
     _look_ahead: String,
 
-    comment_handler: CH,
+    pub comment_handler: CH,
     original: &'a str,
 }
 /// The start/end index of a line
@@ -281,6 +290,12 @@ impl<'a> Parser<'a, DefaultCommentHandler> {
         let config = Config::default();
         let context = Context::default();
         Self::_new(s, config, context, DefaultCommentHandler, text)
+    }
+}
+
+impl<'a> Parser<'a, ()> {
+    pub fn builder() -> Builder<'a> {
+        Builder::new()
     }
 }
 
@@ -398,12 +413,12 @@ where
                     return self.unexpected_token_error(&orig, "use strict in an invalid location");
                 }
                 self.consume_semicolon()?;
-                return Ok(ProgramPart::Dir(Dir {
+                Ok(ProgramPart::Dir(Dir {
                     dir: s.clone_inner(),
                     expr: Lit::String(s),
-                }));
+                }))
             } else {
-                return Ok(ProgramPart::Stmt(Stmt::Expr(Expr::Lit(lit))));
+                Ok(ProgramPart::Stmt(Stmt::Expr(Expr::Lit(lit))))
             }
         } else {
             let stmt = ProgramPart::Stmt(Stmt::Expr(expr));
@@ -432,7 +447,10 @@ where
                         Ok(ProgramPart::Stmt(stmt))
                     } else {
                         if !self.context.is_module {
-                            //Error
+                            return Err(Error::UseOfModuleFeatureOutsideOfModule(
+                                self.current_position,
+                                "es6 import syntax".to_string(),
+                            ));
                         }
                         let import = self.parse_import_decl()?;
                         let decl = Decl::Import(Box::new(import));
@@ -494,7 +512,7 @@ where
     #[inline]
     fn parse_import_decl(&mut self) -> Res<ModImport<'b>> {
         if self.context.in_function_body {
-            //error
+            return Err(Error::InvalidImportError(self.current_position));
         }
         self.expect_keyword(Keyword::Import)?;
         // if the next toke is a string we are at an import
@@ -617,7 +635,7 @@ where
     #[inline]
     fn parse_export_decl(&mut self) -> Res<ModExport<'b>> {
         if self.context.in_function_body {
-            //error
+            return Err(Error::InvalidExportError(self.current_position));
         }
         self.expect_keyword(Keyword::Export)?;
         if self.at_keyword(Keyword::Default) {
@@ -639,7 +657,10 @@ where
                 }
             } else {
                 if self.at_contextual_keyword("from") {
-                    //error
+                    return Err(Error::InvalidUseOfContextualKeyword(
+                        self.current_position,
+                        "from".to_string(),
+                    ));
                 }
                 if self.at_punct(Punct::OpenBrace) {
                     let expr = self.parse_obj_init()?;
@@ -656,7 +677,10 @@ where
         } else if self.at_punct(Punct::Asterisk) {
             let _ = self.next_item()?;
             if !self.at_contextual_keyword("from") {
-                //error
+                return Err(Error::InvalidUseOfContextualKeyword(
+                    self.current_position,
+                    "from".to_string(),
+                ));
             }
             let _ = self.next_item()?;
             let source = self.parse_module_specifier()?;
@@ -860,6 +884,7 @@ where
         } else {
             self.expect_punct(Punct::CloseParen)?;
             let prev_iter = self.context.in_iteration;
+            self.context.in_iteration = true;
             let body = self.parse_statement()?;
             self.context.in_iteration = prev_iter;
             body
@@ -895,7 +920,16 @@ where
     fn parse_var_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
         let (_, patt) = self.parse_pattern(Some(VarKind::Var), &mut vec![])?;
         if self.context.strict && Self::is_restricted(&patt) {
-            //error
+            let patt = match patt {
+                Pat::Ident(ident) => ident.name,
+                _ => unreachable!(
+                    "restricted patterns should only be reachable by identifer patterns"
+                ),
+            };
+            return Err(Error::NonStrictFeatureInStrictContext(
+                self.current_position,
+                format!("{} as an identifier", patt),
+            ));
         }
         let init = if self.at_punct(Punct::Equal) {
             let _ = self.next_item()?;
@@ -927,7 +961,7 @@ where
             None
         };
         if handler.is_none() && finalizer.is_none() {
-            //error: one or the other must be declared
+            return Err(Error::TryWithNoCatchOrFinally(self.current_position));
         }
         Ok(TryStmt {
             block,
@@ -943,10 +977,13 @@ where
         let param = if self.at_punct(Punct::OpenParen) {
             self.expect_punct(Punct::OpenParen)?;
             if self.at_punct(Punct::CloseParen) {
-                //error variable named required
+                return Err(Error::InvalidCatchArg(self.current_position));
             }
             let mut params = vec![];
             let (_, param) = self.parse_pattern(None, &mut params)?;
+            if !self.at_punct(Punct::CloseParen) {
+                return Err(Error::InvalidCatchArg(self.current_position));
+            }
             self.expect_punct(Punct::CloseParen)?;
             Some(param)
         } else {
@@ -967,8 +1004,8 @@ where
     fn parse_throw_stmt(&mut self) -> Res<Expr<'b>> {
         debug!("{}: parse_throw_stmt", self.look_ahead.span.start);
         self.expect_keyword(Keyword::Throw)?;
-        if self.context.has_line_term {
-            //error: no new line allowed after throw
+        if self.context.has_line_term || self.at_punct(Punct::SemiColon) {
+            return Err(Error::ThrowWithNoArg(self.current_position));
         }
         let arg = self.parse_expression()?;
         self.consume_semicolon()?;
@@ -1379,15 +1416,23 @@ where
         let ret = if self.look_ahead.token.is_ident() && !self.context.has_line_term {
             let id = self.parse_var_ident(false)?;
             if !self.context.label_set.contains(&*id.name) {
-                //error: unknown label
+                return Err(Error::UnknownOptionalLabel(
+                    self.current_position,
+                    k,
+                    id.name.to_string(),
+                ));
             }
             Some(id)
         } else {
             None
         };
         self.consume_semicolon()?;
-        if ret.is_some() && !self.context.in_iteration && !self.context.in_switch {
-            //error: invalid break
+        if ret.is_none()
+            && k == Keyword::Break
+            && !self.context.in_iteration
+            && !self.context.in_switch
+        {
+            return Err(Error::InvalidOptionalLabel(self.current_position));
         }
         Ok(ret)
     }
@@ -1487,12 +1532,17 @@ where
                 break;
             }
             let part = self.parse_statement_list_item()?;
-            // if part.is_export() {
-            //     //error
-            // }
-            // if part.is_import() {
-            //     //error
-            // }
+            if let ProgramPart::Decl(ref decl) = part {
+                match decl {
+                    Decl::Export(_) => {
+                        return Err(Error::InvalidExportError(self.current_position))
+                    }
+                    Decl::Import(_) => {
+                        return Err(Error::InvalidImportError(self.current_position))
+                    }
+                    _ => (),
+                }
+            };
             ret.push(part);
         }
         self.expect_punct(Punct::CloseBrace)?;
@@ -2239,7 +2289,8 @@ where
     fn parse_primary_expression(&mut self) -> Res<Expr<'b>> {
         debug!("{}: parse_primary_expression", self.look_ahead.span.start);
         if self.look_ahead.token.is_ident() {
-            if ((self.context.is_module || self.context.allow_await) && self.at_keyword(Keyword::Await))
+            if ((self.context.is_module || self.context.allow_await)
+                && self.at_keyword(Keyword::Await))
                 && !self.config.tolerant
             {
                 return self.unexpected_token_error(
@@ -3356,11 +3407,11 @@ where
     fn is_await(arg: &FuncArg) -> bool {
         match arg {
             FuncArg::Expr(ref e) => match e {
-                Expr::Ident(ref i) => &i.name == &"await",
+                Expr::Ident(ref i) => i.name == "await",
                 _ => false,
             },
             FuncArg::Pat(ref p) => match p {
-                Pat::Ident(ref i) => &i.name == &"await",
+                Pat::Ident(ref i) => i.name == "await",
                 _ => false,
             },
         }
@@ -3891,7 +3942,10 @@ where
     #[inline]
     fn parse_left_hand_side_expr(&mut self) -> Res<Expr<'b>> {
         if !self.context.allow_in {
-            // error
+            return Err(Error::InvalidUseOfContextualKeyword(
+                self.current_position,
+                "in".to_string(),
+            ));
         }
         let mut expr = if self.at_keyword(Keyword::Super) && self.context.in_function_body {
             self.parse_super()?
@@ -4296,6 +4350,7 @@ where
                     self.comment_handler.handle_comment(look_ahead);
                     continue;
                 }
+                self.current_position = self.look_ahead_position;
                 let ret = replace(&mut self.look_ahead, look_ahead);
                 return Ok(ret);
             } else {
