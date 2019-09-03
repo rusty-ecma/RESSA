@@ -24,6 +24,8 @@ default = []
 major_libs = []
 debug_look_ahead = []
 moz_central = ["reqwest", "flate2", "tar", "walkdir"]
+serialization = ["resast/serialization"]
+esprima = ["resast/esprima"]
 
 [dev-dependencies]
 term-painter = "0.2.4"
@@ -35,6 +37,7 @@ lazy_static = "1"
 criterion = "0.3"
 env_logger = "0.6"
 term = "0.6"
+serde_json = "1"
 
 [[bench]]
 name = "major_libs"
