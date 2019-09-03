@@ -2,13 +2,10 @@
 extern crate serde_derive;
 use docopt::Docopt;
 use std::{
-    path::PathBuf,
     error::Error,
     ffi::OsStr,
-    fs::{
-        read_to_string,
-        write,
-    },
+    fs::{read_to_string, write},
+    path::PathBuf,
 };
 
 use ressa::Parser;
@@ -58,13 +55,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     Ok(())
 }
-
+#[cfg(feature = "esprima")]
 fn gen_json(from: PathBuf, pretty: bool) -> Result<String, Box<dyn Error>> {
     let js = read_to_string(&from)?;
     let mut p = Parser::builder()
-                .js(&js)
-                .module(from.extension() == Some(&OsStr::new(".mjs")))
-                .build()?;
+        .js(&js)
+        .module(from.extension() == Some(&OsStr::new(".mjs")))
+        .build()?;
     let ast = p.parse()?;
     let ret = if pretty {
         serde_json::to_string_pretty(&ast)?
