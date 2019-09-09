@@ -21,7 +21,7 @@
 //!         Decl::Func(
 //!             Func {
 //!                 id: Some(Ident::from("helloWorld")),
-//!                 params: vec![],
+//!                 params: Vec::new(),
 //!                 body: FuncBody(
 //!                     vec![
 //!                         ProgramPart::Stmt(
@@ -338,8 +338,8 @@ where
             found_eof: false,
             config,
             context,
-            _tokens: vec![],
-            _comments: vec![],
+            _tokens: Vec::new(),
+            _comments: Vec::new(),
             current_position: Position { line: 1, column: 0 },
             look_ahead_position: Position { line: 1, column: 0 },
             _look_ahead: String::new(),
@@ -364,7 +364,7 @@ where
     ///     };
     ///     let expectation = Program::Script(vec![ProgramPart::Decl(Decl::Func(Func {
     ///         id: Some(Ident::from("helloWorld")),
-    ///         params: vec![],
+    ///         params: Vec::new(),
     ///         body: FuncBody(vec![ProgramPart::Stmt(Stmt::Expr(Expr::Call(call)))]),
     ///         generator: false,
     ///         is_async: false,
@@ -375,7 +375,7 @@ where
     /// ```
     pub fn parse(&mut self) -> Res<Program> {
         debug!("{}: parse_script", self.look_ahead.span.start);
-        let mut body = vec![];
+        let mut body = Vec::new();
         while let Some(part) = self.next() {
             match part {
                 Ok(part) => body.push(part),
@@ -392,7 +392,7 @@ where
     #[inline]
     fn parse_directive_prologues(&mut self) -> Res<Vec<ProgramPart<'b>>> {
         debug!("{}: parse_directive_prologues", self.look_ahead.span.start);
-        let mut ret = vec![];
+        let mut ret = Vec::new();
         loop {
             if !self.look_ahead.token.is_string() {
                 break;
@@ -521,7 +521,7 @@ where
             let source = self.parse_module_specifier()?;
             self.consume_semicolon()?;
             Ok(ModImport {
-                specifiers: vec![],
+                specifiers: Vec::new(),
                 source,
             })
         } else {
@@ -577,7 +577,7 @@ where
     #[inline]
     fn parse_named_imports(&mut self) -> Res<Vec<ImportSpecifier<'b>>> {
         self.expect_punct(Punct::OpenBrace)?;
-        let mut ret = vec![];
+        let mut ret = Vec::new();
         while !self.at_punct(Punct::CloseBrace) {
             ret.push(self.parse_import_specifier()?);
             if !self.at_punct(Punct::CloseBrace) {
@@ -723,7 +723,7 @@ where
             Ok(ModExport::Named(decl))
         } else {
             self.expect_punct(Punct::OpenBrace)?;
-            let mut specifiers = vec![];
+            let mut specifiers = Vec::new();
             let mut found_default = false;
             while !self.at_punct(Punct::CloseBrace) {
                 if self.at_keyword(Keyword::Default) {
@@ -918,7 +918,7 @@ where
 
     #[inline]
     fn parse_var_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
-        let (_, patt) = self.parse_pattern(Some(VarKind::Var), &mut vec![])?;
+        let (_, patt) = self.parse_pattern(Some(VarKind::Var), &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&patt) {
             let patt = match patt {
                 Pat::Ident(ident) => ident.name,
@@ -979,7 +979,7 @@ where
             if self.at_punct(Punct::CloseParen) {
                 return Err(Error::InvalidCatchArg(self.current_position));
             }
-            let mut params = vec![];
+            let mut params = Vec::new();
             let (_, param) = self.parse_pattern(None, &mut params)?;
             if !self.at_punct(Punct::CloseParen) {
                 return Err(Error::InvalidCatchArg(self.current_position));
@@ -1024,7 +1024,7 @@ where
         let prev_sw = self.context.in_switch;
         self.context.in_switch = true;
         let mut found_default = false;
-        let mut cases = vec![];
+        let mut cases = Vec::new();
         loop {
             if self.at_punct(Punct::CloseBrace) {
                 break;
@@ -1057,7 +1057,7 @@ where
             Some(self.parse_expression()?)
         };
         self.expect_punct(Punct::Colon)?;
-        let mut consequent = vec![];
+        let mut consequent = Vec::new();
         loop {
             if self.at_punct(Punct::CloseBrace)
                 || self.at_keyword(Keyword::Default)
@@ -1526,7 +1526,7 @@ where
     fn parse_block(&mut self) -> Res<BlockStmt<'b>> {
         debug!("{}: parse_block", self.look_ahead.span.start);
         self.expect_punct(Punct::OpenBrace)?;
-        let mut ret = vec![];
+        let mut ret = Vec::new();
         loop {
             if self.at_punct(Punct::CloseBrace) {
                 break;
@@ -1591,7 +1591,7 @@ where
     #[inline]
     fn parse_variable_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
         let start = self.look_ahead.clone();
-        let (_, id) = self.parse_pattern(Some(VarKind::Var), &mut vec![])?;
+        let (_, id) = self.parse_pattern(Some(VarKind::Var), &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&id) && !self.config.tolerant {
             return self.unexpected_token_error(&start, "restricted word");
         }
@@ -1622,7 +1622,7 @@ where
     fn parse_lexical_binding(&mut self, kind: VarKind, in_for: bool) -> Res<VarDecl<'b>> {
         debug!("{}: parse_lexical_binding", self.look_ahead.span.start);
         let start = self.look_ahead.clone();
-        let (_, id) = self.parse_pattern(Some(kind), &mut vec![])?;
+        let (_, id) = self.parse_pattern(Some(kind), &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&id) && !self.config.tolerant {
             return self.unexpected_token_error(&start, "restricted word");
         }
@@ -1800,7 +1800,7 @@ where
     #[inline]
     fn parse_class_body(&mut self) -> Res<ClassBody<'b>> {
         debug!("{}: parse_class_body", self.look_ahead.span.start);
-        let mut ret = vec![];
+        let mut ret = Vec::new();
         let mut has_ctor = false;
         self.expect_punct(Punct::OpenBrace)?;
         while !self.at_punct(Punct::CloseBrace) {
@@ -2437,9 +2437,9 @@ where
             if !self.at_punct(Punct::EqualGreaterThan) {
                 self.expect_punct(Punct::EqualGreaterThan)?;
             }
-            Ok(Expr::ArrowParamPlaceHolder(vec![], false))
+            Ok(Expr::ArrowParamPlaceHolder(Vec::new(), false))
         } else {
-            let mut params = vec![];
+            let mut params = Vec::new();
             if self.at_punct(Punct::Ellipsis) {
                 let (_, expr) = self.parse_rest_element(&mut params)?;
                 let arg = FuncArg::Pat(expr);
@@ -2519,7 +2519,7 @@ where
     fn parse_array_init(&mut self) -> Res<Expr<'b>> {
         debug!("{}: parse_array_init", self.look_ahead.span.start);
         self.expect_punct(Punct::OpenBracket)?;
-        let mut elements = vec![];
+        let mut elements = Vec::new();
         while !self.at_punct(Punct::CloseBracket) {
             if self.at_punct(Punct::Comma) {
                 self.next_item()?;
@@ -2548,7 +2548,7 @@ where
     fn parse_obj_init(&mut self) -> Res<Expr<'b>> {
         debug!("{}: parse_obj_init", self.look_ahead.span.start);
         self.expect_punct(Punct::OpenBrace)?;
-        let mut props = vec![];
+        let mut props = Vec::new();
         let mut has_proto = false;
         while !self.at_punct(Punct::CloseBrace) {
             let prop = if self.at_punct(Punct::Ellipsis) {
@@ -2755,8 +2755,8 @@ where
             return self
                 .expected_token_error(&self.look_ahead, &["template head", "template no sub"]);
         }
-        let mut expressions = vec![];
-        let mut quasis = vec![];
+        let mut expressions = Vec::new();
+        let mut quasis = Vec::new();
         let quasi = self.parse_template_element()?;
         let mut breaking = quasi.tail;
         quasis.push(quasi);
@@ -2906,7 +2906,7 @@ where
     fn parse_formal_params(&mut self) -> Res<FormalParams<'b>> {
         debug!("{}: parse_formal_params", self.look_ahead.span.start);
         self.expect_punct(Punct::OpenParen)?;
-        let mut args = vec![];
+        let mut args = Vec::new();
         let mut simple: bool = true;
         let mut found_restricted = false;
         if !self.at_punct(Punct::CloseParen) {
@@ -3045,7 +3045,7 @@ where
     ) -> Res<(bool, Pat<'b>)> {
         debug!("{}: parse_array_pattern", self.look_ahead.span.start);
         self.expect_punct(Punct::OpenBracket)?;
-        let mut elements = vec![];
+        let mut elements = Vec::new();
         while !self.at_punct(Punct::CloseBracket) {
             if self.at_punct(Punct::Comma) {
                 let _ = self.next_item()?;
@@ -3072,7 +3072,7 @@ where
     fn parse_object_pattern(&mut self) -> Res<(bool, Pat<'b>)> {
         debug!("{}: parse_object_pattern", self.look_ahead.span.start);
         self.expect_punct(Punct::OpenBrace)?;
-        let mut body = vec![];
+        let mut body = Vec::new();
         while !self.at_punct(Punct::CloseBrace) {
             let el = if self.at_punct(Punct::Ellipsis) {
                 self.parse_rest_prop()?
@@ -3092,7 +3092,7 @@ where
     fn parse_rest_prop(&mut self) -> Res<ObjPatPart<'b>> {
         debug!("{}: parse_rest_prop", self.look_ahead.span.start);
         self.expect_punct(Punct::Ellipsis)?;
-        let (_, arg) = self.parse_pattern(None, &mut vec![])?;
+        let (_, arg) = self.parse_pattern(None, &mut Vec::new())?;
         if self.at_punct(Punct::Equal) {
             //unexpected token
         }
@@ -3127,7 +3127,7 @@ where
                 PropValue::None
             } else {
                 self.expect_punct(Punct::Colon)?;
-                let (_, p) = self.parse_pattern_with_default(&mut vec![])?;
+                let (_, p) = self.parse_pattern_with_default(&mut Vec::new())?;
                 PropValue::Pat(p)
             };
             (key, value)
@@ -3135,7 +3135,7 @@ where
             computed = self.at_punct(Punct::OpenBracket);
             let key = self.parse_object_property_key()?;
             self.expect_punct(Punct::Colon)?;
-            let (_, v) = self.parse_pattern_with_default(&mut vec![])?;
+            let (_, v) = self.parse_pattern_with_default(&mut Vec::new())?;
             let value = PropValue::Pat(v);
             (key, value)
         };
@@ -3468,7 +3468,7 @@ where
                 self.reinterpret_expr_as_pat(*s)?,
             ))),
             Expr::Obj(o) => {
-                let mut patts = vec![];
+                let mut patts = Vec::new();
                 for expr in o {
                     match expr {
                         ObjProp::Prop(p) => {
@@ -4105,7 +4105,7 @@ where
     fn parse_async_args(&mut self) -> Res<Vec<Expr<'b>>> {
         debug!("{}: parse_async_args", self.look_ahead.span.start);
         self.expect_punct(Punct::OpenParen)?;
-        let mut ret = vec![];
+        let mut ret = Vec::new();
         if !self.at_punct(Punct::CloseParen) {
             loop {
                 let arg = if self.at_punct(Punct::Ellipsis) {
@@ -4162,7 +4162,7 @@ where
     fn parse_args(&mut self) -> Res<Vec<Expr<'b>>> {
         debug!("{}: parse_args", self.look_ahead.span.start);
         self.expect_punct(Punct::OpenParen)?;
-        let mut args = vec![];
+        let mut args = Vec::new();
         if !self.at_punct(Punct::CloseParen) {
             loop {
                 let expr = if self.at_punct(Punct::Ellipsis) {
@@ -4213,7 +4213,7 @@ where
             let args = if self.at_punct(Punct::OpenParen) {
                 self.parse_args()?
             } else {
-                vec![]
+                Vec::new()
             };
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
