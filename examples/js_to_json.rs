@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     Ok(())
 }
-
+#[cfg(feature = "serialization")]
 fn gen_json(from: PathBuf, pretty: bool) -> Result<String, Box<dyn Error>> {
     let js = read_to_string(&from)?;
     let mut p = Parser::builder()

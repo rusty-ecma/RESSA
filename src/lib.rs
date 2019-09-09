@@ -67,7 +67,7 @@ mod comment_handler;
 mod error;
 
 pub use crate::comment_handler::CommentHandler;
-use crate::comment_handler::DefaultCommentHandler;
+pub use crate::comment_handler::DefaultCommentHandler;
 pub use crate::error::Error;
 use resast::prelude::*;
 use resast::ClassBody;

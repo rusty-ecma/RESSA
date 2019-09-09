@@ -19,13 +19,15 @@ reqwest = { version = "0.9", optional = true}
 flate2 = { version = "1", optional = true}
 tar = { version = "0.4", optional = true}
 walkdir = { version = "2", optional = true }
+
 [features]
 default = []
 major_libs = []
 debug_look_ahead = []
-moz_central = ["reqwest", "flate2", "tar", "walkdir"]
 serialization = ["resast/serialization"]
 esprima = ["resast/esprima"]
+moz_central = ["reqwest", "flate2", "tar", "walkdir"]
+test_262 = ["reqwest", "flate2", "tar", "walkdir"]
 
 [dev-dependencies]
 term-painter = "0.2.4"
@@ -38,7 +40,17 @@ criterion = "0.3"
 env_logger = "0.6"
 term = "0.6"
 serde_json = "1"
+serde_yaml = "0"
 
 [[bench]]
 name = "major_libs"
 harness = false
+
+[[example]]
+name = "js-to-json"
+path = "examples/js_to_json.rs"
+required-features = ["serialization"]
+[[example]]
+name = "js-to-json-esprima"
+path = "examples/js_to_json-esprima.rs"
+required-features = ["esprima"]
