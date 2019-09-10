@@ -1,6 +1,7 @@
 #![cfg(feature = "test_262")]
-#[macro_use]
-extern crate serde_derive;
+use serde::{
+    Deserialize, 
+};
 
 use ress::prelude::*;
 use ressa::Parser;
@@ -11,8 +12,6 @@ use std::{
 use flate2::read::GzDecoder;
 
 
-type Tok<'a> = Token<&'a str>;
-type It<'a> = Item<Tok<'a>>;
 type Res<T> = Result<T, Box<dyn Error>>;
 
 struct Test262Runner<'a> {
@@ -56,24 +55,20 @@ impl<'a> Test262Runner<'a> {
     }
 
     pub fn run_strict(&self) -> Res<()> {
-        if let Some(flags) = &self.desc.flags {
-            if !flags.iter().any(|f| f == &Flag::Module || f == &Flag::NoStrict) {
-                self.run_script(&format!("'use strict'\n{}", self.js))?;
-            } 
+        if !self.desc.flags.iter().any(|f| f == &Flag::Module || f == &Flag::NoStrict) {
+            self.run_script(&format!("'use strict'\n{}", self.js))?;
         } 
         Ok(())
     }
 
     pub fn run(&self) -> Res<()> {
-        if let Some(flags) = &self.desc.flags {
-            if !flags.iter().any(|f| f == &Flag::OnlyStrict) {
-                if flags.iter().any(|f| f == &Flag::Module) {
-                    self.run_mod(&self.js)?;
-                } else {
-                    self.run_script(&self.js)?;
-                }
-            } 
-        }
+        if !self.desc.flags.iter().any(|f| f == &Flag::OnlyStrict) {
+            if self.desc.flags.iter().any(|f| f == &Flag::Module) {
+                self.run_mod(&self.js)?;
+            } else {
+                self.run_script(&self.js)?;
+            }
+        } 
         Ok(())
     }
 
@@ -114,19 +109,23 @@ impl<'a> Test262Runner<'a> {
 #[derive(Debug, Deserialize)]
 struct Description {
     negative: Option<Negative>,
+    #[serde(default)]
     includes: Vec<String>,
-    flags: Option<Vec<Flag>>,
-    locale: Option<String>,
+    #[serde(default)]
+    flags: Vec<Flag>,
+    #[serde(default)]
+    locale: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct Negative {
     phase: Phase,
-    kind: String,
+    #[serde(alias = "type")]
+    kind: Option<String>,
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase", untagged)]
+#[derive(Debug, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
 enum Phase {
     Parse,
     Early,
@@ -135,22 +134,17 @@ enum Phase {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
-#[serde(untagged)]
+#[serde(rename_all = "camelCase")]
 enum Flag {
-    #[serde(rename = "camelCase")]
     OnlyStrict,
-    #[serde(rename = "camelCase")]
     NoStrict,
-    #[serde(rename = "camelCase")]
     Module,
-    #[serde(rename = "camelCase")]
     Raw,
-    #[serde(rename = "camelCase")]
     Async,
-    #[serde(rename = "camelCase")]
     Generated,
     CanBlockIsFalse,
     CanBlockIsTrue,
+    Unknown(String)
 }
 
 static URL: &str = "https://github.com/tc39/test262/tarball/master";
@@ -178,7 +172,11 @@ fn walk(path: &Path) -> Res<()> {
                 continue;
             }
             let contents = ::std::fs::read_to_string(&current)?;
-            let handler = Test262Runner::new(&contents)?;
+            let handler = match Test262Runner::new(&contents) {
+                Ok(h) => h,
+                Err(e) => panic!("Error creating runner for {}\n\t{}",  current.display(), e),
+            };
+            eprintln!("{}\n{:?}", current.display(), handler.desc);
             if let Err(e) = handler.run() {
                 panic!("Error in non-strict for {}\n\t{}", current.display(), e);
             }
@@ -211,10 +209,8 @@ fn get_repo(path: &Path) -> Res<()> {
         let stripped = if let Some(ref target) = target {
             if p.starts_with(target) {
                 if let Ok(p2) = p.strip_prefix(target) {
-                    eprintln!("stripped {}", p.display());
                     Some(p2.clone())
                 } else {
-                    eprintln!("failed to strip {}", p.display());
                     None
                 }
             } else {
@@ -228,4 +224,21 @@ fn get_repo(path: &Path) -> Res<()> {
         }
     }
     Ok(())
+}
+
+#[test]
+fn yam() {
+    let yaml = "es6id: B.3.3.2
+flags: [onlyStrict]
+info: |
+    B.3.3.2 Changes to GlobalDeclarationInstantiation
+
+    1. 1. Let strict be IsStrict of script
+    2. If strict is *false*, then
+       [...]";
+    let res: serde_yaml::Mapping = serde_yaml::from_str(yaml).expect("failed to parse yaml");
+    eprintln!("{:?}", res);
+    let yaml2 = "[onlyStrict]";
+    let res2: Vec<Flag> = serde_yaml::from_str(yaml2).expect("failed to parse yaml2");
+    eprintln!("{:?}", res2);
 }

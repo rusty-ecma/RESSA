@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate serde_derive;
+use serde::{Serialize, Deserialize};
 use docopt::Docopt;
 use std::{
     error::Error,

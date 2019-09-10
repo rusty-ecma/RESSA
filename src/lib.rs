@@ -637,6 +637,9 @@ where
         if self.context.in_function_body {
             return Err(Error::InvalidExportError(self.current_position));
         }
+        if !self.context.is_module {
+            return Err(Error::UseOfModuleFeatureOutsideOfModule(self.current_position, "export syntax".to_string()))
+        }
         self.expect_keyword(Keyword::Export)?;
         if self.at_keyword(Keyword::Default) {
             let _ = self.next_item()?;

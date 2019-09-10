@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate serde_derive;
+
 use docopt::Docopt;
 use std::{
     error::Error,

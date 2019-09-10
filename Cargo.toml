@@ -33,8 +33,7 @@ test_262 = ["reqwest", "flate2", "tar", "walkdir"]
 term-painter = "0.2.4"
 docopt = "1"
 walkdir = "2"
-serde_derive = "1"
-serde = "1"
+serde = { version = "1", features = ["derive"] }
 lazy_static = "1"
 criterion = "0.3"
 env_logger = "0.6"
