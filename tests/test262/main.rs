@@ -174,7 +174,21 @@ enum Flag {
 }
 
 static URL: &str = "https://github.com/tc39/test262/tarball/master";
-
+#[derive(Debug)]
+struct TestFailure {
+    pub path: PathBuf,
+    pub strict: Option<String>,
+    pub not_strict: Option<String>,
+    pub runner: Option<String>,
+    pub desc: Description,
+}
+impl TestFailure {
+    pub fn is_failure(&self) -> bool {
+        self.strict.is_some() 
+            || self.not_strict.is_some()
+            || self.runner.is_some()
+    }
+}
 #[test]
 fn test262() -> Res<()> {
     let path = Path::new("./test262");
@@ -182,8 +196,15 @@ fn test262() -> Res<()> {
         get_repo(path)?;
     }
     let failures = walk(&path)?;
-    for (msg, desc) in &failures {
-        println!("----------\n{},\n{:#?}\n----------", msg, desc)
+    if let Ok(env_var) = ::std::env::var("RESSA_WRITE_FAILURES") {
+        if env_var != "0" {
+            for failure in &failures {
+                let new_path = failure.path.with_extension("ron");
+                if let Some(file_name) = new_path.file_name() {
+                    ::std::fs::write(&format!("failures/{}", file_name), format!("{:#?}", failure));
+                }
+            }
+        }
     }
     let len = failures.len();
     if len > 0 {
@@ -192,7 +213,7 @@ fn test262() -> Res<()> {
     Ok(())
 }
 
-fn walk(path: &Path) -> Res<Vec<(String, Description)>> {
+fn walk(path: &Path) -> Res<Vec<TestFailure>> {
     let wd = walkdir::WalkDir::new(path).into_iter().filter_map(filter_mapper);
     let ct = wd.count();
     let pb = ProgressBar::new(ct as u64);
@@ -208,7 +229,6 @@ fn walk(path: &Path) -> Res<Vec<(String, Description)>> {
     let ret = wd.par_iter()
         .progress_with(pb)
         .filter_map(test_mapper)
-        .flatten()
         .collect();
     Ok(ret)
 }
@@ -236,7 +256,7 @@ fn filter_mapper(e: Result<walkdir::DirEntry, walkdir::Error>) -> Option<PathBuf
 type Pair = (String, Description);
 type PairVec = Vec<Pair>;
 type OptPairVec = Option<PairVec>;
-fn test_mapper(path: &PathBuf) -> OptPairVec {
+fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
     let contents = if let Ok(contents) = ::std::fs::read_to_string(path) {
         contents
     } else {
@@ -245,29 +265,33 @@ fn test_mapper(path: &PathBuf) -> OptPairVec {
     let handler = match Test262Runner::new(&contents) {
         Ok(handler) => handler,
         Err(e) => {
-            return Some(vec![(format!("Unable to create handler for {}\n\t{}", path.display(), e), Description::default())]);
+            return Some(TestFailure {
+                desc: Description::default(),
+                path: path.clone(),
+                strict: None,
+                not_strict: None,
+                runner: Some(format!("{}", e)),
+            });
         },
     };
-    let mut ret = vec![];
+    let mut ret = TestFailure {
+        desc: handler.clone_desc(),
+        path: path.clone(),
+        strict: None,
+        not_strict: None,
+        runner: None,
+    };
     if let Err(e) = handler.run_strict() {
-        ret.push((format!("Strict failure for {}\n{}", path.display(), e), handler.clone_desc()))
+        ret.strict = Some(format!("{}", e));
     }
     if let Err(e) = handler.run() {
-        ret.push((format!("Non-strict failure for {}\n{}", path.display(), e), handler.clone_desc()))
+        ret.not_strict = Some(format!("{}", e));
     }
-    if ret.is_empty() {
-        None
-    } else {
+    if ret.is_failure() {
         Some(ret)
+    } else {
+        None
     }
-}
-
-fn report_mapper(pb: &mut ProgressBar, (ct, result): (usize, OptPairVec)) -> OptPairVec {
-    pb.inc(1);
-    if result.is_some() {
-        pb.println(&format!("Error Count: {}", ct));
-    }
-    result
 }
 
 fn get_repo(path: &Path) -> Res<()> {
