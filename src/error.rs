@@ -20,6 +20,7 @@ pub enum Error {
     UnknownOptionalLabel(Position, Keyword, String),
     InvalidOptionalLabel(Position),
     UseOfModuleFeatureOutsideOfModule(Position, String),
+    Scanner(ress::error::Error),
     Other(Box<dyn ::std::error::Error>),
 }
 
@@ -44,6 +45,7 @@ impl Display for Error {
             Error::UnknownOptionalLabel(ref pos, ref key, ref label) => write!(f, "Attempt to {0} {1} but {1} is unknown in this scope at {2}", key.to_string(), label, pos),
             Error::InvalidOptionalLabel(ref pos) => write!(f, "Attempt to break with no label is not allowed unless in an iteration or switch: {}", pos),
             Error::UseOfModuleFeatureOutsideOfModule(ref pos, ref feature) => write!(f, "Used {} at {} which is only available inside of an es6 module", feature, pos),
+            Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
             Error::Other(ref e) => write!(f, "{}", e),
         }
     }
@@ -61,3 +63,9 @@ impl From<::std::io::Error> for Error {
     }
 }
 impl ::std::error::Error for Error {}
+
+impl From<ress::error::Error> for Error {
+    fn from(other: ress::error::Error) -> Self {
+        Error::Scanner(other)
+    }
+}
