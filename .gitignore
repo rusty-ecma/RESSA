@@ -14,3 +14,4 @@ benchmark.md
 moz-central
 *.out
 *.log
+/test262

@@ -19,6 +19,8 @@ reqwest = { version = "0.9", optional = true}
 flate2 = { version = "1", optional = true}
 tar = { version = "0.4", optional = true}
 walkdir = { version = "2", optional = true }
+indicatif = { version = "0.12", optional = true, features = ["with_rayon"] }
+rayon = { version = "", optional = true }
 
 [features]
 default = []
@@ -27,7 +29,7 @@ debug_look_ahead = []
 serialization = ["resast/serialization"]
 esprima = ["resast/esprima"]
 moz_central = ["reqwest", "flate2", "tar", "walkdir"]
-test_262 = ["reqwest", "flate2", "tar", "walkdir"]
+test_262 = ["reqwest", "flate2", "tar", "walkdir", "indicatif", "rayon"]
 
 [dev-dependencies]
 term-painter = "0.2.4"

@@ -4339,7 +4339,7 @@ where
         loop {
             self.context.has_line_term = self.scanner.pending_new_line;
             if let Some(look_ahead) = self.scanner.next() {
-                let look_ahead = look_ahead.unwrap();
+                let look_ahead = look_ahead?;
                 if cfg!(feature = "debug_look_ahead") {
                     self._look_ahead = format!(
                         "{:?}: {:?}",
