@@ -1,6 +1,7 @@
 #![cfg(feature = "test_262")]
 use serde::{
-    Deserialize, 
+    Deserialize,
+    Serialize,
 };
 
 use ressa::Parser;
@@ -94,42 +95,73 @@ impl<'a> Test262Runner<'a> {
     }
 
     fn run_(&self, module: bool, js: &str)  -> Result<(), E262> {
-        match ::std::panic::catch_unwind::<_, Result<(), E262>>(|| {
-            let mut p = Parser::builder().module(module).js(js).build().map_err(|e| E262::new(&format!("{:?}", e)))?;
-
-            match p.parse() {
-                Ok(_) => {
-                    if let Some(n) = &self.desc.negative {
-                        if &n.phase == &Phase::Parse {
-                            Err(E262::new("Unexpected successful parsing"))
-                        } else {
-                            Ok(())
-                        }
+        let result = ::std::panic::catch_unwind::<_, Result<(), E262>>(|| {
+            let mut p = Parser::builder()
+                            .module(module)
+                            .js(js)
+                            .build()
+                            .map_err(|e| E262::new(&format!("{:?}", e)))?;
+            let first_err = p.find(|r| r.is_err());
+            match first_err {
+                None => if let Some(n) = &self.desc.negative {
+                    if &n.phase == &Phase::Parse {
+                        Err(E262::new("Unexpected successful parsing"))
                     } else {
                         Ok(())
                     }
+                } else {
+                    Ok(())
                 },
-                Err(e) => {
+                Some(Err(e)) => {
                     if let Some(n) = &self.desc.negative {
                         if &n.phase == &Phase::Parse {
-                            return Ok(())
+                            Ok(())
                         } else {
                             Err(E262::new(&format!("{:?}", e)))
                         }
                     } else {
                             Err(E262::new(&format!("{:?}", e)))
                     }
-                }
+                },
+                _ => unreachable!(),
             }
-        }) {
+        });
+        match result {
             Ok(inner) => inner,
             Err(e) => Err(E262::new(&format!("{:?}", e)))
         }
+        //     for i in p {
+        //         match i {
+        //             Ok(_) => {
+        //                 if let Some(n) = &self.desc.negative {
+        //                     if &n.phase == &Phase::Parse {
+        //                         Err(E262::new("Unexpected successful parsing"))
+        //                     } else {
+        //                         Ok(())
+        //                     }
+        //                 } else {
+        //                     Ok(())
+        //                 }
+        //             },
+        //             Err(e) => {
+        //                 if let Some(n) = &self.desc.negative {
+        //                     if &n.phase == &Phase::Parse {
+        //                         return Ok(())
+        //                     } else {
+        //                         Err(E262::new(&format!("{:?}", e)))
+        //                     }
+        //                 } else {
+        //                         Err(E262::new(&format!("{:?}", e)))
+        //                 }
+        //             }
+        //         }
+        //     }) {
+        //     
     }
 }
 
 
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Clone, Default, Serialize)]
 struct Description {
     info: Option<String>,
     description: Option<String>,
@@ -142,14 +174,14 @@ struct Description {
     locale: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 struct Negative {
     phase: Phase,
     #[serde(alias = "type")]
     kind: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Clone, Copy)]
+#[derive(Debug, PartialEq, Deserialize, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum Phase {
     Parse,
@@ -158,7 +190,7 @@ enum Phase {
     Runtime,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Clone, Copy)]
+#[derive(Debug, Deserialize, PartialEq, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum Flag {
     OnlyStrict,
@@ -174,39 +206,132 @@ enum Flag {
 }
 
 static URL: &str = "https://github.com/tc39/test262/tarball/master";
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct TestFailure {
     pub path: PathBuf,
     pub strict: Option<String>,
     pub not_strict: Option<String>,
     pub runner: Option<String>,
     pub desc: Description,
+    pub js: String,
 }
+
 impl TestFailure {
     pub fn is_failure(&self) -> bool {
         self.strict.is_some() 
             || self.not_strict.is_some()
             || self.runner.is_some()
     }
+    pub fn to_markdown(&self) -> String {
+        let flags: Vec<String> = self.desc.flags.iter().map(|f| format!("{:?}", f)).collect();
+        let desc = if let Some(ref inner) = self.desc.description {
+            inner.to_string()
+        } else {
+            "__not provided__".to_string()
+        };
+        let info = if let Some(ref inner) = self.desc.info {
+            inner.to_string()
+        } else {
+            "__not provided__".to_string()
+        };
+        let (ran, runner) = if let Some(ref inner) = self.runner {
+            (false, format!("{}", inner))
+        } else {
+            (true, "passed".to_string())
+        };
+        let (strict, not) = if !ran {
+            ("not run".to_string(), "not run".to_string())
+        } else {
+            let strict = if let Some(ref inner) = self.strict {
+                inner.to_string()
+            } else {
+                "passed".to_string()
+            };
+            let not = if let Some(ref inner) = self.not_strict {
+                inner.to_string()
+            } else {
+                "passed".to_string()
+            };
+            (strict, not)
+        };
+        format!("# {}
+## Description
+{desc}
+
+### flags
+{flags}
+
+### Info
+{info}
+
+## Results
+### runner
+{runner}
+
+### strict
+{strict}
+
+### not_strict
+{not}
+
+```js
+{js}
+```
+", 
+desc=desc, 
+info=info, 
+flags=flags.join(", "),
+runner=runner,
+strict=strict,
+not=not,
+js=self.js
+)
+    }
 }
 #[test]
 fn test262() -> Res<()> {
+    ::std::panic::set_hook(Box::new(|_| {}));
     let path = Path::new("./test262");
     if !path.exists() {
         get_repo(path)?;
     }
     let failures = walk(&path)?;
-    if let Ok(env_var) = ::std::env::var("RESSA_WRITE_FAILURES") {
-        if env_var != "0" {
+    let write_failures = if let Ok(env_var) = ::std::env::var("RESSA_WRITE_FAILURES") {
+        env_var != "0"
+    } else {
+        false
+    };
+    let len = failures.len();
+    if write_failures {
+        eprintln!("getting ready to write failures");
+        let base_path = PathBuf::from("failures");
+        let base_path = base_path.join("test262");
+        let keep_writing = base_path.exists() || if let Ok(_) = ::std::fs::create_dir_all(&base_path) {
+            eprintln!("created directory");
+            true
+        } else {
+            eprintln!("failed to create directory");
+            false
+        };
+        if keep_writing {
+            let pb = ProgressBar::new(len as u64);
+            let sty = ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:40.purple/white} {pos:>7}/{len:7} {msg}")
+                .progress_chars("█▓▒░  ");
+            pb.set_style(sty);
             for failure in &failures {
-                let new_path = failure.path.with_extension("ron");
+                pb.inc(1);
+                let new_path = failure.path.with_extension("md");
                 if let Some(file_name) = new_path.file_name() {
-                    ::std::fs::write(&format!("failures/{}", file_name), format!("{:#?}", failure));
+                    let new_path = base_path.join(file_name);
+                    // we really don't care if this fails
+                    let _ = ::std::fs::write(&new_path, failure.to_markdown());
                 }
             }
+            pb.finish();
         }
     }
-    let len = failures.len();
+    
     if len > 0 {
         panic!("{} failures in test262", len);
     }
@@ -218,7 +343,7 @@ fn walk(path: &Path) -> Res<Vec<TestFailure>> {
     let ct = wd.count();
     let pb = ProgressBar::new(ct as u64);
     let sty = ProgressStyle::default_bar()
-        .template("[{elapsed_precise}] {bar:40.cyan/darkgrey} {pos:>7}/{len:7} {msg}")
+        .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
         .progress_chars("█▓▒░  ");
     pb.set_style(sty);
     
@@ -253,9 +378,6 @@ fn filter_mapper(e: Result<walkdir::DirEntry, walkdir::Error>) -> Option<PathBuf
         }
     }
 }
-type Pair = (String, Description);
-type PairVec = Vec<Pair>;
-type OptPairVec = Option<PairVec>;
 fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
     let contents = if let Ok(contents) = ::std::fs::read_to_string(path) {
         contents
@@ -271,6 +393,7 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
                 strict: None,
                 not_strict: None,
                 runner: Some(format!("{}", e)),
+                js: contents
             });
         },
     };
@@ -280,6 +403,7 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
         strict: None,
         not_strict: None,
         runner: None,
+        js: contents.clone(),
     };
     if let Err(e) = handler.run_strict() {
         ret.strict = Some(format!("{}", e));
@@ -347,4 +471,23 @@ info: |
     let yaml2 = "[onlyStrict]";
     let res2: Vec<Flag> = serde_yaml::from_str(yaml2).expect("failed to parse yaml2");
     eprintln!("{:?}", res2);
+}
+
+#[test]
+fn yeild_in_strict_mode() {
+    let _ = env_logger::try_init();
+    let js = "'use strict'
+var yield = 1;";
+    let mut p = Parser::builder().js(js).build().expect("faile to create parser"); 
+    match p.parse() {
+        Err(e) => println!("{}", e),
+        _ => panic!("Unexpected successful parse of yield as identifier"),
+    }
+    let js = "'use strict'
+var \\u0079ield = 123;";
+    let mut p = Parser::builder().js(js).build().expect("faile to create parser"); 
+    match p.parse() {
+        Err(e) => println!("{}", e),
+        _ => panic!("Unexpected successful parse of escaped yield as identifier"),
+    }
 }
