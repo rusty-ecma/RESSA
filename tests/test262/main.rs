@@ -136,6 +136,10 @@ impl<'a> Test262Runner<'a> {
 
 #[derive(Debug, Deserialize, Clone, Default, Serialize)]
 struct Description {
+    #[serde(alias = "esid")]
+    #[serde(alias = "es5id")]
+    #[serde(alias = "es6id")]
+    id: Option<String>,
     info: Option<String>,
     description: Option<String>,
     negative: Option<Negative>,
@@ -145,6 +149,8 @@ struct Description {
     flags: Vec<Flag>,
     #[serde(default)]
     locale: Vec<String>,
+    #[serde(default)]
+    features: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -197,6 +203,7 @@ impl TestFailure {
     }
     pub fn to_markdown(&self) -> String {
         let flags: Vec<String> = self.desc.flags.iter().map(|f| format!("{:?}", f)).collect();
+        let features: Vec<String> = self.desc.features.iter().map(|f| format!("{:?}", f)).collect();
         let desc = if let Some(ref inner) = self.desc.description {
             inner.to_string()
         } else {
@@ -227,12 +234,20 @@ impl TestFailure {
             };
             (strict, not)
         };
-        format!("# {}
+        let id = if let Some(ref id) = self.desc.id {
+            id.to_string()
+        } else {
+            "Unknown ID".to_string()
+        };
+        format!("# {id}
 ## Description
 {desc}
 
 ### flags
 {flags}
+
+### features
+{features}
 
 ### Info
 {info}
@@ -251,9 +266,11 @@ impl TestFailure {
 {js}
 ```
 ", 
+id=id,
 desc=desc, 
 info=info, 
 flags=flags.join(", "),
+features=features.join(", "),
 runner=runner,
 strict=strict,
 not=not,
@@ -272,7 +289,6 @@ fn test262() -> Res<()> {
     if !path.exists() {
         get_repo(path)?;
     }
-    // let failures = walk(&path)?;
     pb.set_style(sty.clone());
     let (ct, paths) = get_paths(&path);
     pb.set_length(ct as u64);
