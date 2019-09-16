@@ -7,6 +7,7 @@ use ress::prelude::*;
 use ressa::{CommentHandler, Parser, Span};
 use term_painter::{Color, ToStyle};
 use walkdir::WalkDir;
+use serde::{Deserialize};
 
 static USAGE: &str = "
 Future Work

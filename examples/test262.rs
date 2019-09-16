@@ -21,6 +21,10 @@ struct Test262Runner<'a> {
     js: &'a str,
 }
 
+fn main() {
+    test262().expect("failed");
+}
+
 #[derive(Debug, Clone)]
 struct E262(String);
 impl ::std::fmt::Display for E262 {
@@ -261,49 +265,55 @@ js=self.js
 )
     }
 }
-#[test]
+
 fn test262() -> Res<()> {
-    let pb = ProgressBar::new_spinner();
+    let m = indicatif::MultiProgress::new();
+    let pb3 = m.add(ProgressBar::new_spinner());
+    let pb = m.add(ProgressBar::new(0));
+    let pb2 = m.add(ProgressBar::new(0));
     let sty = ProgressStyle::default_bar()
-        .template("{bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+        .template("{bar:40.purple/white} {pos:>7}/{len:7} {msg}")
         .progress_chars("█▓▒░  ");
-    // ::std::panic::set_hook(Box::new(|_| {}));
+    ::std::panic::set_hook(Box::new(|_| {}));
     let path = Path::new("./test262");
     if !path.exists() {
         get_repo(path)?;
     }
     // let failures = walk(&path)?;
     pb.set_style(sty.clone());
+    pb3.set_style(sty);
     let (ct, paths) = get_paths(&path);
-    pb.set_length(ct as u64);
+    pb3.set_length(ct as u64);
     let failures: Vec<TestFailure> = paths.par_iter()
         .progress_with(pb)
         .filter_map(test_mapper)
         .collect();
 
     let write_failures = if let Ok(env_var) = ::std::env::var("RESSA_WRITE_FAILURES") {
-        println!("RESSA_WRITE_FAILURES={}", env_var);
+        pb3.set_message(&format!("RESSA_WRITE_FAILURES={}", env_var));
         env_var != "0"
     } else {
-        println!("RESSA_WRITE_FAILURES does not exist");
+        pb3.set_message("RESSA_WRITE_FAILURES does not exist");
         false
     };
     let write_failures = true;
     let len = failures.len();
+    pb2.set_length(len as u64);
     
     if write_failures {
-        println!("getting ready to write failures");
+        pb3.set_message("getting ready to write failures");
         let base_path = PathBuf::from("failures");
         let base_path = base_path.join("test262");
         let keep_writing = base_path.exists() || if let Ok(_) = ::std::fs::create_dir_all(&base_path) {
-            println!("created directory");
+            pb3.set_message("created directory");
             true
         } else {
-            println!("failed to create directory");
+            pb3.set_message("failed to create directory");
             false
         };
         if keep_writing {
             for failure in &failures {
+                pb3.inc(1);
                 let new_path = failure.path.with_extension("md");
                 if let Some(file_name) = new_path.file_name() {
                     let new_path = base_path.join(file_name);
@@ -313,7 +323,8 @@ fn test262() -> Res<()> {
             }
         }
     }
-    println!("found {} failures", len);
+    pb2.finish();
+    eprintln!("found {} failures", len);
     if len > 0 {
         panic!("{} failures in test262", len);
     }

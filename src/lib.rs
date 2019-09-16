@@ -409,7 +409,8 @@ where
         let expr = self.parse_expression()?;
         if let Expr::Lit(lit) = expr {
             if let Lit::String(s) = lit {
-                if !self.context.allow_strict_directive && s.inner_matches("use strict") {
+                self.context.strict = s.inner_matches("use strict");
+                if !self.context.allow_strict_directive && self.context.strict {
                     return self.unexpected_token_error(&orig, "use strict in an invalid location");
                 }
                 self.consume_semicolon()?;
@@ -4686,6 +4687,7 @@ where
     }
 
     fn next_part(&mut self) -> Res<ProgramPart<'b>> {
+        trace!("next_part past_prolog: {}, strict: {}", self.context.past_prolog, self.context.strict);
         if !self.context.past_prolog {
             if self.look_ahead.is_string() {
                 let next_part = match self.parse_directive() {
