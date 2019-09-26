@@ -10,10 +10,133 @@ use std::{
     path::{Path, PathBuf},
 };
 use flate2::read::GzDecoder;
-use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle, ProgressDrawTarget};
+use indicatif::{
+    ParallelProgressIterator, 
+    ProgressIterator,
+    ProgressBar, 
+    ProgressStyle, 
+    ProgressDrawTarget
+};
 use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 
-
+static SKIPPED_FEATURES: &[&str] = &[
+    "IsHTMLDDA",
+    "Reflect.construct",
+    "String.prototype.endsWith",
+    "Array.prototype.flat",
+    "template",
+    "Symbol.toStringTag",
+    "Intl.DateTimeFormat-formatRange",
+    "super",
+    "Symbol.split",
+    "regexp-named-groups",
+    "Symbol.iterator",
+    "DataView.prototype.getFloat32",
+    "globalThis",
+    "object-rest",
+    "class-fields-public",
+    "DataView.prototype.getUint32",
+    "Symbol.prototype.description",
+    "WeakRef",
+    "Int32Array",
+    "Uint8ClampedArray",
+    "String.fromCodePoint",
+    "class-static-methods-private",
+    "SharedArrayBuffer",
+    "Intl.DateTimeFormat-fractionalSecondDigits",
+    "Uint8Array",
+    "rest-parameters",
+    "DataView.prototype.getInt8",
+    "Intl.DateTimeFormat-datetimestyle",
+    "DataView.prototype.setUint8",
+    "String.prototype.trimStart",
+    "caller",
+    "Uint16Array",
+    "Symbol.asyncIterator",
+    "destructuring-binding",
+    "BigInt",
+    "Symbol.hasInstance",
+    "DataView.prototype.getInt16",
+    "arrow-function",
+    "string-trimming",
+    "class-methods-private",
+    "optional-catch-binding",
+    "dynamic-import",
+    "let",
+    "FinalizationGroup",
+    "Symbol",
+    "Float32Array",
+    "import.meta",
+    "Reflect.set",
+    "WeakSet",
+    "tail-call-optimization",
+    "class",
+    "String.prototype.matchAll",
+    "export-star-as-namespace-from-module",
+    "Proxy",
+    "top-level-await",
+    "Symbol.unscopables",
+    "DataView.prototype.getInt32",
+    "Symbol.search",
+    "Intl.NumberFormat-unified",
+    "Symbol.species",
+    "numeric-separator-literal",
+    "Object.fromEntries",
+    "cross-realm",
+    "object-spread",
+    "default-parameters",
+    "DataView.prototype.getFloat64",
+    "optional-chaining",
+    "Symbol.isConcatSpreadable",
+    "Symbol.toPrimitive",
+    "String.prototype.trimEnd",
+    "Array.prototype.values",
+    "regexp-lookbehind",
+    "TypedArray",
+    "destructuring-assignment",
+    "Reflect.setPrototypeOf",
+    "regexp-dotall",
+    "u180e",
+    "Intl.RelativeTimeFormat",
+    "proxy-missing-checks",
+    "DataView.prototype.getUint16",
+    "async-iteration",
+    "Intl.ListFormat",
+    "Intl.DateTimeFormat-quarter",
+    "computed-property-names",
+    "regexp-unicode-property-escapes",
+    "Reflect",
+    "class-fields-private",
+    "Symbol.match",
+    "Intl.DateTimeFormat-dayPeriod",
+    "generators",
+    "async-functions",
+    "Object.is",
+    "Promise.allSettled",
+    "Symbol.replace",
+    "well-formed-json-stringify",
+    "Intl.Locale",
+    "class-static-fields-public",
+    "ArrayBuffer",
+    "Set",
+    "new.target",
+    "Intl.Segmenter",
+    "Promise.prototype.finally",
+    "hashbang",
+    "Int8Array",
+    "const",
+    "WeakMap",
+    "Array.prototype.flatMap",
+    "DataView",
+    "for-of",
+    "Float64Array",
+    "Atomics",
+    "Symbol.matchAll",
+    "json-superset",
+    "String.prototype.includes",
+    "class-static-fields-private",
+    "Map",
+];
 type Res<T> = Result<T, Box<dyn Error>>;
 
 struct Test262Runner<'a> {
@@ -50,24 +173,20 @@ impl<'a> Test262Runner<'a> {
         })
     }
     fn find_desc_comment(js: &str) -> Result<Description, E262> {
-        let start = js.find("/*---");
-        if let Some(start_idx) = start {
-            let ending = &js[start_idx+5..];
-            if let Some(end_idx) = ending.find("---*/") {
-                let trimmed = &ending[..end_idx];
-                let ret = if trimmed.contains('\r') {
-                    serde_yaml::from_str(&trimmed
-                        .replace("\r\n", "\n")
-                        .replace('\r', "\n"))
-                        .map_err(E262::from)?
-                } else {
-                    serde_yaml::from_str(trimmed)
-                            .map_err(E262::from)?
-                };
-                return Ok(ret)
-            }
-        }
-        Err(E262::new("no description comment found"))
+        let start_idx = js.find("/*---").ok_or_else(|| E262::new("Unable to find comment start"))?;
+        let ending = js.get(start_idx+5..).ok_or_else(|| E262::new("Invalid start index"))?;
+        let end_idx = ending.find("---*/").ok_or_else(|| E262::new("Unable to find comment end"))?;
+        let trimmed = ending.get(..end_idx).ok_or_else(|| E262::new("Invalid end index"))?;
+        let ret = if trimmed.contains('\r') {
+            serde_yaml::from_str(&trimmed
+                .replace("\r\n", "\n")
+                .replace('\r', "\n"))
+                .map_err(E262::from)?
+        } else {
+            serde_yaml::from_str(trimmed)
+                    .map_err(E262::from)?
+        };
+        Ok(ret)
     }
     pub fn clone_desc(&self) -> Description {
         self.desc.clone()
@@ -136,10 +255,10 @@ impl<'a> Test262Runner<'a> {
 
 #[derive(Debug, Deserialize, Clone, Default, Serialize)]
 struct Description {
-    #[serde(alias = "esid")]
-    #[serde(alias = "es5id")]
-    #[serde(alias = "es6id")]
     id: Option<String>,
+    esid: Option<String>,
+    es5id: Option<String>,
+    es6id: Option<String>,
     info: Option<String>,
     description: Option<String>,
     negative: Option<Negative>,
@@ -234,11 +353,20 @@ impl TestFailure {
             };
             (strict, not)
         };
-        let id = if let Some(ref id) = self.desc.id {
-            id.to_string()
+        let mut id = if let Some(ref id) = self.desc.id {
+            format!("{} (id) ", id)
         } else {
-            "Unknown ID".to_string()
+            String::new()
         };
+        if let Some(ref i) = self.desc.esid {
+            id.push_str(&format!("{} (esid) ", i));
+        }
+        if let Some(ref i) = self.desc.es5id {
+            id.push_str(&format!("{} (es5id) ", i));
+        }
+        if let Some(ref i) = self.desc.es6id {
+            id.push_str(&format!("{} (es6id) ", i));
+        }
         format!("# {id}
 ## Description
 {desc}
@@ -311,6 +439,9 @@ fn test262() -> Res<()> {
         println!("getting ready to write failures");
         let base_path = PathBuf::from("failures");
         let base_path = base_path.join("test262");
+        if base_path.exists() {
+            let _ = ::std::fs::remove_dir_all(&base_path);
+        }
         let keep_writing = base_path.exists() || if let Ok(_) = ::std::fs::create_dir_all(&base_path) {
             println!("created directory");
             true
@@ -365,7 +496,7 @@ fn walk(path: &Path) -> Res<Vec<TestFailure>> {
                             .into_iter()
                             .filter_map(filter_mapper)
                             .collect();
-    let ret = wd.par_iter()
+    let ret = wd.iter()
         .progress_with(pb)
         .filter_map(test_mapper)
         .collect();
@@ -392,6 +523,7 @@ fn filter_mapper(e: Result<walkdir::DirEntry, walkdir::Error>) -> Option<PathBuf
         }
     }
 }
+
 fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
     let contents = if let Ok(contents) = ::std::fs::read_to_string(path) {
         contents
@@ -419,6 +551,9 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
         runner: None,
         js: contents.clone(),
     };
+    if ret.desc.features.iter().any(|f| SKIPPED_FEATURES.iter().any(|f2| f == f2)) {
+        return None;
+    }
     if let Err(e) = handler.run_strict() {
         ret.strict = Some(format!("{}", e));
     }
