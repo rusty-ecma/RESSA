@@ -53,10 +53,18 @@ fn dexie() {
 fn run_test(name: &str, normal: String, min: String) {
     let _ = env_logger::try_init();
     println!("parsing: {} chars", min.len());
-    let mut p = Parser::new(&normal).expect(&format!("Unable to create {} parser", name));
+    let mut p = Parser::builder()
+        .js(&normal)
+        .module(name.contains("module"))
+        .build()
+        .expect(&format!("Unable to create {} parser", name));
     let r = p.parse();
     handle_result(r, name);
-    let mut p = Parser::new(&min).expect(&format!("Unable to create {}.min", name));
+    let mut p = Parser::builder()
+        .js(&normal)
+        .module(name.contains("module"))
+        .build()
+        .expect(&format!("Unable to create {}.min", name));
     let r = p.parse();
     handle_result(r, &format!("{}.min", name));
 }

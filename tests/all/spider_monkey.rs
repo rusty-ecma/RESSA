@@ -130,7 +130,7 @@ fn run(file: &Path) -> Result<(), Error> {
         }
     }
     let module = contents.starts_with("// |jit-test| module");
-    let mut b = Builder::new();
+    let b = Builder::new();
     let parser = b.js(&contents).module(module).build()?;
     for part in parser {
         let _part = part?;

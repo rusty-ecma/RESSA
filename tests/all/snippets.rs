@@ -77,3 +77,16 @@ yield;
         panic!("Incorrectly parsed reserved word as identifier");
     }
 }
+
+#[test]
+fn new_line_in_fat_arrow() {
+    let js = "var af = x
+=> x;";
+    let mut parser = Parser::new(js).expect("failed to create parser");
+    let expect = parser.parse();
+    if let Err(ressa::Error::NewLineAfterFatArrow(_)) = expect {
+        ()
+    } else {
+        panic!("Incorrectly parsed arrow function with new line after =>\n{:?}", expect);
+    }
+}

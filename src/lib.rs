@@ -3184,7 +3184,9 @@ where
                 self.context.is_binding_element = false;
                 let is_async = Self::is_async(&current);
                 if let Some(params) = self.reinterpret_as_cover_formals_list(current.clone())? {
+                    eprintln!("before {:?} {}", self.look_ahead.token, self.scanner.pending_new_line);
                     self.expect_punct(Punct::EqualGreaterThan)?;
+                    eprintln!("after {:?} {}", self.look_ahead.token, self.scanner.pending_new_line);
                     if self.at_punct(Punct::OpenBrace) {
                         let prev_in = self.context.allow_in;
                         self.context.allow_in = true;
