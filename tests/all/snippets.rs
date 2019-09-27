@@ -90,3 +90,32 @@ fn new_line_in_fat_arrow() {
         panic!("Incorrectly parsed arrow function with new line after =>\n{:?}", expect);
     }
 }
+
+#[test]
+fn arguments_as_param_arrow() {
+    let _ = env_logger::try_init();
+    let js = "'use strict';
+var x = arguments => arguments;";
+    let mut parser = Parser::new(js).expect("failed to create parser");
+    let expect = parser.parse();
+    if let Err(ressa::Error::StrictModeArgumentsOrEval(_)) = expect {
+        ()
+    } else {
+        panic!("Incorrectly parsed arguments as param in strict mode");
+    }
+}
+
+#[test]
+fn duplicate_proto() {
+    let js = "({
+__proto__: Number,
+'__proto__': Number,
+});";
+    let mut parser = Parser::new(js).expect("failed to create parser");
+    let expect = parser.parse();
+    if let Err(ressa::Error::Redecl(_,_)) = expect {
+        ()
+    } else {
+        panic!("Incorrectly parsed multiple __proto__ properties");
+    }
+}

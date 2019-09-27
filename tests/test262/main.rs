@@ -145,22 +145,25 @@ struct Test262Runner<'a> {
 }
 
 #[derive(Debug, Clone)]
-struct E262(String);
+enum E262 {
+    General(String),
+    Success(String),
+}
 impl ::std::fmt::Display for E262 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "{}", self.0)
+        match self {
+            E262::General(ref s) => write!(f, "{}", s),
+            E262::Success(_) => write!(f, "Unexpected Successful Parsing"),
+        }
     }
 }
 impl Error for E262 {}
 impl E262 {
     pub fn new(s: &str) -> Self {
-        Self(s.to_string())
-    }
-    pub fn boxed(s: &str) -> Box<Self> {
-        Box::new(Self::new(s))
+        E262::General(s.to_string())
     }
     pub fn from(e: impl Error) -> Self {
-        Self(format!("{}", e))
+        Self::General(format!("{}", e))
     }
 }
 
@@ -225,29 +228,29 @@ impl<'a> Test262Runner<'a> {
                         .js(js)
                         .build()
                         .map_err(|e| E262::new(&format!("{:?}", e)))?;
-        let first_err = p.find(|r| r.is_err());
-        match first_err {
-            None => if let Some(n) = &self.desc.negative {
-                if &n.phase == &Phase::Parse {
-                    Err(E262::new("Unexpected successful parsing"))
+        match p.parse() {
+            Ok(program) => {
+                if let Some(n) = &self.desc.negative {
+                    if &n.phase == &Phase::Parse {
+                        Err(E262::Success(format!("{:#?}", program)))
+                    } else {
+                        Ok(())
+                    }
                 } else {
                     Ok(())
                 }
-            } else {
-                Ok(())
             },
-            Some(Err(e)) => {
+            Err(e) => {
                 if let Some(n) = &self.desc.negative {
                     if &n.phase == &Phase::Parse {
                         Ok(())
                     } else {
-                        Err(E262::new(&format!("{:?}", e)))
+                        Err(E262::from(e))
                     }
                 } else {
-                        Err(E262::new(&format!("{:?}", e)))
+                    Err(E262::from(e))
                 }
-            },
-            Some(Ok(_)) => Ok(())
+            }
         }
     }
 }
@@ -307,13 +310,27 @@ static URL: &str = "https://github.com/tc39/test262/tarball/master";
 #[derive(Debug, Serialize)]
 struct TestFailure {
     pub path: PathBuf,
-    pub strict: Option<String>,
-    pub not_strict: Option<String>,
-    pub runner: Option<String>,
+    pub strict: TestStatus,
+    pub not_strict: TestStatus,
+    pub runner: TestStatus,
     pub desc: Description,
     pub js: String,
 }
-
+#[derive(Debug, Serialize)]
+enum TestStatus {
+    Success,
+    Failure(String),
+    NotRun
+}
+impl ::std::fmt::Display for TestStatus {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match self {
+            TestStatus::Failure(ref s) => write!(f, "{}", s),
+            TestStatus::NotRun => write!(f, "Not Run"),
+            TestStatus::Success => write!(f, "Passed"),
+        }
+    }
+}
 impl TestFailure {
     pub fn is_failure(&self) -> bool {
         self.strict.is_some() 
@@ -432,7 +449,6 @@ fn test262() -> Res<()> {
         println!("RESSA_WRITE_FAILURES does not exist");
         false
     };
-    let write_failures = true;
     let len = failures.len();
     
     if write_failures {
@@ -477,30 +493,6 @@ fn get_paths(path: &Path) -> (usize, Vec<PathBuf>) {
                             .filter_map(filter_mapper)
                             .collect();
     (ct, wd)
-}
-
-fn walk(path: &Path) -> Res<Vec<TestFailure>> {
-    let wd = walkdir::WalkDir::new(path)
-        .into_iter()
-        .filter_map(filter_mapper);
-    let ct = wd.count();
-    
-    let pb = ProgressBar::new(ct as u64);
-    let sty = ProgressStyle::default_bar()
-        .template("{bar:40.cyan/blue} {pos:>7}/{len:7} {percent} {per_sec}")
-        .progress_chars("█▓▒░  ");
-    pb.set_style(sty);
-    
-    pb.set_draw_target(ProgressDrawTarget::stdout());
-    let wd: Vec<PathBuf> = walkdir::WalkDir::new(path)
-                            .into_iter()
-                            .filter_map(filter_mapper)
-                            .collect();
-    let ret = wd.iter()
-        .progress_with(pb)
-        .filter_map(test_mapper)
-        .collect();
-    Ok(ret)
 }
 
 fn filter_mapper(e: Result<walkdir::DirEntry, walkdir::Error>) -> Option<PathBuf> {
@@ -555,10 +547,18 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
         return None;
     }
     if let Err(e) = handler.run_strict() {
-        ret.strict = Some(format!("{}", e));
+        let s = match e {
+            E262::General(ref general) => general.to_string(),
+            E262::Success(ref tree) => format!("{}\n```ron\n{}\n```", inner, tree),
+        };
+        ret.strict = Some(s);
     }
     if let Err(e) = handler.run() {
-        ret.not_strict = Some(format!("{}", e));
+        let s = match e {
+            E262::General(ref general) => general.to_string(),
+            E262::Success(ref tree) => format!("{}\n```ron\n{}\n```", inner, tree),
+        };
+        ret.not_strict = Some(s);
     }
     if ret.is_failure() {
         Some(ret)

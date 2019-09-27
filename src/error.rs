@@ -21,6 +21,7 @@ pub enum Error {
     InvalidOptionalLabel(Position),
     UseOfModuleFeatureOutsideOfModule(Position, String),
     NewLineAfterFatArrow(Position),
+    StrictModeArgumentsOrEval(Position),
     Scanner(ress::error::Error),
     Other(Box<dyn ::std::error::Error>),
 }
@@ -47,6 +48,7 @@ impl Display for Error {
             Error::InvalidOptionalLabel(ref pos) => write!(f, "Attempt to break with no label is not allowed unless in an iteration or switch: {}", pos),
             Error::UseOfModuleFeatureOutsideOfModule(ref pos, ref feature) => write!(f, "Used {} at {} which is only available inside of an es6 module", feature, pos),
             Error::NewLineAfterFatArrow(ref pos) => write!(f, "New line after fat arrow at {}", pos),
+            Error::StrictModeArgumentsOrEval(ref pos) => write!(f, "arguments or eval used as an identifier in strict mode near {}", pos),
             Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
             Error::Other(ref e) => write!(f, "{}", e),
         }
