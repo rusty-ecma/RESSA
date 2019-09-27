@@ -1454,45 +1454,49 @@ where
         debug!("parse_labelled_statement, {:?}", self.look_ahead.token);
         let start = self.look_ahead.span;
         let ret = self.parse_expression()?;
-        if Self::is_ident(&ret) && self.at_punct(Punct::Colon) {
-            let _colon = self.next_item()?;
-            let id = if let Expr::Ident(ident) = ret {
-                ident
-            } else {
-                return Err(self.reinterpret_error("expression", "ident"));
-            };
-            if !self.context.label_set.insert(self.get_string(&start)?) {
-                return Err(self.redecl_error(&id.name));
+        if let Expr::Ident(ref ident) = ret {
+            if self.context.strict && Self::is_strict_reserved(ident) {
+                return Err(Error::NonStrictFeatureInStrictContext(self.current_position, "strict reserved word as identifier".to_string()));
             }
-            let body = if self.at_keyword(Keyword::Class) {
-                let class = self.next_item()?;
-                if !self.config.tolerant {
-                    return self.unexpected_token_error(&class, "");
-                }
-                let body = self.parse_class_body()?;
-                let cls = Class {
-                    id: None,
-                    super_class: None,
-                    body,
+            if self.at_punct(Punct::Colon) {
+                let _colon = self.next_item()?;
+                let id = if let Expr::Ident(ident) = ret {
+                    ident
+                } else {
+                    return Err(self.reinterpret_error("expression", "ident"));
                 };
-                let expr = Expr::Class(cls);
-                Stmt::Expr(expr)
-            } else if self.at_keyword(Keyword::Function) {
-                let f = self.parse_function_decl(true)?;
-                let expr = Expr::Func(f);
-                Stmt::Expr(expr)
-            } else {
-                self.parse_statement()?
-            };
-            self.context.label_set.remove(&self.get_string(&start)?);
-            Ok(Stmt::Labeled(LabeledStmt {
-                label: id,
-                body: Box::new(body),
-            }))
-        } else {
-            self.consume_semicolon()?;
-            Ok(Stmt::Expr(ret))
+                if !self.context.label_set.insert(self.get_string(&start)?) {
+                    return Err(self.redecl_error(&id.name));
+                }
+                let body = if self.at_keyword(Keyword::Class) {
+                    let class = self.next_item()?;
+                    if !self.config.tolerant {
+                        return self.unexpected_token_error(&class, "");
+                    }
+                    let body = self.parse_class_body()?;
+                    let cls = Class {
+                        id: None,
+                        super_class: None,
+                        body,
+                    };
+                    let expr = Expr::Class(cls);
+                    Stmt::Expr(expr)
+                } else if self.at_keyword(Keyword::Function) {
+                    let f = self.parse_function_decl(true)?;
+                    let expr = Expr::Func(f);
+                    Stmt::Expr(expr)
+                } else {
+                    self.parse_statement()?
+                };
+                self.context.label_set.remove(&self.get_string(&start)?);
+                return Ok(Stmt::Labeled(LabeledStmt {
+                    label: id,
+                    body: Box::new(body),
+                }))
+            }
         }
+        self.consume_semicolon()?;
+        Ok(Stmt::Expr(ret))
     }
 
     #[inline]
@@ -2292,6 +2296,9 @@ where
     #[inline]
     fn parse_primary_expression(&mut self) -> Res<Expr<'b>> {
         debug!("{}: parse_primary_expression", self.look_ahead.span.start);
+        if self.context.strict && self.look_ahead.token.is_strict_reserved() {
+            return Err(Error::NonStrictFeatureInStrictContext(self.look_ahead_position, "strict mode reserved word as an identifer".to_string()));
+        }
         if self.look_ahead.token.is_ident() {
             if ((self.context.is_module || self.context.allow_await)
                 && self.at_keyword(Keyword::Await))
@@ -3184,9 +3191,7 @@ where
                 self.context.is_binding_element = false;
                 let is_async = Self::is_async(&current);
                 if let Some(params) = self.reinterpret_as_cover_formals_list(current.clone())? {
-                    eprintln!("before {:?} {}", self.look_ahead.token, self.scanner.pending_new_line);
-                    self.expect_punct(Punct::EqualGreaterThan)?;
-                    eprintln!("after {:?} {}", self.look_ahead.token, self.scanner.pending_new_line);
+                    self.expect_fat_arrow()?;
                     if self.at_punct(Punct::OpenBrace) {
                         let prev_in = self.context.allow_in;
                         self.context.allow_in = true;
@@ -3318,7 +3323,10 @@ where
         &mut self,
         expr: Expr<'b>,
     ) -> Res<Option<Vec<FuncArg<'b>>>> {
-        let (params, async_arrow) = if Self::is_ident(&expr) {
+        let (params, async_arrow) = if let Expr::Ident(ref ident) = expr {
+            if self.context.strict && Self::is_strict_reserved(ident) {
+                return Err(Error::NonStrictFeatureInStrictContext(self.current_position, "strict reserved word as an identifier".to_string()))
+            }
             (vec![FuncArg::Expr(expr)], false)
         } else if let Expr::ArrowParamPlaceHolder(params, is_async) = expr {
             (params, is_async)
@@ -3336,6 +3344,9 @@ where
                                 if y.argument.is_some() {
                                     invalid_param = true;
                                 } else {
+                                    if self.context.strict {
+                                        return Err(Error::NonStrictFeatureInStrictContext(self.current_position, "strict reserved word as an identifier".to_string()));
+                                    }
                                     params2.push(FuncArg::Pat(Pat::Ident(resast::Ident::from(
                                         "yield",
                                     ))));
@@ -3350,6 +3361,9 @@ where
                                 if y.argument.is_some() {
                                     invalid_param = true;
                                 } else {
+                                    if self.context.strict {
+                                        return Err(Error::NonStrictFeatureInStrictContext(self.current_position, "strict reserved word as an identifier".to_string()));
+                                    }
                                     params2.push(FuncArg::Expr(Expr::Ident(resast::Ident::from(
                                         "yield",
                                     ))));
@@ -4389,6 +4403,19 @@ where
         }
         Ok(())
     }
+    #[inline]
+    fn expect_fat_arrow(&mut self) -> Res<()> {
+        if self.look_ahead.token.matches_punct(Punct::EqualGreaterThan) {
+            if self.context.has_line_term {
+                Err(Error::NewLineAfterFatArrow(self.look_ahead_position))
+            } else {
+                let _ = self.next_item()?;
+                Ok(())
+            }
+        } else {
+            self.expected_token_error(&self.look_ahead, &["=>"])
+        }
+    }
     /// move on to the next item and validate it matches
     /// the keyword provided, discarding the result
     /// if it does
@@ -4634,8 +4661,10 @@ where
     }
 
     fn expected_token_error<T>(&self, item: &Item<Token<&'b str>>, expectation: &[&str]) -> Res<T> {
-        let bt = backtrace::Backtrace::new();
-        error!("{:?}", bt);
+        if cfg!(feature = "error_backtrace") {
+            let bt = backtrace::Backtrace::new();
+            error!("{:?}", bt);
+        }
         let pos = item.location.start;
         let expectation = expectation
             .iter()
@@ -4655,8 +4684,10 @@ where
         ))
     }
     fn unexpected_token_error<T>(&self, item: &Item<Token<&'b str>>, msg: &str) -> Res<T> {
-        let bt = backtrace::Backtrace::new();
-        error!("{:?}", bt);
+        if cfg!(feature = "error_backtrace") {
+            let bt = backtrace::Backtrace::new();
+            error!("{:?}", bt);
+        }
         let pos = item.location.start;
 
         let name = self.scanner.string_for(&item.span).unwrap_or_default();
@@ -4675,12 +4706,24 @@ where
         }
     }
     fn op_error(&self, msg: &str) -> Error {
+        if cfg!(feature = "error_backtrace") {
+            let bt = backtrace::Backtrace::new();
+            error!("{:?}", bt);
+        }
         Error::OperationError(self.current_position, msg.to_owned())
     }
     fn redecl_error(&self, name: &str) -> Error {
+        if cfg!(feature = "error_backtrace") {
+            let bt = backtrace::Backtrace::new();
+            error!("{:?}", bt);
+        }
         Error::Redecl(self.current_position, name.to_owned())
     }
     fn reinterpret_error(&self, from: &str, to: &str) -> Error {
+        if cfg!(feature = "error_backtrace") {
+            let bt = backtrace::Backtrace::new();
+            error!("{:?}", bt);
+        }
         Error::UnableToReinterpret(self.current_position, from.to_owned(), to.to_owned())
     }
 

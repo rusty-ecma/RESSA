@@ -26,6 +26,7 @@ rayon = { version = "", optional = true }
 default = []
 major_libs = []
 debug_look_ahead = []
+error_backtrace = []
 serialization = ["resast/serialization"]
 esprima = ["resast/esprima"]
 moz_central = ["reqwest", "flate2", "tar", "walkdir"]
