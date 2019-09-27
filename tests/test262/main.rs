@@ -194,7 +194,7 @@ impl<'a> Test262Runner<'a> {
     pub fn clone_desc(&self) -> Description {
         self.desc.clone()
     }
-    pub fn run_strict(&self) -> Res<()> {
+    pub fn run_strict(&self) -> Result<(), E262> {
         if !self.desc.flags.iter().any(|f| f == &Flag::Module || f == &Flag::NoStrict) {
             self.run_script(&format!("'use strict'\n{}", self.js))?;
         } 
@@ -232,7 +232,7 @@ impl<'a> Test262Runner<'a> {
             Ok(program) => {
                 if let Some(n) = &self.desc.negative {
                     if &n.phase == &Phase::Parse {
-                        Err(E262::Success(format!("{:#?}", program)))
+                        Err(E262::Success(format!("```ron\n{:#?}\n```", program)))
                     } else {
                         Ok(())
                     }
@@ -316,11 +316,20 @@ struct TestFailure {
     pub desc: Description,
     pub js: String,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 enum TestStatus {
     Success,
     Failure(String),
     NotRun
+}
+impl TestStatus {
+    pub fn is_failure(&self) -> bool {
+        if let TestStatus::Failure(_) = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 impl ::std::fmt::Display for TestStatus {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
@@ -333,9 +342,9 @@ impl ::std::fmt::Display for TestStatus {
 }
 impl TestFailure {
     pub fn is_failure(&self) -> bool {
-        self.strict.is_some() 
-            || self.not_strict.is_some()
-            || self.runner.is_some()
+        self.strict.is_failure()
+            || self.not_strict.is_failure()
+            || self.runner.is_failure()
     }
     pub fn to_markdown(&self) -> String {
         let flags: Vec<String> = self.desc.flags.iter().map(|f| format!("{:?}", f)).collect();
@@ -350,26 +359,9 @@ impl TestFailure {
         } else {
             "__not provided__".to_string()
         };
-        let (ran, runner) = if let Some(ref inner) = self.runner {
-            (false, format!("{}", inner))
-        } else {
-            (true, "passed".to_string())
-        };
-        let (strict, not) = if !ran {
-            ("not run".to_string(), "not run".to_string())
-        } else {
-            let strict = if let Some(ref inner) = self.strict {
-                inner.to_string()
-            } else {
-                "passed".to_string()
-            };
-            let not = if let Some(ref inner) = self.not_strict {
-                inner.to_string()
-            } else {
-                "passed".to_string()
-            };
-            (strict, not)
-        };
+        let runner = format!("{}", self.runner);
+        let strict = format!("{}", self.strict);
+        let not = format!("{}", self.not_strict);
         let mut id = if let Some(ref id) = self.desc.id {
             format!("{} (id) ", id)
         } else {
@@ -528,9 +520,9 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
             return Some(TestFailure {
                 desc: Description::default(),
                 path: path.clone(),
-                strict: None,
-                not_strict: None,
-                runner: Some(format!("{}", e)),
+                strict: TestStatus::NotRun,
+                not_strict: TestStatus::NotRun,
+                runner: TestStatus::Failure(format!("{}", e)),
                 js: contents
             });
         },
@@ -538,9 +530,9 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
     let mut ret = TestFailure {
         desc: handler.clone_desc(),
         path: path.clone(),
-        strict: None,
-        not_strict: None,
-        runner: None,
+        strict: TestStatus::Success,
+        not_strict: TestStatus::NotRun,
+        runner: TestStatus::NotRun,
         js: contents.clone(),
     };
     if ret.desc.features.iter().any(|f| SKIPPED_FEATURES.iter().any(|f2| f == f2)) {
@@ -549,16 +541,20 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
     if let Err(e) = handler.run_strict() {
         let s = match e {
             E262::General(ref general) => general.to_string(),
-            E262::Success(ref tree) => format!("{}\n```ron\n{}\n```", inner, tree),
+            E262::Success(ref tree) => tree.to_string(),
         };
-        ret.strict = Some(s);
+        ret.strict = TestStatus::Failure(s);
+    } else {
+        ret.strict = TestStatus::Success;
     }
     if let Err(e) = handler.run() {
         let s = match e {
             E262::General(ref general) => general.to_string(),
-            E262::Success(ref tree) => format!("{}\n```ron\n{}\n```", inner, tree),
+            E262::Success(ref tree) => tree.to_string(),
         };
-        ret.not_strict = Some(s);
+        ret.not_strict = TestStatus::Failure(s);
+    } else {
+        ret.not_strict = TestStatus::Success;
     }
     if ret.is_failure() {
         Some(ret)
