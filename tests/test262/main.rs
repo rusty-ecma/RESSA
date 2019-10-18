@@ -20,6 +20,7 @@ use indicatif::{
 use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 
 static SKIPPED_FEATURES: &[&str] = &[
+    "coalesce-expression",
     "IsHTMLDDA",
     "Reflect.construct",
     "String.prototype.endsWith",
@@ -304,6 +305,8 @@ enum Flag {
     CanBlockIsFalse,
     #[serde(alias = "CanBlockIsTrue")]
     CanBlockIsTrue,
+    #[serde(alias = "non-deterministic")]
+    NonDeterministic,
 }
 
 static URL: &str = "https://github.com/tc39/test262/tarball/master";
@@ -387,7 +390,9 @@ impl TestFailure {
 {features}
 
 ### Info
+```
 {info}
+```
 
 ## Results
 ### runner
@@ -413,6 +418,19 @@ strict=strict,
 not=not,
 js=self.js
 )
+    }
+    fn get_first_id(&self, fallback: &str) -> String {
+        if let Some(ref i) = self.desc.esid {
+            i.to_string()
+        } else if let Some(ref i) = self.desc.es5id {
+            i.to_string()
+        } else if let Some(ref i) = self.desc.es6id {
+            i.to_string()
+        } else if let Some(ref i) = self.desc.description {
+            i.replace(" ", "_")
+        } else {
+            fallback.to_string()
+        }
     }
 }
 #[test]
@@ -445,7 +463,7 @@ fn test262() -> Res<()> {
     
     if write_failures {
         println!("getting ready to write failures");
-        let base_path = PathBuf::from("failures");
+        let base_path = ::std::fs::canonicalize("failures")?;
         let base_path = base_path.join("test262");
         if base_path.exists() {
             let _ = ::std::fs::remove_dir_all(&base_path);
@@ -458,14 +476,27 @@ fn test262() -> Res<()> {
             false
         };
         if keep_writing {
+            use std::io::Write;
+            let root_path = base_path.join("test262.html");
+            let mut root_file = ::std::io::BufWriter::new(::std::fs::File::create(&root_path)?);
+            root_file.write_all(b"<html><head><title>ressa test 262 failures</title><body><h1>Failures</h1><ul>")?;
             for failure in &failures {
-                let new_path = failure.path.with_extension("md");
+                let new_path = failure.path.with_extension("html");
                 if let Some(file_name) = new_path.file_name() {
                     let new_path = base_path.join(file_name);
+                    root_file.write_all(format!("<li><a href=\"{}\">{}</a></li>", 
+                        new_path.display(), 
+                        failure.get_first_id(&file_name.clone().to_str().unwrap_or("unknown"))
+                    ).as_bytes())?;
                     // we really don't care if this fails
-                    let _ = ::std::fs::write(&new_path, failure.to_markdown());
+                    let md = failure.to_markdown();
+                    let parser = pulldown_cmark::Parser::new(&md);
+                    pulldown_cmark::html::write_html(::std::fs::File::create(&new_path)?, parser)?;
+                    // let _ = ::std::fs::write(&new_path, failure.to_markdown());
                 }
             }
+            root_file.write_all(b"</ul></body></html>")?;
+            println!("file:{}", root_path.display());
         }
     }
     println!("found {} failures", len);
@@ -530,9 +561,9 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
     let mut ret = TestFailure {
         desc: handler.clone_desc(),
         path: path.clone(),
-        strict: TestStatus::Success,
+        strict: TestStatus::NotRun,
         not_strict: TestStatus::NotRun,
-        runner: TestStatus::NotRun,
+        runner: TestStatus::Success,
         js: contents.clone(),
     };
     if ret.desc.features.iter().any(|f| SKIPPED_FEATURES.iter().any(|f2| f == f2)) {

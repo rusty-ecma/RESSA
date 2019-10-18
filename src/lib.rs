@@ -4403,8 +4403,11 @@ where
     /// swap the last look ahead with this new token
     /// and return the last token
     fn next_item(&mut self) -> Res<Item<Token<&'b str>>> {
+        trace!("next_item {}", self.context.has_line_term);
+        let mut comment_line_term = false;
         loop {
-            self.context.has_line_term = self.scanner.pending_new_line;
+            trace!("loop top");
+            self.context.has_line_term = comment_line_term || self.scanner.pending_new_line;
             if let Some(look_ahead) = self.scanner.next() {
                 let look_ahead = look_ahead?;
                 if cfg!(feature = "debug_look_ahead") {
@@ -4417,11 +4420,19 @@ where
                 }
                 self.look_ahead_position = look_ahead.location.start;
                 if look_ahead.token.is_comment() {
+                    trace!("next_item comment {}", self.context.has_line_term);
+                    if let Token::Comment(ref inner) = look_ahead.token {
+                        if inner.is_multi_line() {
+                            comment_line_term = self.context.has_line_term
+                                || Self::comment_has_line_term(inner);
+                        }
+                    }
                     self.comment_handler.handle_comment(look_ahead);
                     continue;
                 }
                 self.current_position = self.look_ahead_position;
                 let ret = replace(&mut self.look_ahead, look_ahead);
+                trace!("end next_item {}", self.context.has_line_term);
                 return Ok(ret);
             } else {
                 // if the next item is None, the iterator is spent
@@ -4439,6 +4450,14 @@ where
                     return Err(Error::UnexpectedEoF);
                 }
             }
+        }
+    }
+
+    fn comment_has_line_term(comment: &Comment<&'b str>) -> bool {
+        if let ress::tokens::CommentKind::Multi = comment.kind {
+            comment.content.chars().any(|c| c == '\n' || c == '\r' || c == '\u{2028}' || c == '\u{2029}')
+        } else {
+            false
         }
     }
 
@@ -4619,6 +4638,7 @@ where
     /// EoF or a close brace
     #[inline]
     fn consume_semicolon(&mut self) -> Res<()> {
+        trace!("consume_semicolon {}", self.context.has_line_term);
         if self.at_punct(Punct::SemiColon) {
             let _semi = self.next_item()?;
         } else if !self.context.has_line_term

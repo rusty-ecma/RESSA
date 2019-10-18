@@ -119,3 +119,12 @@ __proto__: Number,
         panic!("Incorrectly parsed multiple __proto__ properties");
     }
 }
+
+#[test]
+fn line_term_comment() {
+    let _ = env_logger::try_init();
+    let js = "''/*
+*/''";
+    let mut parser = Parser::new(js).expect("failed to create parser");
+    let expect = parser.parse().unwrap();
+}
