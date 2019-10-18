@@ -126,5 +126,5 @@ fn line_term_comment() {
     let js = "''/*
 */''";
     let mut parser = Parser::new(js).expect("failed to create parser");
-    let expect = parser.parse().unwrap();
+    parser.parse().unwrap();
 }
