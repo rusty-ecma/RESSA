@@ -1,4 +1,5 @@
 #![cfg(feature = "test_262")]
+
 use serde::{
     Deserialize,
     Serialize,
@@ -12,10 +13,8 @@ use std::{
 use flate2::read::GzDecoder;
 use indicatif::{
     ParallelProgressIterator, 
-    ProgressIterator,
     ProgressBar, 
     ProgressStyle, 
-    ProgressDrawTarget
 };
 use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 
@@ -432,6 +431,26 @@ js=self.js
             fallback.to_string()
         }
     }
+
+    pub fn as_list_item(&self, path: &impl AsRef<std::path::Path>) -> String {
+        let mut html = format!(r#"<li><a class="test-name" href="{}">{}</a> - <div class="additional-info">"#, 
+            path.as_ref().display(),
+            self.get_first_id("unknown"));
+        if let TestStatus::Failure(_) =  self.runner {
+            html.push_str(r#"<span class="not-run-error">!!!</span>"#)
+        }
+        if let Some(ref d) = self.desc.description {
+            html.push_str(&format!(r#"<div class="description">{}</div>"#, d));
+        }
+        if !self.desc.features.is_empty() {
+            html.push_str(r#"<div class="feature title"><span>features</span></div>"#)
+        }
+        for feat in &self.desc.features {
+            html.push_str(&format!(r#"<div class="feature"><span>{:?}</span></div>"#, feat));
+        }
+        html.push_str("</div></li>");
+        html
+    }
 }
 #[test]
 fn test262() -> Res<()> {
@@ -439,7 +458,6 @@ fn test262() -> Res<()> {
     let sty = ProgressStyle::default_bar()
         .template("{bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
         .progress_chars("█▓▒░  ");
-    // ::std::panic::set_hook(Box::new(|_| {}));
     let path = Path::new("./test262");
     if !path.exists() {
         get_repo(path)?;
@@ -463,7 +481,7 @@ fn test262() -> Res<()> {
     
     if write_failures {
         println!("getting ready to write failures");
-        let base_path = ::std::fs::canonicalize("failures")?;
+        let base_path = PathBuf::from("failures");
         let base_path = base_path.join("test262");
         if base_path.exists() {
             let _ = ::std::fs::remove_dir_all(&base_path);
@@ -475,24 +493,33 @@ fn test262() -> Res<()> {
             println!("failed to create directory");
             false
         };
+        let base_path = ::std::fs::canonicalize(&base_path)?;
         if keep_writing {
             use std::io::Write;
             let root_path = base_path.join("test262.html");
             let mut root_file = ::std::io::BufWriter::new(::std::fs::File::create(&root_path)?);
-            root_file.write_all(b"<html><head><title>ressa test 262 failures</title><body><h1>Failures</h1><ul>")?;
+            let head = b"<html>
+            <head>
+                <title>ressa test 262 failures</title>
+                <script>{}</script>
+                <style>{}</style>
+            </head>
+            <body>";
+            root_file.write_all(head)?;
+            root_file.write_all(b"<h1>Failures</h1><ul>")?;
             for failure in &failures {
+                use std::io::{Write,BufWriter};
+                use std::fs::File;
                 let new_path = failure.path.with_extension("html");
                 if let Some(file_name) = new_path.file_name() {
                     let new_path = base_path.join(file_name);
-                    root_file.write_all(format!("<li><a href=\"{}\">{}</a></li>", 
-                        new_path.display(), 
-                        failure.get_first_id(&file_name.clone().to_str().unwrap_or("unknown"))
-                    ).as_bytes())?;
-                    // we really don't care if this fails
+                    root_file.write_all(failure.as_list_item(&new_path).as_bytes())?;
                     let md = failure.to_markdown();
                     let parser = pulldown_cmark::Parser::new(&md);
-                    pulldown_cmark::html::write_html(::std::fs::File::create(&new_path)?, parser)?;
-                    // let _ = ::std::fs::write(&new_path, failure.to_markdown());
+                    let mut f = BufWriter::new(File::create(&new_path)?);
+                    f.write_all(head)?;
+                    pulldown_cmark::html::write_html(&mut f, parser)?;
+                    f.write_all(b"</body></html>")?;
                 }
             }
             root_file.write_all(b"</ul></body></html>")?;

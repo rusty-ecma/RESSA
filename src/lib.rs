@@ -4621,7 +4621,7 @@ where
             !self.scanner.pending_new_line
                 && if let Some(peek) = self.scanner.look_ahead() {
                     if let Ok(peek) = peek {
-                        peek.token.matches_keyword(Keyword::Function)
+                        peek.token.matches_keyword(Keyword::Function(()))
                     } else {
                         false
                     }
@@ -4688,33 +4688,55 @@ where
     fn is_start_of_expr(&self) -> bool {
         let mut ret = true;
         let token = &self.look_ahead.token;
-        if token.is_punct() {
-            ret = token.matches_punct(Punct::OpenBracket)
-                || token.matches_punct(Punct::OpenParen)
-                || token.matches_punct(Punct::OpenBracket)
-                || token.matches_punct(Punct::Plus)
-                || token.matches_punct(Punct::Dash)
-                || token.matches_punct(Punct::Bang)
-                || token.matches_punct(Punct::Tilde)
-                || token.matches_punct(Punct::DoublePlus)
-                || token.matches_punct(Punct::DoubleDash)
+        match token {
+            Token::Punct(Punct::OpenBracket)
+            | Token::Punct(Punct::OpenParen)
+            | Token::Punct(Punct::OpenBracket)
+            | Token::Punct(Punct::Plus)
+            | Token::Punct(Punct::Dash)
+            | Token::Punct(Punct::Bang)
+            | Token::Punct(Punct::Tilde)
+            | Token::Punct(Punct::DoublePlus)
+            | Token::Punct(Punct::DoubleDash) => true,
+            Token::Keyword(Keyword::Class(_))
+            | Token::Keyword(Keyword::Delete(_))
+            | Token::Keyword(Keyword::Function(_))
+            | Token::Keyword(Keyword::Let(_))
+            | Token::Keyword(Keyword::New(_))
+            | Token::Keyword(Keyword::Super(_))
+            | Token::Keyword(Keyword::This(_))
+            | Token::Keyword(Keyword::TypeOf(_))
+            | Token::Keyword(Keyword::Void(_))
+            | Token::Keyword(Keyword::Yield(_)) => true,
+            _ => token.is_regex(),
         }
-        if token.is_keyword() {
-            ret = token.matches_keyword(Keyword::Class)
-                || token.matches_keyword(Keyword::Delete)
-                || token.matches_keyword(Keyword::Function)
-                || token.matches_keyword(Keyword::Let)
-                || token.matches_keyword(Keyword::New)
-                || token.matches_keyword(Keyword::Super)
-                || token.matches_keyword(Keyword::This)
-                || token.matches_keyword(Keyword::TypeOf)
-                || token.matches_keyword(Keyword::Void)
-                || token.matches_keyword(Keyword::Yield)
-        }
-        if token.is_regex() {
-            ret = true;
-        }
-        ret
+        // if token.is_punct() {
+        //      ret = token.matches_punct(Punct::OpenBracket)
+        //         || token.matches_punct(Punct::OpenParen)
+        //         || token.matches_punct(Punct::OpenBracket)
+        //         || token.matches_punct(Punct::Plus)
+        //         || token.matches_punct(Punct::Dash)
+        //         || token.matches_punct(Punct::Bang)
+        //         || token.matches_punct(Punct::Tilde)
+        //         || token.matches_punct(Punct::DoublePlus)
+        //         || token.matches_punct(Punct::DoubleDash)
+        // }
+        // if token.is_keyword() {
+        //      ret = token.matches_keyword(Keyword::Class)
+        //         || token.matches_keyword(Keyword::Delete)
+        //         || token.matches_keyword(Keyword::Function)
+        //         || token.matches_keyword(Keyword::Let)
+        //         || token.matches_keyword(Keyword::New)
+        //         || token.matches_keyword(Keyword::Super)
+        //         || token.matches_keyword(Keyword::This)
+        //         || token.matches_keyword(Keyword::TypeOf)
+        //         || token.matches_keyword(Keyword::Void)
+        //         || token.matches_keyword(Keyword::Yield)
+        // }
+        // if token.is_regex() {
+        //     ret = true;
+        // }
+        // ret
     }
 
     #[inline]
