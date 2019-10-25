@@ -17,7 +17,7 @@ pub enum Error {
     TryWithNoCatchOrFinally(Position),
     InvalidCatchArg(Position),
     ThrowWithNoArg(Position),
-    UnknownOptionalLabel(Position, Keyword, String),
+    UnknownOptionalLabel(Position, Keyword<()>, String),
     InvalidOptionalLabel(Position),
     UseOfModuleFeatureOutsideOfModule(Position, String),
     NewLineAfterFatArrow(Position),
