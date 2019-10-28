@@ -11,12 +11,7 @@ categories = ["parsing", "text-processing", "web-programming"]
 edition = "2018"
 
 [dependencies]
-<<<<<<< HEAD
-# ress = "0.8.1" 
-ress = { path = "../ress" }
-=======
 ress = "0.9.0-alpha.1"
->>>>>>> next
 resast = "0.4.0"
 log = "0.4"
 backtrace = "0"
