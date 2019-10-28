@@ -433,8 +433,12 @@ js=self.js
     }
 
     pub fn as_list_item(&self, path: &impl AsRef<std::path::Path>) -> String {
+        let mut href = format!("{}", path.as_ref().display());
+        if href.starts_with("\\\\?") {
+            href = format!("\\\\{}", &href[3..]);
+        }
         let mut html = format!(r#"<li><a class="test-name" href="{}">{}</a> - <div class="additional-info">"#, 
-            path.as_ref().display(),
+            href,
             self.get_first_id("unknown"));
         if let TestStatus::Failure(_) =  self.runner {
             html.push_str(r#"<span class="not-run-error">!!!</span>"#)
@@ -452,6 +456,7 @@ js=self.js
         html
     }
 }
+static SKIP_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 #[test]
 fn test262() -> Res<()> {
     let pb = ProgressBar::new_spinner();
@@ -478,7 +483,6 @@ fn test262() -> Res<()> {
         false
     };
     let len = failures.len();
-    
     if write_failures {
         println!("getting ready to write failures");
         let base_path = PathBuf::from("failures");
@@ -528,7 +532,9 @@ fn test262() -> Res<()> {
     }
     println!("found {} failures", len);
     if len > 0 {
-        panic!("{} failures in test262", len);
+        let total_run = ct - SKIP_COUNT.load(std::sync::atomic::Ordering::Relaxed) as usize;
+        let fail_rate = len as f32 / total_run as f32;
+        panic!("Failed {} of {} test262, fail rate of {:02.2}%", len, total_run, fail_rate * 100.0);
     }
     Ok(())
 }
@@ -594,6 +600,7 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
         js: contents.clone(),
     };
     if ret.desc.features.iter().any(|f| SKIPPED_FEATURES.iter().any(|f2| f == f2)) {
+        SKIP_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         return None;
     }
     if let Err(e) = handler.run_strict() {
