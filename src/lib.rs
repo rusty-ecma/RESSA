@@ -1323,7 +1323,11 @@ where
         } else {
             Some(self.parse_expression()?)
         };
+        let start_pos = self.look_ahead_position;
         let body = self.parse_loop_body()?;
+        if Self::is_func_decl(&body) {
+            return Err(Error::InvalidFuncPosition(start_pos, "Function declaration cannot be the body of a loop, maybe wrap this in a block statement?".to_string()));
+        }
         Ok(ForStmt {
             init,
             test,
@@ -1335,6 +1339,9 @@ where
     #[inline]
     fn parse_for_in_loop(&mut self, left: LoopLeft<'b>) -> Res<ForInStmt<'b>> {
         debug!("{}: parse_for_in_loop {:?}", self.look_ahead.span.start, self.look_ahead.token);
+        if let LoopLeft::Variable(_, VarDecl { init: Some(_), ..}) = left {
+            return Err(Error::ForOfInAssign(self.look_ahead_position, "For in loop left hand side cannot contain an assignment".to_string()))
+        }
         let _ = self.next_item()?;
         let right = self.parse_expression()?;
         let body = self.parse_loop_body()?;
@@ -1348,6 +1355,9 @@ where
     #[inline]
     fn parse_for_of_loop(&mut self, left: LoopLeft<'b>, is_await: bool) -> Res<ForOfStmt<'b>> {
         debug!("{}: parse_for_of_loop {:?}", self.look_ahead.span.start, self.look_ahead.token);
+        if let LoopLeft::Variable(_, VarDecl { init: Some(_), ..}) = left {
+            return Err(Error::ForOfInAssign(self.look_ahead_position, "For in loop left hand side cannot contain an assignment".to_string()))
+        }
         let _ = self.next_item()?;
         let right = self.parse_assignment_expr()?;
         let body = self.parse_loop_body()?;
@@ -1375,10 +1385,14 @@ where
     #[inline]
     fn parse_do_while_stmt(&mut self) -> Res<DoWhileStmt<'b>> {
         debug!("{}: parse_do_while_stmt {:?}", self.look_ahead.span.start, self.look_ahead.token);
+        let start_pos = self.look_ahead_position;
         self.expect_keyword(Keyword::Do(()))?;
         let prev_iter = self.context.in_iteration;
         self.context.in_iteration = true;
         let body = self.parse_statement()?;
+        if Self::is_func_decl(&body) {
+            return Err(Error::InvalidFuncPosition(start_pos, "Function declaration cannot be the body of a do while loop, maybe wrap this in a block statement?".to_string()));
+        }
         self.context.in_iteration = prev_iter;
         self.expect_keyword(Keyword::While(()))?;
         self.expect_punct(Punct::OpenParen)?;
@@ -2929,11 +2943,15 @@ where
                 resast::Ident::from(s)
             }
             Token::Keyword(ref k) => {
-                if !k.has_unicode_escape() {
+                if k.has_unicode_escape()
+                    || k == &Keyword::Yield(()) 
+                    || k == &Keyword::Await(()) 
+                    || (!self.context.strict && k.is_strict_reserved()) {
+                    let s = self.get_string(&ident.span)?;
+                    resast::Ident::from(s)
+                } else {
                     return self.unexpected_token_error(&ident, "Keyword used as an identifier");
                 }
-                let s = self.get_string(&ident.span)?;
-                resast::Ident::from(s)
             }
             _ => self.expected_token_error(&ident, &["variable identifier"])?,
         };
@@ -4007,6 +4025,15 @@ where
                 return Ok(Expr::Update(ret));
             }
             Ok(expr)
+        }
+    }
+
+    #[inline]
+    fn is_func_decl(stmt: &Stmt) -> bool {
+        if let Stmt::Expr(Expr::Func(_)) = stmt {
+            true
+        } else {
+            false
         }
     }
 
