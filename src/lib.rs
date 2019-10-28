@@ -818,9 +818,9 @@ where
                 }
             }
             Token::Keyword(ref k) => match k {
-                Keyword::Break(_) => Stmt::Break(self.parse_break_stmt()?),
-                Keyword::Continue(_) => Stmt::Continue(self.parse_continue_stmt()?),
-                Keyword::Debugger(_) => self.parse_debugger_stmt()?,
+                Keyword::Break(k) => Stmt::Break(self.parse_break_stmt(k)?),
+                Keyword::Continue(k) => Stmt::Continue(self.parse_continue_stmt(k)?),
+                Keyword::Debugger(k) => self.parse_debugger_stmt(k)?,
                 Keyword::Do(_) => Stmt::DoWhile(self.parse_do_while_stmt()?),
                 Keyword::For(_) => self.parse_for_stmt()?,
                 Keyword::Function(_) => Stmt::Expr(self.parse_fn_stmt()?),
