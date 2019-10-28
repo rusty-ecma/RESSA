@@ -1316,7 +1316,6 @@ where
         } else {
             Some(self.parse_expression()?)
         };
-        let _d = format!("{:?}", test);
         debug!("{:#?}", test);
         self.expect_punct(Punct::SemiColon)?;
         let update = if self.at_punct(Punct::CloseParen) {
