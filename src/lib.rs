@@ -436,7 +436,7 @@ where
         let tok = self.look_ahead.token.clone();
         match &tok {
             Token::Keyword(ref k) => match k {
-                Keyword::Import(_s) => {
+                Keyword::Import(_) => {
                     if self.at_import_call() {
                         let stmt = self.parse_statement()?;
                         Ok(ProgramPart::Stmt(stmt))
@@ -452,33 +452,33 @@ where
                         Ok(ProgramPart::Decl(decl))
                     }
                 }
-                Keyword::Export(_s) => {
+                Keyword::Export(_) => {
                     let export = self.parse_export_decl()?;
                     let decl = Decl::Export(Box::new(export));
                     Ok(ProgramPart::Decl(decl))
                 }
-                Keyword::Const(_s) => {
+                Keyword::Const(_) => {
                     let decl = self.parse_lexical_decl(false)?;
                     Ok(ProgramPart::Decl(decl))
                 }
-                Keyword::Function(_s) => {
+                Keyword::Function(_) => {
                     let func = self.parse_function_decl(true)?;
                     let decl = Decl::Func(func);
                     Ok(ProgramPart::Decl(decl))
                 }
-                Keyword::Class(_s) => {
+                Keyword::Class(_) => {
                     let class = self.parse_class_decl(false)?;
                     let decl = Decl::Class(class);
                     Ok(ProgramPart::Decl(decl))
                 }
-                Keyword::Let(_s) => Ok(if self.at_lexical_decl() {
+                Keyword::Let(_) => Ok(if self.at_lexical_decl() {
                     let decl = self.parse_lexical_decl(false)?;
                     ProgramPart::Decl(decl)
                 } else {
                     let stmt = self.parse_statement()?;
                     ProgramPart::Stmt(stmt)
                 }),
-                Keyword::Var(_s) => {
+                Keyword::Var(_) => {
                     let _var = self.next_item()?;
                     let decls = self.parse_var_decl_list(false)?;
                     self.consume_semicolon()?;
@@ -818,21 +818,21 @@ where
                 }
             }
             Token::Keyword(ref k) => match k {
-                Keyword::Break(s) => Stmt::Break(self.parse_break_stmt(s)?),
-                Keyword::Continue(s) => Stmt::Continue(self.parse_continue_stmt(s)?),
-                Keyword::Debugger(s) => self.parse_debugger_stmt(s)?,
-                Keyword::Do(_s) => Stmt::DoWhile(self.parse_do_while_stmt()?),
-                Keyword::For(_s) => self.parse_for_stmt()?,
-                Keyword::Function(_s) => Stmt::Expr(self.parse_fn_stmt()?),
-                Keyword::If(_s) => Stmt::If(self.parse_if_stmt()?),
-                Keyword::Return(_s) => Stmt::Return(self.parse_return_stmt()?),
-                Keyword::Switch(_s) => Stmt::Switch(self.parse_switch_stmt()?),
-                Keyword::Throw(_s) => Stmt::Throw(self.parse_throw_stmt()?),
-                Keyword::Try(_s) => Stmt::Try(self.parse_try_stmt()?),
-                Keyword::Var(_s) => self.parse_var_stmt()?,
-                Keyword::While(_s) => Stmt::While(self.parse_while_stmt()?),
-                Keyword::With(_s) => Stmt::With(self.parse_with_stmt()?),
-                Keyword::Yield(_s) if !self.context.strict => self.parse_labelled_statement()?,
+                Keyword::Break(_) => Stmt::Break(self.parse_break_stmt()?),
+                Keyword::Continue(_) => Stmt::Continue(self.parse_continue_stmt()?),
+                Keyword::Debugger(_) => self.parse_debugger_stmt()?,
+                Keyword::Do(_) => Stmt::DoWhile(self.parse_do_while_stmt()?),
+                Keyword::For(_) => self.parse_for_stmt()?,
+                Keyword::Function(_) => Stmt::Expr(self.parse_fn_stmt()?),
+                Keyword::If(_) => Stmt::If(self.parse_if_stmt()?),
+                Keyword::Return(_) => Stmt::Return(self.parse_return_stmt()?),
+                Keyword::Switch(_) => Stmt::Switch(self.parse_switch_stmt()?),
+                Keyword::Throw(_) => Stmt::Throw(self.parse_throw_stmt()?),
+                Keyword::Try(_) => Stmt::Try(self.parse_try_stmt()?),
+                Keyword::Var(_) => self.parse_var_stmt()?,
+                Keyword::While(_) => Stmt::While(self.parse_while_stmt()?),
+                Keyword::With(_) => Stmt::With(self.parse_with_stmt()?),
+                Keyword::Yield(_) if !self.context.strict => self.parse_labelled_statement()?,
                 _ => Stmt::Expr(self.parse_expression_statement()?),
             },
             _ => return self.expected_token_error(&self.look_ahead, &[]),
@@ -1195,8 +1195,8 @@ where
             let kind = self.next_item()?;
             let kind = match &kind.token {
                 Token::Keyword(ref k) => match k {
-                    Keyword::Const(_s) => VarKind::Const,
-                    Keyword::Let(_s) => VarKind::Let,
+                    Keyword::Const(_) => VarKind::Const,
+                    Keyword::Let(_) => VarKind::Let,
                     _ => unreachable!(),
                 },
                 _ => return self.expected_token_error(&kind, &["const", "let"]),
@@ -1560,8 +1560,8 @@ where
         debug!("next: {:?} {}", next, self.context.allow_yield);
         let kind = match next.token {
             Token::Keyword(ref k) => match k {
-                Keyword::Let(_s) => VarKind::Let,
-                Keyword::Const(_s) => VarKind::Const,
+                Keyword::Let(_) => VarKind::Let,
+                Keyword::Const(_) => VarKind::Const,
                 _ => return self.expected_token_error(&next, &["let", "const"]),
             },
             _ => return self.expected_token_error(&next, &["let", "const"]),
@@ -2701,7 +2701,7 @@ where
                     is_static: false,
                 })
             } else if start.token.is_ident() ||
-                start.token.matches_keyword(Keyword::Yield(())) {
+                start.token == Token::Keyword(Keyword::Yield("yield")) {
                 if self.at_punct(Punct::Equal) {
                     self.context.first_covert_initialized_name_error =
                         Some(self.look_ahead.clone());
@@ -3864,9 +3864,9 @@ where
                 _ => None,
             },
             Token::Keyword(ref k) => match k {
-                Keyword::TypeOf(_s) => Some(UnaryOp::TypeOf),
-                Keyword::Void(_s) => Some(UnaryOp::Void),
-                Keyword::Delete(_s) => Some(UnaryOp::Delete),
+                Keyword::TypeOf(_) => Some(UnaryOp::TypeOf),
+                Keyword::Void(_) => Some(UnaryOp::Void),
+                Keyword::Delete(_) => Some(UnaryOp::Delete),
                 _ => None,
             },
             _ => None,
@@ -3876,8 +3876,8 @@ where
     fn binary_operator(token: &Token<&str>) -> Option<BinaryOp> {
         match token {
             Token::Keyword(ref key) => match key {
-                Keyword::InstanceOf(_s) => Some(BinaryOp::InstanceOf),
-                Keyword::In(_s) => Some(BinaryOp::In),
+                Keyword::InstanceOf(_) => Some(BinaryOp::InstanceOf),
+                Keyword::In(_) => Some(BinaryOp::In),
                 _ => None,
             },
             Token::Punct(ref p) => match p {
@@ -4701,7 +4701,7 @@ where
                 || token.matches_punct(Punct::DoubleDash)
         }
         if token.is_keyword() {
-             ret = token.matches_keyword(Keyword::Class(()))
+            ret = token.matches_keyword(Keyword::Class(()))
                 || token.matches_keyword(Keyword::Delete(()))
                 || token.matches_keyword(Keyword::Function(()))
                 || token.matches_keyword(Keyword::Let(()))
