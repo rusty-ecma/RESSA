@@ -483,6 +483,9 @@ fn test262() -> Res<()> {
         false
     };
     let len = failures.len();
+    let total_run = ct - SKIP_COUNT.load(std::sync::atomic::Ordering::Relaxed) as usize;
+    let fail_rate = len as f32 / total_run as f32;
+    let report = format!("Failed {} of {} test262, fail rate of {:02.2}%", len, total_run, fail_rate * 100.0);
     if write_failures {
         println!("getting ready to write failures");
         let base_path = PathBuf::from("failures");
@@ -511,6 +514,7 @@ fn test262() -> Res<()> {
             <body>";
             root_file.write_all(head)?;
             root_file.write_all(b"<h1>Failures</h1><ul>")?;
+            root_file.write_all(format!("<quote>{}<quote>", report).as_bytes())?;
             for failure in &failures {
                 use std::io::{Write,BufWriter};
                 use std::fs::File;
@@ -530,11 +534,8 @@ fn test262() -> Res<()> {
             println!("file:{}", root_path.display());
         }
     }
-    println!("found {} failures", len);
     if len > 0 {
-        let total_run = ct - SKIP_COUNT.load(std::sync::atomic::Ordering::Relaxed) as usize;
-        let fail_rate = len as f32 / total_run as f32;
-        panic!("Failed {} of {} test262, fail rate of {:02.2}%", len, total_run, fail_rate * 100.0);
+        panic!("{}", report);
     }
     Ok(())
 }
