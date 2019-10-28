@@ -508,13 +508,40 @@ fn test262() -> Res<()> {
             let head = b"<html>
             <head>
                 <title>ressa test 262 failures</title>
-                <script>{}</script>
-                <style>{}</style>
+                
+                <style>
+* {
+  font-family: sans-serif; 
+}
+body {
+    max-width: 800px;
+    margin: auto;
+}
+quote {
+  font-weight: bold;
+  color: ghostwhite;
+  background: grey;
+  padding: 5px 10px;
+  margin-bottom: 15px;
+}
+ul {
+  display: flex;
+  flex-flow: column;
+}
+li > a {
+  font-weight: bold;
+}
+li > .additional-info {
+  margin-bottom: 10px;
+  border: 1px solid black;
+  max-width: 800px;
+}
+                </style>
             </head>
             <body>";
             root_file.write_all(head)?;
             root_file.write_all(b"<h1>Failures</h1><ul>")?;
-            root_file.write_all(format!("<quote>{}<quote>", report).as_bytes())?;
+            root_file.write_all(format!("<quote>{}</quote>", report).as_bytes())?;
             for failure in &failures {
                 use std::io::{Write,BufWriter};
                 use std::fs::File;

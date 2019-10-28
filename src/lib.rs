@@ -403,7 +403,8 @@ where
         let expr = self.parse_expression()?;
         if let Expr::Lit(lit) = expr {
             if let Lit::String(s) = lit {
-                self.context.strict = s.inner_matches("use strict");
+                self.context.strict = self.context.strict || s.inner_matches("use strict");
+                debug!("updated context.strict to {}", self.context.strict);
                 if !self.context.allow_strict_directive && self.context.strict {
                     return self.unexpected_token_error(&orig, "use strict in an invalid location");
                 }
@@ -637,7 +638,12 @@ where
         }
         self.expect_keyword(Keyword::Export(()))?;
         if self.at_keyword(Keyword::Default(())) {
-            let _ = self.next_item()?;
+            let item = self.next_item()?;
+            if let Token::Keyword(k) = &item.token {
+                if k.has_unicode_escape() {
+                    return self.unexpected_token_error(&item, "Keyword used with escaped character(s)");
+                }
+            }
             let decl = if self.at_keyword(Keyword::Function(())) {
                 let func = Decl::Func(self.parse_function_decl(true)?);
                 DefaultExportDecl::Decl(func)
@@ -875,6 +881,7 @@ where
         self.expect_keyword(Keyword::While(()))?;
         self.expect_punct(Punct::OpenParen)?;
         let test = self.parse_expression()?;
+        let start_pos = self.look_ahead_position;
         let body = if !self.at_punct(Punct::CloseParen) {
             if !self.config.tolerant {
                 return self.expected_token_error(&self.look_ahead, &[")"]);
@@ -888,10 +895,14 @@ where
             self.context.in_iteration = prev_iter;
             body
         };
-        Ok(WhileStmt {
-            test,
-            body: Box::new(body),
-        })
+        if Self::is_func_decl(&body) {
+            Err(Error::InvalidFuncPosition(start_pos, "Function declaration cannot be the body of a do while loop, maybe wrap this in a block statement?".to_string()))
+        } else {
+            Ok(WhileStmt {
+                test,
+                body: Box::new(body),
+            })
+        }
     }
 
     #[inline]
@@ -2590,14 +2601,16 @@ where
         debug!("{}: parse_obj_init {:?}", self.look_ahead.span.start, self.look_ahead.token);
         self.expect_punct(Punct::OpenBrace)?;
         let mut props = Vec::new();
-        let mut has_proto = false;
+        let mut proto_ct = 0;
         while !self.at_punct(Punct::CloseBrace) {
             let prop = if self.at_punct(Punct::Ellipsis) {
                 let spread = self.parse_spread_element()?;
                 ObjProp::Spread(spread)
             } else {
-                let (found_proto, prop) = self.parse_obj_prop(has_proto)?;
-                has_proto = has_proto || found_proto;
+                let (found_proto, prop) = self.parse_obj_prop()?;
+                if found_proto {
+                    proto_ct += 1;
+                }
                 prop
             };
             props.push(prop);
@@ -2606,15 +2619,18 @@ where
             }
         }
         self.expect_punct(Punct::CloseBrace)?;
-        Ok(Expr::Obj(props))
+        if !self.at_punct(Punct::Equal) && proto_ct > 1 {
+            Err(Error::OperationError(self.look_ahead_position, "Multiple prototypes in object initializer is ot allowed".to_string()))
+        } else {
+            Ok(Expr::Obj(props))
+        }
     }
 
     #[inline]
-    fn parse_obj_prop(&mut self, has_proto: bool) -> Res<(bool, ObjProp<'b>)> {
+    fn parse_obj_prop(&mut self) -> Res<(bool, ObjProp<'b>)> {
         debug!("{}: parse_obj_prop {:?}", self.look_ahead.span.start, self.look_ahead.token);
         let start = self.look_ahead.clone();
-        let start_pos = self.look_ahead_position;
-        let mut has_proto = has_proto;
+        let mut is_proto = false;
         let mut at_get = false;
         let mut at_set = false;
         let (key, is_async, computed) = if start.token.is_ident() {
@@ -2678,13 +2694,7 @@ where
             let kind = PropKind::Init;
             if self.at_punct(Punct::Colon) && !is_async {
                 if !computed && Self::is_proto_(&key) {
-                    if has_proto {
-                        self.tolerate_error(Error::Redecl(
-                            start_pos,
-                            "prototype can only be declared once".to_string(),
-                        ))?;
-                    }
-                    has_proto = true;
+                    is_proto = true;
                 }
                 let _ = self.next_item()?;
                 let (prev_bind, prev_assign, prev_first) = self.get_cover_grammar_state();
@@ -2760,7 +2770,7 @@ where
         } else {
             return self.expected_token_error(&start, &["object property key"]);
         };
-        Ok((has_proto, prop))
+        Ok((is_proto, prop))
     }
 
     #[inline]
