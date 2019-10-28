@@ -3806,6 +3806,9 @@ where
         let expr = self.parse_unary_expression()?;
         self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
         if self.at_punct(Punct::DoubleAsterisk) {
+            if let Expr::Unary(_) = expr {
+                return Err(Error::OperationError(self.look_ahead_position, "Unary operation cannot be the left hand side of an exponentiation expression.".to_string()));
+            }
             let _stars = self.next_item()?;
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
