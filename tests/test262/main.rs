@@ -536,7 +536,9 @@ li > .additional-info {
   border: 1px solid black;
   max-width: 800px;
 }
-                </style>
+</style>
+<link rel=\"stylesheet\" href=\"http://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/styles/default.min.css\">
+
             </head>
             <body>";
             root_file.write_all(head)?;
@@ -554,6 +556,13 @@ li > .additional-info {
                     let mut f = BufWriter::new(File::create(&new_path)?);
                     f.write_all(head)?;
                     pulldown_cmark::html::write_html(&mut f, parser)?;
+                    f.write_all(format!("<script>{}
+document.addEventListener('DOMContentLoaded', (event) => {{
+  document.querySelectorAll('pre code').forEach((block) => {{
+    hljs.highlightBlock(block);
+  }});
+}});
+</script>", include_str!("./hilight.js")).as_bytes())?;
                     f.write_all(b"</body></html>")?;
                 }
             }

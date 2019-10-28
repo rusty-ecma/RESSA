@@ -17,3 +17,4 @@ moz-central
 *.ron
 /test262
 /failures
+!tests/test262/hilight.js
