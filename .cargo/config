@@ -1,0 +1,2 @@
+[alias]
+test262 = "test --features test_262 --test test262 -- test262"
