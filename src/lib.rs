@@ -2925,7 +2925,14 @@ where
             return self.expected_token_error(&ident, &["variable identifier"]);
         }
         let i = match ident.token {
-            Token::Ident(_) | Token::Keyword(_) => {
+            Token::Ident(_) => {
+                let s = self.get_string(&ident.span)?;
+                resast::Ident::from(s)
+            }
+            Token::Keyword(ref k) => {
+                if !k.has_unicode_escape() {
+                    return self.unexpected_token_error(&ident, "Keyword used as an identifier");
+                }
                 let s = self.get_string(&ident.span)?;
                 resast::Ident::from(s)
             }
