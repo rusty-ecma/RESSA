@@ -8,9 +8,8 @@
     "react": "^16.4.2",
     "react-dom": "^16.4.2",
     "vue": "^2.5.17",
-    "everything.js": "^1.0.3"
-  },
-  "dependencies": {
+    "everything.js": "^1.0.3",
     "acorn": "^6.2.0"
-  }
+  },
+  "dependencies": {}
 }
