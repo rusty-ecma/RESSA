@@ -217,6 +217,42 @@ get a() { return super.stuff; }
     let mut p = Parser::new(js).unwrap();
     p.parse().unwrap();
 }
+
+#[test]
+#[should_panic = "assignment not allowed in `for in` lhs"]
+fn init_in_for_in_loop() {
+    let _ = env_logger::try_init();
+    let js = "for (a = 0 in {}) {}";
+    let mut p = Parser::new(js).unwrap();
+    p.parse().expect("assignment not allowed in `for in` lhs");
+}
+
+#[test]
+#[should_panic = "assignment not allowed in `for in` lhs"]
+fn var_init_in_for_in_loop_strict() {
+    let _ = env_logger::try_init();
+    let js = "'use strict';
+for (var a = 0 in {}) {}";
+    let mut p = Parser::new(js).unwrap();
+    p.parse().expect("assignment not allowed in `for in` lhs");
+}
+#[test]
+fn var_init_in_for_in_loop_not_strict() {
+    let _ = env_logger::try_init();
+    let js = "for (var a = 0 in {}) {}";
+    let mut p = Parser::new(js).unwrap();
+    p.parse().expect("assignment not allowed in `for in` lhs");
+}
+#[test]
+#[should_panic = "use strict not allowed with fancy params"]
+fn arrow_funct_non_simple_args_use_strict_in_body() {
+    let _ = env_logger::try_init();
+    let js = "var x = (a = 0) => {
+'use strict';
+};";
+    let mut p = Parser::new(js).unwrap();
+    p.parse().expect("use strict not allowed with fancy params");
+}
 #[test]
 fn line_term_comment() {
     let _ = env_logger::try_init();

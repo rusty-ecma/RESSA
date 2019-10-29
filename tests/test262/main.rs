@@ -1,7 +1,8 @@
 #![cfg(feature = "test_262")]
 
 use serde::{Deserialize, Serialize};
-
+use std::fs::File;
+use std::io::{BufWriter};
 use flate2::read::GzDecoder;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -308,7 +309,7 @@ enum Flag {
 }
 
 static URL: &str = "https://github.com/tc39/test262/tarball/master";
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 struct TestFailure {
     pub path: PathBuf,
     pub strict: TestStatus,
@@ -317,7 +318,7 @@ struct TestFailure {
     pub desc: Description,
     pub js: String,
 }
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Debug, Serialize, PartialEq, Clone)]
 enum TestStatus {
     Success,
     Failure(String),
@@ -421,7 +422,7 @@ impl TestFailure {
             js = self.js
         )
     }
-    fn get_first_id(&self, fallback: &str) -> String {
+    pub fn get_first_id(&self, fallback: &str) -> String {
         if let Some(ref i) = self.desc.esid {
             i.to_string()
         } else if let Some(ref i) = self.desc.es5id {
@@ -440,8 +441,15 @@ impl TestFailure {
         if href.starts_with("\\\\?") {
             href = format!("\\\\{}", &href[3..]);
         }
+        let mut li_class = "failure-container".to_string();
+        if let Some(ref neg) = self.desc.negative {
+            if &neg.phase == &Phase::Parse {
+                li_class.push_str(" negative");
+            }
+        }
         let mut html = format!(
-            r#"<li><a class="test-name" href="{}">{}</a> - <div class="additional-info">"#,
+            r#"<li class="{}"><a class="test-name" href="{}">{}</a> - <div class="additional-info">"#,
+            li_class,
             href,
             self.get_first_id("unknown")
         );
@@ -501,6 +509,12 @@ fn test262() -> Res<()> {
         fail_rate * 100.0
     );
     if write_failures {
+        let mut collected = std::collections::HashMap::new();
+        for failure in failures {
+            let id = failure.get_first_id("unknown");
+            let sames = collected.entry(id).or_insert(vec![]);
+            sames.push(failure.clone());
+        }
         println!("getting ready to write failures");
         let base_path = PathBuf::from("failures");
         let base_path = base_path.join("test262");
@@ -551,41 +565,38 @@ li > .additional-info {
   border: 1px solid black;
   max-width: 800px;
 }
+li.negative {{
+    border-color: red;
+}}
 </style>
 <link rel=\"stylesheet\" href=\"http://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/styles/default.min.css\">
 
             </head>
             <body>";
             root_file.write_all(head)?;
-            root_file.write_all(b"<h1>Failures</h1><ul>")?;
-            root_file.write_all(format!("<quote>{}</quote>", report).as_bytes())?;
-            for failure in &failures {
-                use std::fs::File;
-                use std::io::{BufWriter, Write};
-                let new_path = failure.path.with_extension("html");
-                if let Some(file_name) = new_path.file_name() {
-                    let new_path = base_path.join(file_name);
-                    root_file.write_all(failure.as_list_item(&new_path).as_bytes())?;
-                    let md = failure.to_markdown();
-                    let parser = pulldown_cmark::Parser::new(&md);
-                    let mut f = BufWriter::new(File::create(&new_path)?);
-                    f.write_all(head)?;
-                    pulldown_cmark::html::write_html(&mut f, parser)?;
-                    f.write_all(
-                        format!(
-                            "<script>{}
-document.addEventListener('DOMContentLoaded', (event) => {{
-  document.querySelectorAll('pre code').forEach((block) => {{
-    hljs.highlightBlock(block);
-  }});
-}});
-</script>",
-                            include_str!("./hilight.js")
-                        )
-                        .as_bytes(),
-                    )?;
-                    f.write_all(b"</body></html>")?;
+            root_file.write_all(format!("<h1>Failures</h1><quote>{}</quote><ul>", report).as_bytes())?;
+            for (id, list) in collected {
+                root_file.write_all(format!("<li><h2>{} ({})</h2><ol>", id, list.len()).as_bytes())?;
+                for fail in list {
+                    let new_path = fail.path.with_extension("html");
+                    if let Some(file_name) = new_path.file_name() {
+                        let new_path = base_path.join(file_name);
+                        root_file.write(fail.as_list_item(&new_path).as_bytes())?;
+                        let md = fail.to_markdown();
+                        let parser = pulldown_cmark::Parser::new(&md);
+                        let mut f = BufWriter::new(File::create(&new_path)?);
+                        f.write_all(head)?;
+                        pulldown_cmark::html::write_html(&mut f, parser)?;
+                        f.write_all(
+                            format!(
+                                "<script>{};document.addEventListener('DOMContentLoaded', (event) => {{document.querySelectorAll('pre code').forEach((block) => {{hljs.highlightBlock(block);}});}});</script>",include_str!("./hilight.js")
+                            )
+                            .as_bytes(),
+                        )?;
+                        f.write_all(b"</body></html>")?;
+                    }
                 }
+                root_file.write_all(b"</ol></li>")?;
             }
             root_file.write_all(b"</ul></body></html>")?;
             let root_str = format!("{}", root_path.display());

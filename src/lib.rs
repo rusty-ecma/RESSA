@@ -1343,6 +1343,12 @@ where
             self.context.allow_in = prev_in;
             if self.at_keyword(Keyword::In(())) {
                 let _ = self.next_item()?;
+                if let Expr::Assign(_) = init {
+                    return Err(Error::ForOfInAssign(
+                        self.look_ahead_position,
+                        "For in loop left hand side cannot contain an assignment".to_string(),
+                    ));
+                }
                 let left = LoopLeft::Expr(init);
                 let right = self.parse_expression()?;
                 Ok(Stmt::ForIn(ForInStmt {
@@ -1432,11 +1438,27 @@ where
             "{}: parse_for_in_loop {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        if let LoopLeft::Variable(_, VarDecl { init: Some(_), .. }) = left {
-            return Err(Error::ForOfInAssign(
-                self.look_ahead_position,
-                "For in loop left hand side cannot contain an assignment".to_string(),
-            ));
+        if let LoopLeft::Variable(kind, VarDecl { ref id, init: Some(_), .. }) = left {
+            if kind != VarKind::Var || self.context.strict {
+                return Err(Error::ForOfInAssign(
+                    self.look_ahead_position,
+                    "For in loop left hand side cannot contain an assignment".to_string(),
+                ));
+            }
+            match id {
+                Pat::Obj(_) 
+                | Pat::Array(_) => return Err(Error::ForOfInAssign(
+                        self.look_ahead_position,
+                        "For in loop left hand side cannot contain an assignment".to_string(),
+                    )),
+                _ => ()
+            }
+            // else {
+            //     return Err(Error::ForOfInAssign(
+            //         self.look_ahead_position,
+            //         "For in loop left hand side cannot contain an assignment".to_string(),
+            //     ));
+            // }
         }
         let _ = self.next_item()?;
         let right = self.parse_expression()?;
@@ -3541,6 +3563,7 @@ where
                 self.context.is_assignment_target = false;
                 self.context.is_binding_element = false;
                 let is_async = Self::is_async(&current);
+                let prev_strict = self.context.allow_strict_directive;
                 if let Some(params) = self.reinterpret_as_cover_formals_list(current.clone())? {
                     if self.context.strict {
                         if params.iter().any(Self::check_arg_strict_mode) {
@@ -3574,6 +3597,7 @@ where
                             body: ArrowFuncBody::Expr(Box::new(a)),
                         });
                     };
+                    self.context.allow_strict_directive = prev_strict;
                 }
             } else if self.at_assign() {
                 if !self.context.is_assignment_target && !self.config.tolerant {
@@ -3720,6 +3744,7 @@ where
                 match &param {
                     FuncArg::Pat(ref p) => {
                         if let Pat::Assign(ref a) = p {
+                            self.context.allow_super_call = false;
                             if let Expr::Yield(ref y) = &*a.right {
                                 if y.argument.is_some() {
                                     invalid_param = true;
@@ -3794,6 +3819,7 @@ where
                 &["not a yield expression in a function param"],
             );
         }
+        let mut found_non_simple = false;
         if self.context.strict && !self.context.allow_yield {
             for param in params2.iter() {
                 if let FuncArg::Expr(ref e) = param {
@@ -3804,7 +3830,13 @@ where
                         );
                     }
                 }
+                if !found_non_simple && Self::is_simple(param) {
+                    found_non_simple = true;
+                }
             }
+        }
+        if found_non_simple {
+            self.context.allow_strict_directive = false;
         }
         Ok(Some(params2))
     }
