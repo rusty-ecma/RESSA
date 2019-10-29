@@ -97,6 +97,13 @@ struct Context<'a> {
     allow_yield: bool,
     /// If await is allowed as an identifier
     allow_await: bool,
+    /// if super is allowed as a keyword
+    allow_super: bool,
+    /// if super is allowed to be part of a call expression
+    /// allow_super should always be true when this is true
+    /// but not the other way around. This is only valid in a 
+    /// constructor
+    allow_super_call: bool,
     /// If we have found any possible naming errors
     /// which are not yet resolved
     first_covert_initialized_name_error: Option<Item<Token<&'a str>>>,
@@ -144,6 +151,8 @@ impl<'a> Default for Context<'a> {
             allow_in: true,
             allow_strict_directive: true,
             allow_yield: true,
+            allow_super: false,
+            allow_super_call: false,
             first_covert_initialized_name_error: None,
             is_assignment_target: false,
             is_binding_element: false,
@@ -1852,8 +1861,11 @@ where
         };
         let prev_await = self.context.allow_await;
         let prev_yield = self.context.allow_yield;
+        let prev_super = self.context.allow_super;
         self.context.allow_await = is_async;
         self.context.allow_yield = !is_gen;
+        debug!("setting allow_super to {}", false);
+        self.context.allow_super = false;
 
         let formal_params = self.parse_formal_params()?;
         let strict = formal_params.strict;
@@ -1874,6 +1886,8 @@ where
         self.context.allow_strict_directive = prev_allow_strict;
         self.context.allow_await = prev_await;
         self.context.allow_yield = prev_yield;
+        debug!("setting allow_super to {}", prev_super);
+        self.context.allow_super = prev_super;
         Ok(Func {
             id,
             params,
@@ -1945,6 +1959,10 @@ where
         } else {
             None
         };
+        if super_class.is_some() {
+            debug!("setting allow_super to {}", true);
+            self.context.allow_super = true;
+        }
         let body = self.parse_class_body()?;
 
         self.context.strict = prev_strict;
@@ -1985,6 +2003,8 @@ where
         );
         let mut token = self.look_ahead.token.clone();
         let mut has_ctor = has_ctor;
+        let mut is_ctor = false;
+        let prev_super_call = self.context.allow_super_call;
         let mut key: Option<PropKey> = None;
         let mut value: Option<PropValue> = None;
         let mut computed = false;
@@ -2002,7 +2022,7 @@ where
             computed = self.at_punct(Punct::OpenBracket);
 
             let new_key = self.parse_object_property_key()?;
-
+            
             if Self::is_static(&new_key)
                 && (Self::qualified_prop_name(&self.look_ahead.token)
                     || self.at_punct(Punct::Asterisk))
@@ -2016,6 +2036,7 @@ where
                     key = Some(self.parse_object_property_key()?);
                 }
             } else {
+                is_ctor = Self::is_key(&new_key, "constructor");
                 key = Some(new_key);
             }
             if token.is_ident()
@@ -2064,6 +2085,11 @@ where
         }
 
         if kind.is_none() && key.is_some() && self.at_punct(Punct::OpenParen) {
+            if is_ctor {
+                self.context.allow_super_call = self.context.allow_super;
+            } else {
+                self.context.allow_super_call = false;
+            }
             kind = Some(PropKind::Init);
             method = true;
             value = Some(if is_async {
@@ -2092,7 +2118,7 @@ where
             if is_static && Self::is_key(&key, "prototype") {
                 return self.expected_token_error(&self.look_ahead, &[]);
             }
-            if !is_static && Self::is_key(&key, "constructor") {
+            if !is_static && is_ctor {
                 if kind != PropKind::Method || !method {
                     return self
                         .expected_token_error(&self.look_ahead, &["[constructor declaration]"]);
@@ -2108,7 +2134,7 @@ where
                 if has_ctor {
                     return self.expected_token_error(&self.look_ahead, &[]);
                 } else {
-                    has_ctor = true;
+                    has_ctor = is_ctor;
                 }
                 kind = PropKind::Ctor;
             }
@@ -2119,7 +2145,7 @@ where
         } else {
             return self.expected_token_error(&self.look_ahead, &[]);
         };
-
+        self.context.allow_super_call = prev_super_call;
         Ok((
             has_ctor,
             Prop {
@@ -2135,6 +2161,10 @@ where
     }
 
     #[inline]
+    /// Compares `key` with `other` to see if they 
+    /// match, this takes into account all of the 
+    /// different shapes that `key` could be, including
+    /// identifiers and literals
     fn is_key(key: &PropKey, other: &str) -> bool {
         match key {
             PropKey::Lit(ref l) => match l {
@@ -2844,21 +2874,30 @@ where
             (Some(key), false, computed)
         };
         let at_qualified = self.at_qualified_prop_key();
+        let prev_super = self.context.allow_super;
         let prop = if at_get && at_qualified && !is_async {
+            let key = self.parse_object_property_key()?;
+            self.context.allow_super = true;
+            let value = self.parse_getter_method()?;
+            self.context.allow_super = prev_super;
             ObjProp::Prop(Prop {
                 computed: self.at_punct(Punct::OpenBracket),
-                key: self.parse_object_property_key()?,
-                value: self.parse_getter_method()?,
+                key,
+                value,
                 kind: PropKind::Get,
                 method: false,
                 short_hand: false,
                 is_static: false,
             })
         } else if at_set && at_qualified && !is_async {
+            let key = self.parse_object_property_key()?;
+            self.context.allow_super = true;
+            let value = self.parse_setter_method()?;
+            self.context.allow_super = prev_super;
             ObjProp::Prop(Prop {
                 computed: self.at_punct(Punct::OpenBracket),
-                key: self.parse_object_property_key()?,
-                value: self.parse_setter_method()?,
+                key,
+                value,
                 kind: PropKind::Set,
                 method: false,
                 short_hand: false,
@@ -2894,14 +2933,17 @@ where
                     is_static: false,
                 })
             } else if self.at_punct(Punct::OpenParen) {
+                self.context.allow_super = true;
+                let value = if is_async {
+                    self.parse_async_property_method()?
+                } else {
+                    self.parse_property_method()?
+                };
+                self.context.allow_super = prev_super;
                 ObjProp::Prop(Prop {
                     computed,
                     key,
-                    value: if is_async {
-                        self.parse_async_property_method()?
-                    } else {
-                        self.parse_property_method()?
-                    },
+                    value,
                     kind,
                     method: true,
                     short_hand: false,
@@ -3054,6 +3096,9 @@ where
         }
         let prev_await = self.context.allow_await;
         let prev_yield = self.context.allow_yield;
+        let prev_super = self.context.allow_super;
+        debug!("setting allow_super to {}", false);
+        self.context.allow_super = false;
         self.context.allow_await = is_async;
         self.context.allow_yield = !is_gen;
         let mut found_restricted = false;
@@ -3077,7 +3122,6 @@ where
         } else {
             None
         };
-        let param_start = self.look_ahead_position;
         let formal_params = self.parse_formal_params()?;
         found_restricted = found_restricted || formal_params.found_restricted;
         let prev_strict = self.context.strict;
@@ -3095,6 +3139,8 @@ where
         self.context.allow_strict_directive = prev_allow_strict_directive;
         self.context.allow_yield = prev_yield;
         self.context.allow_await = prev_await;
+        debug!("setting allow_super to {}", prev_super);
+        self.context.allow_super = prev_super;
         let func = Func {
             id,
             params: formal_params.params,
@@ -4397,10 +4443,21 @@ where
     }
 
     #[inline]
+    /// Will parse a pending super expression.
+    /// 
+    /// > note: This will handle any invalid super expression
+    /// scenarios
     fn parse_super(&mut self) -> Res<Expr<'b>> {
+        let super_position = self.look_ahead_position;
+        if !self.context.allow_super {
+            return Err(Error::InvalidSuper(super_position));
+        }
         self.expect_keyword(Keyword::Super(()))?;
-        if !self.at_punct(Punct::OpenBracket) && !self.at_punct(Punct::Period) {
-            return self.expected_token_error(&self.look_ahead, &["[", "."]);
+        if self.at_punct(Punct::OpenParen) && !self.context.allow_super_call {
+            return Err(Error::InvalidSuper(super_position))
+        }
+        if !self.at_punct(Punct::OpenBracket) && !self.at_punct(Punct::Period) && !self.at_punct(Punct::OpenParen) {
+            return self.expected_token_error(&self.look_ahead, &["[", ".", "("]);
         }
         Ok(Expr::Super)
     }
@@ -4417,14 +4474,7 @@ where
         self.context.allow_in = true;
 
         let mut expr = if self.at_keyword(Keyword::Super(())) && self.context.in_function_body {
-            let _ = self.next_item()?;
-            if !self.at_punct(Punct::OpenParen)
-                && !self.at_punct(Punct::Period)
-                && !self.at_punct(Punct::OpenBracket)
-            {
-                return self.expected_token_error(&self.look_ahead, &["(", ".", "["]);
-            }
-            Expr::Super
+            self.parse_super()?
         } else {
             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
             let ret = if self.at_keyword(Keyword::New(())) {

@@ -22,6 +22,7 @@ pub enum Error {
     UseOfModuleFeatureOutsideOfModule(Position, String),
     NewLineAfterFatArrow(Position),
     StrictModeArgumentsOrEval(Position),
+    InvalidSuper(Position),
     InvalidFuncPosition(Position, String),
     ForOfInAssign(Position, String),
     Scanner(ress::error::Error),
@@ -53,6 +54,7 @@ impl Display for Error {
             Error::StrictModeArgumentsOrEval(ref pos) => write!(f, "arguments or eval used as an identifier in strict mode near {}", pos),
             Error::InvalidFuncPosition(ref pos, ref msg) => write!(f, "{} at {}", msg, pos),
             Error::ForOfInAssign(ref pos, ref msg) => write!(f, "{} at {}", msg, pos),
+            Error::InvalidSuper(ref pos) => write!(f, "Invalid use of super at {}", pos),
             Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
             Error::Other(ref e) => write!(f, "{}", e),
         }
