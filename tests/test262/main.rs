@@ -1,22 +1,15 @@
 #![cfg(feature = "test_262")]
 
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 
+use flate2::read::GzDecoder;
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ressa::Parser;
 use std::{
     error::Error,
     path::{Path, PathBuf},
 };
-use flate2::read::GzDecoder;
-use indicatif::{
-    ParallelProgressIterator, 
-    ProgressBar, 
-    ProgressStyle, 
-};
-use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 
 static SKIPPED_FEATURES: &[&str] = &[
     "coalesce-expression",
@@ -170,24 +163,26 @@ impl E262 {
 impl<'a> Test262Runner<'a> {
     pub fn new(js: &'a str) -> Res<Self> {
         let desc = Self::find_desc_comment(js)?;
-        Ok(Self {
-            desc,
-            js,
-        })
+        Ok(Self { desc, js })
     }
     fn find_desc_comment(js: &str) -> Result<Description, E262> {
-        let start_idx = js.find("/*---").ok_or_else(|| E262::new("Unable to find comment start"))?;
-        let ending = js.get(start_idx+5..).ok_or_else(|| E262::new("Invalid start index"))?;
-        let end_idx = ending.find("---*/").ok_or_else(|| E262::new("Unable to find comment end"))?;
-        let trimmed = ending.get(..end_idx).ok_or_else(|| E262::new("Invalid end index"))?;
+        let start_idx = js
+            .find("/*---")
+            .ok_or_else(|| E262::new("Unable to find comment start"))?;
+        let ending = js
+            .get(start_idx + 5..)
+            .ok_or_else(|| E262::new("Invalid start index"))?;
+        let end_idx = ending
+            .find("---*/")
+            .ok_or_else(|| E262::new("Unable to find comment end"))?;
+        let trimmed = ending
+            .get(..end_idx)
+            .ok_or_else(|| E262::new("Invalid end index"))?;
         let ret = if trimmed.contains('\r') {
-            serde_yaml::from_str(&trimmed
-                .replace("\r\n", "\n")
-                .replace('\r', "\n"))
+            serde_yaml::from_str(&trimmed.replace("\r\n", "\n").replace('\r', "\n"))
                 .map_err(E262::from)?
         } else {
-            serde_yaml::from_str(trimmed)
-                    .map_err(E262::from)?
+            serde_yaml::from_str(trimmed).map_err(E262::from)?
         };
         Ok(ret)
     }
@@ -195,9 +190,14 @@ impl<'a> Test262Runner<'a> {
         self.desc.clone()
     }
     pub fn run_strict(&self) -> Result<(), E262> {
-        if !self.desc.flags.iter().any(|f| f == &Flag::Module || f == &Flag::NoStrict) {
+        if !self
+            .desc
+            .flags
+            .iter()
+            .any(|f| f == &Flag::Module || f == &Flag::NoStrict)
+        {
             self.run_script(&format!("'use strict'\n{}", self.js))?;
-        } 
+        }
         Ok(())
     }
 
@@ -208,7 +208,7 @@ impl<'a> Test262Runner<'a> {
             } else {
                 self.run_script(&self.js)?;
             }
-        } 
+        }
         Ok(())
     }
 
@@ -222,12 +222,12 @@ impl<'a> Test262Runner<'a> {
         Ok(())
     }
 
-    fn run_(&self, module: bool, js: &str)  -> Result<(), E262> {
+    fn run_(&self, module: bool, js: &str) -> Result<(), E262> {
         let mut p = Parser::builder()
-                        .module(module)
-                        .js(js)
-                        .build()
-                        .map_err(|e| E262::new(&format!("{:?}", e)))?;
+            .module(module)
+            .js(js)
+            .build()
+            .map_err(|e| E262::new(&format!("{:?}", e)))?;
         match p.parse() {
             Ok(program) => {
                 if let Some(n) = &self.desc.negative {
@@ -239,7 +239,7 @@ impl<'a> Test262Runner<'a> {
                 } else {
                     Ok(())
                 }
-            },
+            }
             Err(e) => {
                 if let Some(n) = &self.desc.negative {
                     if &n.phase == &Phase::Parse {
@@ -254,7 +254,6 @@ impl<'a> Test262Runner<'a> {
         }
     }
 }
-
 
 #[derive(Debug, Deserialize, Clone, Default, Serialize)]
 struct Description {
@@ -322,7 +321,7 @@ struct TestFailure {
 enum TestStatus {
     Success,
     Failure(String),
-    NotRun
+    NotRun,
 }
 impl TestStatus {
     pub fn is_failure(&self) -> bool {
@@ -344,13 +343,16 @@ impl ::std::fmt::Display for TestStatus {
 }
 impl TestFailure {
     pub fn is_failure(&self) -> bool {
-        self.strict.is_failure()
-            || self.not_strict.is_failure()
-            || self.runner.is_failure()
+        self.strict.is_failure() || self.not_strict.is_failure() || self.runner.is_failure()
     }
     pub fn to_markdown(&self) -> String {
         let flags: Vec<String> = self.desc.flags.iter().map(|f| format!("{:?}", f)).collect();
-        let features: Vec<String> = self.desc.features.iter().map(|f| format!("{:?}", f)).collect();
+        let features: Vec<String> = self
+            .desc
+            .features
+            .iter()
+            .map(|f| format!("{:?}", f))
+            .collect();
         let desc = if let Some(ref inner) = self.desc.description {
             inner.to_string()
         } else {
@@ -378,7 +380,8 @@ impl TestFailure {
         if let Some(ref i) = self.desc.es6id {
             id.push_str(&format!("{} (es6id) ", i));
         }
-        format!("# {id}
+        format!(
+            "# {id}
 ## Description
 {desc}
 
@@ -406,17 +409,17 @@ impl TestFailure {
 ```js
 {js}
 ```
-", 
-id=id,
-desc=desc, 
-info=info, 
-flags=flags.join(", "),
-features=features.join(", "),
-runner=runner,
-strict=strict,
-not=not,
-js=self.js
-)
+",
+            id = id,
+            desc = desc,
+            info = info,
+            flags = flags.join(", "),
+            features = features.join(", "),
+            runner = runner,
+            strict = strict,
+            not = not,
+            js = self.js
+        )
     }
     fn get_first_id(&self, fallback: &str) -> String {
         if let Some(ref i) = self.desc.esid {
@@ -437,10 +440,12 @@ js=self.js
         if href.starts_with("\\\\?") {
             href = format!("\\\\{}", &href[3..]);
         }
-        let mut html = format!(r#"<li><a class="test-name" href="{}">{}</a> - <div class="additional-info">"#, 
+        let mut html = format!(
+            r#"<li><a class="test-name" href="{}">{}</a> - <div class="additional-info">"#,
             href,
-            self.get_first_id("unknown"));
-        if let TestStatus::Failure(_) =  self.runner {
+            self.get_first_id("unknown")
+        );
+        if let TestStatus::Failure(_) = self.runner {
             html.push_str(r#"<span class="not-run-error">!!!</span>"#)
         }
         if let Some(ref d) = self.desc.description {
@@ -450,7 +455,10 @@ js=self.js
             html.push_str(r#"<div class="feature title"><span>features</span></div>"#)
         }
         for feat in &self.desc.features {
-            html.push_str(&format!(r#"<div class="feature"><span>{:?}</span></div>"#, feat));
+            html.push_str(&format!(
+                r#"<div class="feature"><span>{:?}</span></div>"#,
+                feat
+            ));
         }
         html.push_str("</div></li>");
         html
@@ -470,7 +478,8 @@ fn test262() -> Res<()> {
     pb.set_style(sty.clone());
     let (ct, paths) = get_paths(&path);
     pb.set_length(ct as u64);
-    let failures: Vec<TestFailure> = paths.par_iter()
+    let failures: Vec<TestFailure> = paths
+        .par_iter()
         .progress_with(pb)
         .filter_map(test_mapper)
         .collect();
@@ -485,7 +494,12 @@ fn test262() -> Res<()> {
     let len = failures.len();
     let total_run = ct - SKIP_COUNT.load(std::sync::atomic::Ordering::Relaxed) as usize;
     let fail_rate = len as f32 / total_run as f32;
-    let report = format!("Failed {} of {} test262, fail rate of {:02.2}%", len, total_run, fail_rate * 100.0);
+    let report = format!(
+        "Failed {} of {} test262, fail rate of {:02.2}%",
+        len,
+        total_run,
+        fail_rate * 100.0
+    );
     if write_failures {
         println!("getting ready to write failures");
         let base_path = PathBuf::from("failures");
@@ -493,13 +507,14 @@ fn test262() -> Res<()> {
         if base_path.exists() {
             let _ = ::std::fs::remove_dir_all(&base_path);
         }
-        let keep_writing = base_path.exists() || if let Ok(_) = ::std::fs::create_dir_all(&base_path) {
-            println!("created directory");
-            true
-        } else {
-            println!("failed to create directory");
-            false
-        };
+        let keep_writing = base_path.exists()
+            || if let Ok(_) = ::std::fs::create_dir_all(&base_path) {
+                println!("created directory");
+                true
+            } else {
+                println!("failed to create directory");
+                false
+            };
         let base_path = ::std::fs::canonicalize(&base_path)?;
         if keep_writing {
             use std::io::Write;
@@ -545,8 +560,8 @@ li > .additional-info {
             root_file.write_all(b"<h1>Failures</h1><ul>")?;
             root_file.write_all(format!("<quote>{}</quote>", report).as_bytes())?;
             for failure in &failures {
-                use std::io::{Write,BufWriter};
                 use std::fs::File;
+                use std::io::{BufWriter, Write};
                 let new_path = failure.path.with_extension("html");
                 if let Some(file_name) = new_path.file_name() {
                     let new_path = base_path.join(file_name);
@@ -556,18 +571,29 @@ li > .additional-info {
                     let mut f = BufWriter::new(File::create(&new_path)?);
                     f.write_all(head)?;
                     pulldown_cmark::html::write_html(&mut f, parser)?;
-                    f.write_all(format!("<script>{}
+                    f.write_all(
+                        format!(
+                            "<script>{}
 document.addEventListener('DOMContentLoaded', (event) => {{
   document.querySelectorAll('pre code').forEach((block) => {{
     hljs.highlightBlock(block);
   }});
 }});
-</script>", include_str!("./hilight.js")).as_bytes())?;
+</script>",
+                            include_str!("./hilight.js")
+                        )
+                        .as_bytes(),
+                    )?;
                     f.write_all(b"</body></html>")?;
                 }
             }
             root_file.write_all(b"</ul></body></html>")?;
-            println!("file:{}", root_path.display());
+            let root_str = format!("{}", root_path.display());
+            if root_str.starts_with("\\\\?") {
+                println!("file://{}", &root_str[3..].replace('\\', "/"))
+            } else {
+                println!("file:{}", root_str.replace('\\', "/"));
+            }
         }
     }
     if len > 0 {
@@ -582,9 +608,9 @@ fn get_paths(path: &Path) -> (usize, Vec<PathBuf>) {
         .filter_map(filter_mapper);
     let ct = wd.count();
     let wd = walkdir::WalkDir::new(path)
-                            .into_iter()
-                            .filter_map(filter_mapper)
-                            .collect();
+        .into_iter()
+        .filter_map(filter_mapper)
+        .collect();
     (ct, wd)
 }
 
@@ -624,9 +650,9 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
                 strict: TestStatus::NotRun,
                 not_strict: TestStatus::NotRun,
                 runner: TestStatus::Failure(format!("{}", e)),
-                js: contents
+                js: contents,
             });
-        },
+        }
     };
     let mut ret = TestFailure {
         desc: handler.clone_desc(),
@@ -636,7 +662,12 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
         runner: TestStatus::Success,
         js: contents.clone(),
     };
-    if ret.desc.features.iter().any(|f| SKIPPED_FEATURES.iter().any(|f2| f == f2)) {
+    if ret
+        .desc
+        .features
+        .iter()
+        .any(|f| SKIPPED_FEATURES.iter().any(|f2| f == f2))
+    {
         SKIP_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         return None;
     }
@@ -667,13 +698,10 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
 
 fn get_repo(path: &Path) -> Res<()> {
     let _ = ::std::fs::create_dir_all(path);
-    let mut response = reqwest::get(
-        URL,
-    )?;
+    let mut response = reqwest::get(URL)?;
     let mut buf = Vec::new();
-    response
-        .copy_to(&mut buf)?;
-        
+    response.copy_to(&mut buf)?;
+
     let gz = GzDecoder::new(buf.as_slice());
     let mut t = tar::Archive::new(gz);
     let mut target: Option<PathBuf> = None;
@@ -725,14 +753,20 @@ fn yeild_in_strict_mode() {
     let _ = env_logger::try_init();
     let js = "'use strict'
 var yield = 1;";
-    let mut p = Parser::builder().js(js).build().expect("faile to create parser"); 
+    let mut p = Parser::builder()
+        .js(js)
+        .build()
+        .expect("faile to create parser");
     match p.parse() {
         Err(e) => println!("{}", e),
         _ => panic!("Unexpected successful parse of yield as identifier"),
     }
     let js = "'use strict'
 var \\u0079ield = 123;";
-    let mut p = Parser::builder().js(js).build().expect("faile to create parser"); 
+    let mut p = Parser::builder()
+        .js(js)
+        .build()
+        .expect("faile to create parser");
     match p.parse() {
         Err(e) => println!("{}", e),
         _ => panic!("Unexpected successful parse of escaped yield as identifier"),

@@ -87,7 +87,10 @@ fn new_line_in_fat_arrow() {
     if let Err(ressa::Error::NewLineAfterFatArrow(_)) = expect {
         ()
     } else {
-        panic!("Incorrectly parsed arrow function with new line after =>\n{:?}", expect);
+        panic!(
+            "Incorrectly parsed arrow function with new line after =>\n{:?}",
+            expect
+        );
     }
 }
 
@@ -113,7 +116,7 @@ __proto__: Number,
 });";
     let mut parser = Parser::new(js).expect("failed to create parser");
     let expect = parser.parse();
-    if let Err(ressa::Error::Redecl(_,_)) = expect {
+    if let Err(ressa::Error::Redecl(_, _)) = expect {
         ()
     } else {
         panic!("Incorrectly parsed multiple __proto__ properties");

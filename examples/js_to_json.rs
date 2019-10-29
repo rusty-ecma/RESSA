@@ -1,4 +1,3 @@
-
 use docopt::Docopt;
 use std::{
     error::Error,

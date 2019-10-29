@@ -4637,15 +4637,7 @@ fn var_decl_one_2015() -> Part {
 fn var_decl_two() -> ProgramPart<'static> {
     ProgramPart::Decl(Decl::Var(
         VarKind::Var,
-        var_decls(&[
-            r"œ一",
-            r"ǻ둘",
-            r"ɤ〩",
-            r"φ",
-            r"ﬁⅷ",
-            r"ユニコード",
-            r"x‌‍",
-        ]),
+        var_decls(&[r"œ一", r"ǻ둘", r"ɤ〩", r"φ", r"ﬁⅷ", r"ユニコード", r"x‌‍"]),
     ))
 }
 fn var_decl_two_2015() -> ProgramPart<'static> {
