@@ -532,7 +532,7 @@ fn test262() -> Res<()> {
         let base_path = ::std::fs::canonicalize(&base_path)?;
         if keep_writing {
             use std::io::Write;
-            let root_path = base_path.join("test262.html");
+            let root_path = base_path.join("index.html");
             let mut root_file = ::std::io::BufWriter::new(::std::fs::File::create(&root_path)?);
             let head = b"<html>
             <head>
@@ -581,7 +581,7 @@ li.negative {{
                     let new_path = fail.path.with_extension("html");
                     if let Some(file_name) = new_path.file_name() {
                         let new_path = base_path.join(file_name);
-                        root_file.write(fail.as_list_item(&new_path).as_bytes())?;
+                        root_file.write(fail.as_list_item(&file_name).as_bytes())?;
                         let md = fail.to_markdown();
                         let parser = pulldown_cmark::Parser::new(&md);
                         let mut f = BufWriter::new(File::create(&new_path)?);
