@@ -387,6 +387,9 @@ where
             "{}: parse_script {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
+        if self.context.is_module {
+            self.context.strict = true;
+        }
         let body: Res<Vec<ProgramPart>> = self.collect();
         Ok(if self.context.is_module {
             Program::Mod(body?)
@@ -5250,6 +5253,9 @@ where
             self.context.past_prolog,
             self.context.strict
         );
+        if self.context.is_module {
+            self.context.strict = true;
+        }
         if !self.context.past_prolog {
             if self.look_ahead.is_string() {
                 let next_part = match self.parse_directive() {
