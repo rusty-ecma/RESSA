@@ -451,7 +451,7 @@ impl TestFailure {
             r#"<li class="{}"><a class="test-name" href="{}">{}</a> - <div class="additional-info">"#,
             li_class,
             href,
-            self.get_first_id("unknown")
+            self.path.display()
         );
         if let TestStatus::Failure(_) = self.runner {
             html.push_str(r#"<span class="not-run-error">!!!</span>"#)
@@ -565,9 +565,9 @@ li > .additional-info {
   border: 1px solid black;
   max-width: 800px;
 }
-li.negative {{
+li.negative {
     border-color: red;
-}}
+}
 </style>
 <link rel=\"stylesheet\" href=\"http://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/styles/default.min.css\">
 
