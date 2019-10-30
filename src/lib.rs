@@ -1865,7 +1865,7 @@ where
             }
             is_gen
         };
-        let (id, first_restricted) = if !opt_ident || !self.at_punct(Punct::OpenParen) {
+        let (id, _first_restricted) = if !opt_ident || !self.at_punct(Punct::OpenParen) {
             let start = self.look_ahead.clone();
             let id = self.parse_var_ident(false)?;
             if self.context.strict && start.token.is_restricted() {
@@ -1891,7 +1891,7 @@ where
         self.context.allow_yield = !is_gen;
         debug!("setting allow_super to {}", false);
         self.context.allow_super = false;
-
+        let param_start = self.look_ahead_position;
         let formal_params = self.parse_formal_params()?;
         let strict = formal_params.strict;
         let params = formal_params.params;
@@ -1900,8 +1900,8 @@ where
         self.context.allow_strict_directive = formal_params.simple;
         let body = self.parse_function_source_el()?;
         if self.context.strict {
-            if let Some(ref item) = first_restricted {
-                return self.expected_token_error(item, &[]);
+            if formal_params.found_restricted {
+                return Err(Error::StrictModeArgumentsOrEval(param_start));
             }
         }
         if self.context.strict && strict {
@@ -3230,15 +3230,12 @@ where
                 resast::Ident::from(s)
             }
             Token::Keyword(ref k) => {
-                if k.has_unicode_escape()
-                    || k == &Keyword::Yield(()) 
-                    || k == &Keyword::Await(()) 
-                    || (!self.context.strict && k.is_strict_reserved())
-                {
+                if k.is_reserved()
+                || (self.context.strict && k.is_strict_reserved()) {
+                    return self.unexpected_token_error(&ident, "reserved word as ident")
+                } else {
                     let s = self.get_string(&ident.span)?;
                     resast::Ident::from(s)
-                } else {
-                    return self.unexpected_token_error(&ident, "Keyword used as an identifier");
                 }
             }
             _ => self.expected_token_error(&ident, &["variable identifier"])?,
@@ -4692,7 +4689,14 @@ where
             "{}: parse_new_expr {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        self.expect_keyword(Keyword::New(()))?;
+        let item = self.next_item()?;
+        if let Token::Keyword(ref key) = &item.token {
+            if key.has_unicode_escape() {
+                return self.unexpected_token_error(&item, "`new` cannot contain unicode escapes");
+            }
+        } else {
+            return self.expected_token_error(&item, &["new"]);
+        }
         if self.at_punct(Punct::Period) {
             let _ = self.next_item()?;
             if self.at_contextual_keyword("target") && self.context.in_function_body {
