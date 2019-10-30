@@ -2830,6 +2830,7 @@ where
             "{}: parse_obj_init {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
+        let start_pos = self.look_ahead_position;
         self.expect_punct(Punct::OpenBrace)?;
         let mut props = Vec::new();
         let mut proto_ct = 0;
@@ -2852,7 +2853,7 @@ where
         self.expect_punct(Punct::CloseBrace)?;
         if !self.at_punct(Punct::Equal) && proto_ct > 1 {
             Err(Error::OperationError(
-                self.look_ahead_position,
+                start_pos,
                 "Multiple prototypes in object initializer is ot allowed".to_string(),
             ))
         } else {
@@ -2899,12 +2900,13 @@ where
         let at_qualified = self.at_qualified_prop_key();
         let prev_super = self.context.allow_super;
         let prop = if at_get && at_qualified && !is_async {
+            let computed = self.at_punct(Punct::OpenBracket);
             let key = self.parse_object_property_key()?;
             self.context.allow_super = true;
             let value = self.parse_getter_method()?;
             self.context.allow_super = prev_super;
             ObjProp::Prop(Prop {
-                computed: self.at_punct(Punct::OpenBracket),
+                computed,
                 key,
                 value,
                 kind: PropKind::Get,
@@ -2913,12 +2915,13 @@ where
                 is_static: false,
             })
         } else if at_set && at_qualified && !is_async {
+            let computed = self.at_punct(Punct::OpenBracket);
             let key = self.parse_object_property_key()?;
             self.context.allow_super = true;
             let value = self.parse_setter_method()?;
             self.context.allow_super = prev_super;
             ObjProp::Prop(Prop {
-                computed: self.at_punct(Punct::OpenBracket),
+                computed,
                 key,
                 value,
                 kind: PropKind::Set,
