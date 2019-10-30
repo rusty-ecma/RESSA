@@ -1975,15 +1975,13 @@ where
         } else {
             Some(self.parse_var_ident(false)?)
         };
-        super_class = if super_class.is_none() && self.at_contextual_keyword("extends") {
+        if super_class.is_none() && self.at_contextual_keyword("extends") {
             let _ = self.next_item()?;
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
-            let super_class = self.parse_left_hand_side_expr()?;
+            let new_super = self.parse_left_hand_side_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-            Some(Box::new(super_class))
-        } else {
-            None
-        };
+            super_class = Some(Box::new(new_super))
+        }
         if super_class.is_some() {
             debug!("setting allow_super to {}", true);
             self.context.allow_super = true;

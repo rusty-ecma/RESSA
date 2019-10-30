@@ -253,6 +253,18 @@ fn arrow_funct_non_simple_args_use_strict_in_body() {
     let mut p = Parser::new(js).unwrap();
     p.parse().expect("use strict not allowed with fancy params");
 }
+
+#[test]
+fn super_in_class_expr_ctor() {
+    let _ = env_logger::try_init();
+    let js = "new class extends Other {
+    constructor() {
+        super();
+    }
+}";
+    let mut p = Parser::new(js).unwrap();
+    p.parse().expect("super in class expr ctor");
+}
 #[test]
 fn line_term_comment() {
     let _ = env_logger::try_init();
