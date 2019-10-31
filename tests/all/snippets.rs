@@ -274,3 +274,46 @@ fn line_term_comment() {
     let mut parser = Parser::new(js).expect("failed to create parser");
     parser.parse().unwrap();
 }
+
+#[test]
+fn await_as_ident() {
+    let _ = env_logger::try_init();
+    let js = "var await;";
+    let mut p = Parser::new(js).unwrap();
+    p.parse().unwrap();
+}
+#[test]
+#[should_panic = "await is always reserved in a module"]
+fn await_as_ident_module() {
+    let _ = env_logger::try_init();
+    let js = "var await;";
+    let mut p = Parser::builder().js(js).module(true).build().unwrap();
+    p.parse().expect("await is always reserved in a module");
+}
+#[test]
+#[should_panic = "await is reserved in an async fn"]
+fn await_as_ident_async_fn() {
+    let _ = env_logger::try_init();
+    let js = "async function() { var await = 0; }";
+    let mut p = Parser::builder().js(js).module(true).build().unwrap();
+    p.parse().expect("await is reserved in an async fn");
+}
+
+#[test]
+#[should_panic = "export is reserved"]
+fn export_as_ident() {
+    run_test(r"var expor\u0074;", false).expect("export is reserved");
+}
+
+#[test]
+fn async_arrow_await() {
+    run_test("async () => await 0;", false).unwrap();
+}
+
+
+fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
+    let _ = env_logger::try_init();
+    let mut p = Parser::builder().js(js).module(as_mod).build()?;
+    p.parse()?;
+    Ok(())
+}

@@ -425,7 +425,7 @@ where
         if let Expr::Lit(lit) = expr {
             if let Lit::String(s) = lit {
                 self.context.strict = self.context.strict || s.inner_matches("use strict");
-                debug!("updated context.strict to {}", self.context.strict);
+                debug!("updated context.strict to {}, allowed?: {}", self.context.strict, self.context.allow_strict_directive);
                 if !self.context.allow_strict_directive && self.context.strict {
                     return self.unexpected_token_error(&orig, "use strict in an invalid location");
                 }
@@ -617,7 +617,11 @@ where
             };
             (imported, local)
         } else {
+            let imported_pos = self.look_ahead_position;
             let imported = self.parse_ident_name()?;
+            if imported.name == "arguments" || imported.name == "eval" {
+                return Err(Error::StrictModeArgumentsOrEval(imported_pos));
+            }
             let local = if self.at_contextual_keyword("as") {
                 let _ = self.next_item()?;
                 self.parse_var_ident(false)?
@@ -1887,7 +1891,7 @@ where
         let prev_await = self.context.allow_await;
         let prev_yield = self.context.allow_yield;
         let prev_super = self.context.allow_super;
-        self.context.allow_await = is_async;
+        self.context.allow_await = !is_async;
         self.context.allow_yield = !is_gen;
         debug!("setting allow_super to {}", false);
         self.context.allow_super = false;
@@ -1961,7 +1965,7 @@ where
         let prev_strict = self.context.strict;
         self.context.strict = true;
         self.expect_keyword(Keyword::Class(()))?;
-        let mut super_class = if self.at_contextual_keyword("extends") {
+        let mut super_class = if self.at_keyword(Keyword::Extends(())) {
             let _ = self.next_item()?;
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let super_class = self.parse_left_hand_side_expr()?;
@@ -1974,8 +1978,8 @@ where
             None
         } else {
             Some(self.parse_var_ident(false)?)
-        };
-        if super_class.is_none() && self.at_contextual_keyword("extends") {
+        }; 
+        if super_class.is_none() && self.at_keyword(Keyword::Extends(())) {
             let _ = self.next_item()?;
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
             let new_super = self.parse_left_hand_side_expr()?;
@@ -3198,6 +3202,13 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         let ident = self.next_item()?;
+        match &ident.token {
+            Token::Ident(_)
+            | Token::Keyword(_) 
+            | Token::Boolean(_)
+            | Token::Null => (),
+            _ => return self.expected_token_error(&ident, &["identifier"]),
+        }
         let ret = self.get_string(&ident.span)?;
 
         Ok(resast::Ident::from(ret))
@@ -3221,7 +3232,7 @@ where
             if self.context.strict || ident.token.matches_keyword(Keyword::Let(())) || !is_var {
                 return self.expected_token_error(&ident, &["variable identifier"]);
             }
-        } else if (self.context.is_module || self.context.allow_await)
+        } else if (self.context.is_module || !self.context.allow_await)
             && &self.original[ident.span.start..ident.span.end] == "await"
         {
             return self.expected_token_error(&ident, &["variable identifier"]);
@@ -3566,6 +3577,8 @@ where
                 self.context.is_binding_element = false;
                 let is_async = Self::is_async(&current);
                 let prev_strict = self.context.allow_strict_directive;
+                let prev_await = self.context.allow_await;
+                self.context.allow_await = !is_async;
                 if let Some(params) = self.reinterpret_as_cover_formals_list(current.clone())? {
                     if self.context.strict {
                         if params.iter().any(Self::check_arg_strict_mode) {
@@ -3577,6 +3590,7 @@ where
                         let prev_in = self.context.allow_in;
                         self.context.allow_in = true;
                         let body = self.parse_function_source_el()?;
+                        self.context.allow_await = prev_await;
                         self.context.allow_in = prev_in;
                         current = Expr::ArrowFunc(ArrowFuncExpr {
                             id: None,
@@ -3590,6 +3604,7 @@ where
                         let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
                         let a = self.parse_assignment_expr()?;
                         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+                        self.context.allow_await = prev_await;
                         current = Expr::ArrowFunc(ArrowFuncExpr {
                             id: None,
                             expression: true,
@@ -3721,7 +3736,9 @@ where
             _ => false,
         }
     }
-
+    /// Returns a pair with first element indicating
+    /// that an argument is not simple and the second
+    /// being the formalized arguments list
     fn reinterpret_as_cover_formals_list(
         &mut self,
         expr: Expr<'b>,
@@ -3822,19 +3839,19 @@ where
             );
         }
         let mut found_non_simple = false;
-        if self.context.strict && !self.context.allow_yield {
-            for param in params2.iter() {
-                if let FuncArg::Expr(ref e) = param {
-                    if let Expr::Yield(_) = e {
+        for param in params2.iter() {
+            if let FuncArg::Expr(ref e) = param {
+                if let Expr::Yield(_) = e {
+                    if self.context.strict && !self.context.allow_yield {
                         return self.expected_token_error(
                             &self.look_ahead,
                             &["not a yield expression in a function param"],
                         );
                     }
                 }
-                if !found_non_simple && Self::is_simple(param) {
-                    found_non_simple = true;
-                }
+            }
+            if !found_non_simple && !Self::is_simple(param) {
+                found_non_simple = true;
             }
         }
         if found_non_simple {
@@ -4208,8 +4225,9 @@ where
     #[inline]
     fn parse_unary_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
-            "{}: parse_unary_expression {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            "{}: parse_unary_expression {:?} allow_await: {}",
+            self.look_ahead.span.start, self.look_ahead.token, 
+            self.context.allow_await
         );
         if self.at_punct(Punct::Plus)
             || self.at_punct(Punct::Dash)
@@ -4239,7 +4257,8 @@ where
                 operator,
                 argument: Box::new(arg),
             }))
-        } else if self.context.allow_await && self.at_keyword(Keyword::Await(())) {
+        } else if !self.context.allow_await && self.at_keyword(Keyword::Await(())) {
+            debug!("parsing await expr");
             self.parse_await_expr()
         } else {
             self.parse_update_expr()
@@ -5102,9 +5121,13 @@ where
     /// a contextual keyword like `async`
     #[inline]
     fn at_contextual_keyword(&self, s: &str) -> bool {
-        if let Some(current) = self.scanner.str_for(&self.look_ahead.span) {
-            debug!("at_contextual_keyword {:?} {:?}", s, current);
-            current == s
+       self.is_contextual_keyword(s, &self.look_ahead.span)
+    }
+    #[inline]
+    fn is_contextual_keyword(&self, keyword: &str, span: &Span) -> bool {
+        if let Some(current) = self.scanner.str_for(span) {
+            debug!("at_contextual_keyword {:?} {:?}", keyword, current);
+            current == keyword
         } else {
             false
         }
