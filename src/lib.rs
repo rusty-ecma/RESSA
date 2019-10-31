@@ -2842,6 +2842,7 @@ where
                 let (found_proto, prop) = self.parse_obj_prop()?;
                 if found_proto {
                     proto_ct += 1;
+                    debug!("found proto: {}", proto_ct);
                 }
                 prop
             };
@@ -2852,7 +2853,7 @@ where
         }
         self.expect_punct(Punct::CloseBrace)?;
         if !self.at_punct(Punct::Equal) && proto_ct > 1 {
-            Err(Error::OperationError(
+            Err(Error::Redecl(
                 start_pos,
                 "Multiple prototypes in object initializer is ot allowed".to_string(),
             ))

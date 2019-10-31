@@ -110,6 +110,7 @@ var x = arguments => arguments;";
 
 #[test]
 fn duplicate_proto() {
+    let _ = env_logger::try_init();
     let js = "({
 __proto__: Number,
 '__proto__': Number,
@@ -119,7 +120,7 @@ __proto__: Number,
     if let Err(ressa::Error::Redecl(_, _)) = expect {
         ()
     } else {
-        panic!("Incorrectly parsed multiple __proto__ properties");
+        panic!("Incorrectly parsed multiple __proto__ properties:\n\t{:?}", expect);
     }
 }
 #[test]
