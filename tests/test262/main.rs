@@ -475,6 +475,8 @@ impl TestFailure {
 static SKIP_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 #[test]
 fn test262() -> Res<()> {
+    use dotenv::dotenv;
+    dotenv().ok().unwrap();
     let pb = ProgressBar::new_spinner();
     let sty = ProgressStyle::default_bar()
         .template("{bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
