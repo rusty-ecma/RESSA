@@ -546,7 +546,7 @@ where
             //variant
             let specifiers = if self.at_punct(Punct::OpenBrace) {
                 self.parse_named_imports()?
-            // If we are at ta *, this is the namespace variant
+            // If we are at a *, this is the namespace variant
             } else if self.at_punct(Punct::Asterisk) {
                 vec![self.parse_import_namespace_specifier()?]
             // if we are at an identifier that is not `default` this is the default variant
@@ -607,6 +607,7 @@ where
 
     #[inline]
     fn parse_import_specifier(&mut self) -> Res<ImportSpecifier<'b>> {
+        let start = self.look_ahead_position;
         let (imported, local) = if self.look_ahead.token.is_ident() {
             let imported = self.parse_var_ident(false)?;
             let local = if self.at_contextual_keyword("as") {
@@ -617,11 +618,7 @@ where
             };
             (imported, local)
         } else {
-            let imported_pos = self.look_ahead_position;
             let imported = self.parse_ident_name()?;
-            if imported.name == "arguments" || imported.name == "eval" {
-                return Err(Error::StrictModeArgumentsOrEval(imported_pos));
-            }
             let local = if self.at_contextual_keyword("as") {
                 let _ = self.next_item()?;
                 self.parse_var_ident(false)?
@@ -630,6 +627,9 @@ where
             };
             (imported, local)
         };
+        if imported.name == "arguments" || imported.name == "eval" {
+            return Err(Error::StrictModeArgumentsOrEval(start));
+        }
         Ok(ImportSpecifier::Normal(NormalImportSpec {
             imported,
             local,
@@ -2010,10 +2010,7 @@ where
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             super_class = Some(Box::new(new_super))
         }
-        if super_class.is_some() {
-            debug!("setting allow_super to {}", true);
-            self.context.allow_super = true;
-        }
+        self.context.allow_super = true;
         let body = self.parse_class_body()?;
 
         self.context.strict = prev_strict;
