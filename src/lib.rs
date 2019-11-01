@@ -1008,8 +1008,19 @@ where
         );
         self.expect_keyword(Keyword::Try(()))?;
         let block = self.parse_block()?;
+        for part in &block.0 {
+            if let ProgramPart::Stmt(Stmt::Continue(_)) = &part {
+                return self.unexpected_token_error(&self.look_ahead, "continue in try catch");
+            }
+        }
         let handler = if self.at_keyword(Keyword::Catch(())) {
-            Some(self.parse_catch_clause()?)
+            let handler = self.parse_catch_clause()?;
+            for part in &handler.body.0 {
+                if let ProgramPart::Stmt(Stmt::Continue(_)) = &part {
+                    return self.unexpected_token_error(&self.look_ahead, "continue in try catch");
+                }
+            }
+            Some(handler)
         } else {
             None
         };
@@ -1611,6 +1622,7 @@ where
     fn parse_labelled_statement(&mut self) -> Res<Stmt<'b>> {
         debug!("parse_labelled_statement, {:?}", self.look_ahead.token);
         let start = self.look_ahead.span;
+        let pos = self.look_ahead_position;
         let ret = self.parse_expression()?;
         if let Expr::Ident(ref ident) = ret {
             if self.context.strict && Self::is_strict_reserved(ident) {
@@ -1649,6 +1661,9 @@ where
                 } else {
                     self.parse_statement()?
                 };
+                if Self::is_labeled_func(&body) {
+                    return Err(Error::UnexpectedToken(pos, "nested labeled statements cannot have a function expression as their inner statement".to_string()));
+                }
                 self.context.label_set.remove(&self.get_string(&start)?);
                 return Ok(Stmt::Labeled(LabeledStmt {
                     label: id,
@@ -1658,6 +1673,15 @@ where
         }
         self.consume_semicolon()?;
         Ok(Stmt::Expr(ret))
+    }
+
+    fn is_labeled_func(stmt: &Stmt) -> bool {
+        if let Stmt::Labeled(LabeledStmt { ref body, .. }) = stmt {
+            if let Stmt::Expr(Expr::Func(_)) = body.as_ref() {
+                return true;
+            }
+        }
+        false
     }
 
     #[inline]
