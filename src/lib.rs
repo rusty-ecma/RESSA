@@ -3268,6 +3268,7 @@ where
             }
             Token::Keyword(ref k) => {
                 if k.is_reserved()
+                || k == &Keyword::Enum(())
                 || (self.context.strict && k.is_strict_reserved()) {
                     return self.unexpected_token_error(&ident, "reserved word as ident")
                 } else {
