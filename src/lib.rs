@@ -1008,16 +1008,20 @@ where
         );
         self.expect_keyword(Keyword::Try(()))?;
         let block = self.parse_block()?;
-        for part in &block.0 {
-            if let ProgramPart::Stmt(Stmt::Continue(_)) = &part {
-                return self.unexpected_token_error(&self.look_ahead, "continue in try catch");
+        if !self.context.in_iteration {
+            for part in &block.0 {
+                if let ProgramPart::Stmt(Stmt::Continue(_)) = &part {
+                    return self.unexpected_token_error(&self.look_ahead, "continue in try catch");
+                }
             }
         }
         let handler = if self.at_keyword(Keyword::Catch(())) {
             let handler = self.parse_catch_clause()?;
-            for part in &handler.body.0 {
-                if let ProgramPart::Stmt(Stmt::Continue(_)) = &part {
-                    return self.unexpected_token_error(&self.look_ahead, "continue in try catch");
+            if !self.context.in_iteration {
+                for part in &handler.body.0 {
+                    if let ProgramPart::Stmt(Stmt::Continue(_)) = &part {
+                        return self.unexpected_token_error(&self.look_ahead, "continue in try catch");
+                    }
                 }
             }
             Some(handler)
