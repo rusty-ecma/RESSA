@@ -44,7 +44,6 @@ env_logger = "0.6"
 term = "0.6"
 serde_json = "1"
 serde_yaml = "0"
-dotenv = "0.15.0"
 
 [[bench]]
 name = "major_libs"
