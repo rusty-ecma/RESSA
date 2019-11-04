@@ -442,13 +442,15 @@ impl TestFailure {
             href = format!("\\\\{}", &href[3..]);
         }
         let mut li_class = "failure-container".to_string();
-        if let Some(ref neg) = self.desc.negative {
-            if &neg.phase == &Phase::Parse {
-                li_class.push_str(" negative");
-            }
-        }
+        let neg = if let Some(Negative { phase: Phase::Parse, ..}) = &self.desc.negative {
+            li_class.push_str(" negative");
+            true
+        } else {
+            false
+        };
         let mut html = format!(
-            r#"<li class="{}"><a class="test-name" href="{}">{}</a> - <div class="additional-info">"#,
+            r#"<li class="{}">
+<a class="test-name" href="{}">{}</a> - <div class="additional-info">"#,
             li_class,
             href,
             self.path.display()
@@ -456,9 +458,21 @@ impl TestFailure {
         if let TestStatus::Failure(_) = self.runner {
             html.push_str(r#"<span class="not-run-error">!!!</span>"#)
         }
+        if !neg {
+            let mut error_text = r#"<div class="error-text">"#.to_string();
+            if let TestStatus::Failure(ref msg) = self.strict {
+                error_text.push_str(&format!(r#"<span class="strict">{}</span>"#, msg));
+            }
+            if let TestStatus::Failure(ref msg) = self.not_strict {
+                error_text.push_str(&format!(r#"<span class="not-strict">{}</span>"#, msg));
+            }
+            error_text.push_str("</div>");
+            html.push_str(&error_text);
+        }
         if let Some(ref d) = self.desc.description {
             html.push_str(&format!(r#"<div class="description">{}</div>"#, d));
         }
+        
         if !self.desc.features.is_empty() {
             html.push_str(r#"<div class="feature title"><span>features</span></div>"#)
         }
@@ -534,46 +548,16 @@ fn test262() -> Res<()> {
             use std::io::Write;
             let root_path = base_path.join("index.html");
             let mut root_file = ::std::io::BufWriter::new(::std::fs::File::create(&root_path)?);
-            let head = b"<html>
+            let head = format!("<html>
             <head>
                 <title>ressa test 262 failures</title>
                 
-                <style>
-* {
-  font-family: sans-serif; 
-}
-body {
-    max-width: 800px;
-    margin: auto;
-}
-quote {
-  font-weight: bold;
-  color: ghostwhite;
-  background: grey;
-  padding: 5px 10px;
-  margin-bottom: 15px;
-}
-ul {
-  display: flex;
-  flex-flow: column;
-}
-li > a {
-  font-weight: bold;
-}
-li > .additional-info {
-  margin-bottom: 10px;
-  border: 1px solid black;
-  max-width: 800px;
-}
-li.negative {
-    border-color: red;
-}
-</style>
+                <style>{}</style>
 <link rel=\"stylesheet\" href=\"http://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/styles/default.min.css\">
 
             </head>
-            <body>";
-            root_file.write_all(head)?;
+            <body>", include_str!("./style.css"));
+            root_file.write_all(head.as_bytes())?;
             root_file.write_all(format!("<h1>Failures</h1><quote>{}</quote><ul>", report).as_bytes())?;
             for (id, list) in collected {
                 root_file.write_all(format!("<li><h2>{} ({})</h2><ol>", id, list.len()).as_bytes())?;
@@ -585,7 +569,7 @@ li.negative {
                         let md = fail.to_markdown();
                         let parser = pulldown_cmark::Parser::new(&md);
                         let mut f = BufWriter::new(File::create(&new_path)?);
-                        f.write_all(head)?;
+                        f.write_all(head.as_bytes())?;
                         pulldown_cmark::html::write_html(&mut f, parser)?;
                         f.write_all(
                             format!(
