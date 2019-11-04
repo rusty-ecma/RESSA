@@ -857,7 +857,12 @@ where
             }
             Token::Keyword(ref k) => match k {
                 Keyword::Break(k) => Stmt::Break(self.parse_break_stmt(k)?),
-                Keyword::Continue(k) => Stmt::Continue(self.parse_continue_stmt(k)?),
+                Keyword::Continue(k) => {
+                    if !self.context.in_iteration {
+                        return Err(Error::ContinueOutsideOfIteration(self.look_ahead_position));
+                    }
+                    Stmt::Continue(self.parse_continue_stmt(k)?)
+                },
                 Keyword::Debugger(k) => self.parse_debugger_stmt(k)?,
                 Keyword::Do(_) => Stmt::DoWhile(self.parse_do_while_stmt()?),
                 Keyword::For(_) => self.parse_for_stmt()?,
@@ -1695,6 +1700,7 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         let ret = self.parse_expression()?;
+        
         self.consume_semicolon()?;
         Ok(ret)
     }

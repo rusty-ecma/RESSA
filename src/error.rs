@@ -25,6 +25,7 @@ pub enum Error {
     InvalidSuper(Position),
     InvalidFuncPosition(Position, String),
     ForOfInAssign(Position, String),
+    ContinueOutsideOfIteration(Position),
     Scanner(ress::error::Error),
     Other(Box<dyn ::std::error::Error>),
 }
@@ -55,6 +56,7 @@ impl Display for Error {
             Error::InvalidFuncPosition(ref pos, ref msg) => write!(f, "{} at {}", msg, pos),
             Error::ForOfInAssign(ref pos, ref msg) => write!(f, "{} at {}", msg, pos),
             Error::InvalidSuper(ref pos) => write!(f, "Invalid use of super at {}", pos),
+            Error::ContinueOutsideOfIteration(ref pos) => write!(f, "Invalid use of continue at {}", pos),
             Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
             Error::Other(ref e) => write!(f, "{}", e),
         }

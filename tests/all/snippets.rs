@@ -160,33 +160,7 @@ class B extends A {
     p.parse().expect("failed to handle super property in method");
 }
 
-#[test]
-#[should_panic = "base classes can't refer to super"]
-fn super_in_ctor_neg() {
-    let _ = env_logger::try_init();
-    let js = "
-class B {
-    constructor() {
-        super()
-    }
-}";
-    let mut p = Parser::new(js).unwrap();
-    p.parse().expect("base classes can't refer to super");
-}
 
-#[test]
-#[should_panic = "base classes can't refer to super"]
-fn super_in_method_prop_neg() {
-    let _ = env_logger::try_init();
-    let js = "
-class B {
-    thing() {
-        return super.stuff;
-    }
-}";
-    let mut p = Parser::new(js).unwrap();
-    p.parse().expect("base classes can't refer to super");
-}
 #[test]
 #[should_panic = "super calls should only be allowed in ctors"]
 fn super_in_method_neg() {
