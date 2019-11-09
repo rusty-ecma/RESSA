@@ -446,6 +446,7 @@ impl TestFailure {
             li_class.push_str(" negative");
             true
         } else {
+            li_class.push_str(" positive");
             false
         };
         let mut html = format!(
