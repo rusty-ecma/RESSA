@@ -599,10 +599,10 @@ fn test262() -> Res<()> {
 }
 
 fn get_paths(path: &Path) -> (usize, Vec<PathBuf>) {
-    let wd = walkdir::WalkDir::new(path)
+    let ct = walkdir::WalkDir::new(path)
         .into_iter()
-        .filter_map(filter_mapper);
-    let ct = wd.count();
+        .filter_map(filter_mapper)
+        .count();
     let wd = walkdir::WalkDir::new(path)
         .into_iter()
         .filter_map(filter_mapper)
