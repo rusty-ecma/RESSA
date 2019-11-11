@@ -284,6 +284,23 @@ fn async_arrow_await() {
     run_test("async () => await 0;", false).unwrap();
 }
 
+#[test]
+fn async_await() {
+    run_test("var f = async function() {
+        try {
+            await new Promise((r) => r());
+        } catch (e) {
+            await new Promise((r, j) => j(e));
+        } finally {
+            await new Promise((r) => r());
+        }
+    }", false).unwrap();
+}
+
+#[test]
+fn for_in_head_let() {
+    run_test("for(var let in {});", false).unwrap();
+}
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();

@@ -1664,6 +1664,9 @@ where
                     let expr = Expr::Class(cls);
                     Stmt::Expr(expr)
                 } else if self.at_keyword(Keyword::Function(())) {
+                    if self.context.strict {
+                        return Err(Error::UnexpectedToken(pos, "labeled statement bodies cannot be a function declaration".to_string()));
+                    }
                     let f = self.parse_function_decl(true)?;
                     let expr = Expr::Func(f);
                     Stmt::Expr(expr)
@@ -1798,6 +1801,7 @@ where
 
     #[inline]
     fn parse_variable_decl_list(&mut self, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
+        debug!("{} parse_variable_decl_list in_for: {}", self.look_ahead.span.start, in_for);
         let mut ret = vec![self.parse_variable_decl(in_for)?];
         while self.at_punct(Punct::Comma) {
             let _ = self.next_item()?;
@@ -1808,6 +1812,7 @@ where
 
     #[inline]
     fn parse_variable_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
+        debug!("{} parse_variable_decl in_for: {}", self.look_ahead.span.start, in_for);
         let start = self.look_ahead.clone();
         let (_, id) = self.parse_pattern(Some(VarKind::Var), &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&id) && !self.config.tolerant {
@@ -2668,7 +2673,9 @@ where
             {
                 let ident = self.parse_ident_name()?;
                 Ok(Expr::Ident(ident))
-            } else {
+            } else if self.at_keyword(Keyword::Await(())) {
+                self.parse_await_expr()
+            } else {                
                 self.context.is_assignment_target = false;
                 self.context.is_binding_element = false;
                 if self.at_keyword(Keyword::Function(())) {
@@ -3161,7 +3168,8 @@ where
         let prev_super = self.context.allow_super;
         debug!("setting allow_super to {}", false);
         self.context.allow_super = false;
-        self.context.allow_await = is_async;
+        debug!("setting allow_await to {}", is_async);
+        self.context.allow_await = !is_async;
         self.context.allow_yield = !is_gen;
         let mut found_restricted = false;
         let id = if !self.at_punct(Punct::OpenParen) {
@@ -3612,10 +3620,8 @@ where
                 let prev_await = self.context.allow_await;
                 self.context.allow_await = !is_async;
                 if let Some(params) = self.reinterpret_as_cover_formals_list(current.clone())? {
-                    if self.context.strict {
-                        if params.iter().any(Self::check_arg_strict_mode) {
-                            return Err(Error::StrictModeArgumentsOrEval(self.current_position));
-                        }
+                    if self.context.strict && params.iter().any(Self::check_arg_strict_mode) {
+                        return Err(Error::StrictModeArgumentsOrEval(self.current_position));
                     }
                     self.expect_fat_arrow()?;
                     if self.at_punct(Punct::OpenBrace) {
@@ -4366,6 +4372,9 @@ where
             "{}: parse_await_expr {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
+        if self.context.allow_await {
+            self.unexpected_token_error(&self.look_ahead, "await is not valid in this context")?;
+        }
         let _await = self.next_item()?;
         let arg = self.parse_unary_expression()?;
         Ok(Expr::Await(Box::new(arg)))
