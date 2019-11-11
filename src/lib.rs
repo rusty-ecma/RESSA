@@ -627,7 +627,7 @@ where
             };
             (imported, local)
         };
-        if imported.name == "arguments" || imported.name == "eval" {
+        if local.name == "arguments" || local.name == "eval" {
             return Err(Error::StrictModeArgumentsOrEval(start));
         }
         Ok(ImportSpecifier::Normal(NormalImportSpec {

@@ -302,6 +302,11 @@ fn for_in_head_let() {
     run_test("for(var let in {});", false).unwrap();
 }
 
+#[test]
+fn import_aliased_eval() {
+    run_test("import { eval as _eval } from './other.js';", true).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
