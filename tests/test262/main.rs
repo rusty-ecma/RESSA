@@ -559,7 +559,7 @@ fn test262() -> Res<()> {
             </head>
             <body>", include_str!("./style.css"));
             root_file.write_all(head.as_bytes())?;
-            root_file.write_all(format!("<h1>Failures</h1><quote>{}</quote><ul>", report).as_bytes())?;
+            root_file.write_all(format!("<h1>Failures</h1><quote>{}</quote><button id=\"remove-neg-button\">positive only</button><ul>", report).as_bytes())?;
             for (id, list) in collected {
                 root_file.write_all(format!("<li class=\"single-error-list\"><h2>{} ({})</h2><ol>", id, list.len()).as_bytes())?;
                 for fail in list {
@@ -583,7 +583,7 @@ fn test262() -> Res<()> {
                 }
                 root_file.write_all(b"</ol></li>")?;
             }
-            root_file.write_all(b"</ul></body></html>")?;
+            root_file.write_all(format!("</ul><script>{}</script></body></html>", include_str!("./removeNegative.js")).as_bytes())?;
             let root_str = format!("{}", root_path.display());
             if root_str.starts_with("\\\\?") {
                 println!("file://{}", &root_str[3..].replace('\\', "/"))
