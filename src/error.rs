@@ -13,6 +13,7 @@ pub enum Error {
     NonStrictFeatureInStrictContext(Position, String),
     InvalidImportError(Position),
     InvalidExportError(Position),
+    InvalidYield(Position),
     InvalidUseOfContextualKeyword(Position, String),
     TryWithNoCatchOrFinally(Position),
     InvalidCatchArg(Position),
@@ -33,7 +34,7 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            Error::UnexpectedToken(ref pos, ref msg) => write!(f, "Unexpected Token at {}{}: {}", pos.line, pos.column, msg),
+            Error::UnexpectedToken(ref pos, ref msg) => write!(f, "Unexpected Token at {}: {}", pos, msg),
             Error::UnexpectedEoF => write!(f, "Unexpectedly found the end of the file"),
             Error::ParseAfterEoF => write!(f, "Parser attempted to get the next token after finding the end of the file"),
             Error::UnableToReinterpret(ref pos, ref from, ref to) => write!(f, "Unable to re-interpret from {} to {} at {}", from, to, pos),
@@ -41,6 +42,7 @@ impl Display for Error {
             Error::OperationError(ref pos, ref msg) => write!(f, "Invalid operation, {}: {}", pos, msg),
             Error::InvalidGetterParams(ref pos) => write!(f, "Found a getter method that takes arguments at {}, getter methods cannot take arguments", pos),
             Error::InvalidSetterParams(ref pos) => write!(f, "Found a setter method that takes more or less than 1 argument at {}, setter methods must take only one argument", pos),
+            Error::InvalidYield(ref pos) => write!(f, "Yield cannot be used as an identifier at {}", pos),
             Error::NonStrictFeatureInStrictContext(ref pos, ref name) => write!(f, "Attempting to use non-strict feature {} in a strict context at {}", name, pos),
             Error::InvalidImportError(ref pos) => write!(f, "Inavlid use of es6 import syntax at {}", pos),
             Error::InvalidExportError(ref pos) => write!(f, "Inavlid use of es6 export syntax at {}", pos),
