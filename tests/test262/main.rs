@@ -561,7 +561,7 @@ fn test262() -> Res<()> {
             root_file.write_all(head.as_bytes())?;
             root_file.write_all(format!("<h1>Failures</h1><quote>{}</quote><ul>", report).as_bytes())?;
             for (id, list) in collected {
-                root_file.write_all(format!("<li><h2>{} ({})</h2><ol>", id, list.len()).as_bytes())?;
+                root_file.write_all(format!("<li class=\"single-error-list\"><h2>{} ({})</h2><ol>", id, list.len()).as_bytes())?;
                 for fail in list {
                     let new_path = fail.path.with_extension("html");
                     if let Some(file_name) = new_path.file_name() {
