@@ -120,7 +120,10 @@ __proto__: Number,
     if let Err(ressa::Error::Redecl(_, _)) = expect {
         ()
     } else {
-        panic!("Incorrectly parsed multiple __proto__ properties:\n\t{:?}", expect);
+        panic!(
+            "Incorrectly parsed multiple __proto__ properties:\n\t{:?}",
+            expect
+        );
     }
 }
 #[test]
@@ -129,7 +132,8 @@ fn super_in_func() {
     let _ = env_logger::try_init();
     let js = "function() { super() }";
     let mut p = Parser::new(js).unwrap();
-    p.parse().expect("expected to fail on super call in function");
+    p.parse()
+        .expect("expected to fail on super call in function");
 }
 
 #[test]
@@ -157,9 +161,9 @@ class B extends A {
     }
 }";
     let mut p = Parser::new(js).unwrap();
-    p.parse().expect("failed to handle super property in method");
+    p.parse()
+        .expect("failed to handle super property in method");
 }
-
 
 #[test]
 #[should_panic = "super calls should only be allowed in ctors"]
@@ -173,7 +177,8 @@ class B {
     }
 }";
     let mut p = Parser::new(js).unwrap();
-    p.parse().expect("super calls should only be allowed in ctors");
+    p.parse()
+        .expect("super calls should only be allowed in ctors");
 }
 #[test]
 #[should_panic = "super is invalid in an arrow"]
@@ -231,12 +236,16 @@ fn arrow_funct_non_simple_args_use_strict_in_body() {
 
 #[test]
 fn nested_await_ident() {
-    run_test("var await;
+    run_test(
+        "var await;
 async function i() {
     function b() {
         await = 0;
     }
-}", false).unwrap();
+}",
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -261,18 +270,16 @@ fn line_term_comment() {
 
 #[test]
 fn await_as_ident() {
-    let _ = env_logger::try_init();
-    let js = "var await;";
-    let mut p = Parser::new(js).unwrap();
-    p.parse().unwrap();
+    run_test("var await;", false).unwrap();
 }
 #[test]
 #[should_panic = "await is always reserved in a module"]
 fn await_as_ident_module() {
-    let _ = env_logger::try_init();
-    let js = "var await;";
-    let mut p = Parser::builder().js(js).module(true).build().unwrap();
-    p.parse().expect("await is always reserved in a module");
+    run_test("var await;", true).expect("await is always reserved in a module");
+}
+#[test]
+fn await_as_ident_strict() {
+    run_test("'use strict';var await;", false).unwrap();
 }
 #[test]
 #[should_panic = "await is reserved in an async fn"]
@@ -306,7 +313,8 @@ fn yield_as_param_in_method() {
 
 #[test]
 fn async_await() {
-    run_test("var f = async function() {
+    run_test(
+        "var f = async function() {
         try {
             await new Promise((r) => r());
         } catch (e) {
@@ -314,7 +322,10 @@ fn async_await() {
         } finally {
             await new Promise((r) => r());
         }
-    }", false).unwrap();
+    }",
+        false,
+    )
+    .unwrap();
 }
 
 #[test]

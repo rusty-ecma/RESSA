@@ -1,12 +1,12 @@
 #![cfg(feature = "test_262")]
 
-use serde::{Deserialize, Serialize};
-use std::fs::File;
-use std::io::{BufWriter};
 use flate2::read::GzDecoder;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ressa::Parser;
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::BufWriter;
 use std::{
     error::Error,
     path::{Path, PathBuf},
@@ -442,7 +442,11 @@ impl TestFailure {
             href = format!("\\\\{}", &href[3..]);
         }
         let mut li_class = "failure-container".to_string();
-        let neg = if let Some(Negative { phase: Phase::Parse, ..}) = &self.desc.negative {
+        let neg = if let Some(Negative {
+            phase: Phase::Parse,
+            ..
+        }) = &self.desc.negative
+        {
             li_class.push_str(" negative");
             true
         } else {
@@ -473,7 +477,7 @@ impl TestFailure {
         if let Some(ref d) = self.desc.description {
             html.push_str(&format!(r#"<div class="description">{}</div>"#, d));
         }
-        
+
         if !self.desc.features.is_empty() {
             html.push_str(r#"<div class="feature title"><span>features</span></div>"#)
         }
@@ -561,7 +565,14 @@ fn test262() -> Res<()> {
             root_file.write_all(head.as_bytes())?;
             root_file.write_all(format!("<h1>Failures</h1><quote>{}</quote><button id=\"remove-neg-button\">positive only</button><ul>", report).as_bytes())?;
             for (id, list) in collected {
-                root_file.write_all(format!("<li class=\"single-error-list\"><h2>{} ({})</h2><ol>", id, list.len()).as_bytes())?;
+                root_file.write_all(
+                    format!(
+                        "<li class=\"single-error-list\"><h2>{} ({})</h2><ol>",
+                        id,
+                        list.len()
+                    )
+                    .as_bytes(),
+                )?;
                 for fail in list {
                     let new_path = fail.path.with_extension("html");
                     if let Some(file_name) = new_path.file_name() {
@@ -583,7 +594,13 @@ fn test262() -> Res<()> {
                 }
                 root_file.write_all(b"</ol></li>")?;
             }
-            root_file.write_all(format!("</ul><script>{}</script></body></html>", include_str!("./removeNegative.js")).as_bytes())?;
+            root_file.write_all(
+                format!(
+                    "</ul><script>{}</script></body></html>",
+                    include_str!("./removeNegative.js")
+                )
+                .as_bytes(),
+            )?;
             let root_str = format!("{}", root_path.display());
             if root_str.starts_with("\\\\?") {
                 println!("file://{}", &root_str[3..].replace('\\', "/"))

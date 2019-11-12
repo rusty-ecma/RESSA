@@ -101,7 +101,7 @@ struct Context<'a> {
     allow_super: bool,
     /// if super is allowed to be part of a call expression
     /// allow_super should always be true when this is true
-    /// but not the other way around. This is only valid in a 
+    /// but not the other way around. This is only valid in a
     /// constructor
     allow_super_call: bool,
     /// If we have found any possible naming errors
@@ -425,7 +425,10 @@ where
         if let Expr::Lit(lit) = expr {
             if let Lit::String(s) = lit {
                 self.context.strict = self.context.strict || s.inner_matches("use strict");
-                debug!("updated context.strict to {}, allowed?: {}", self.context.strict, self.context.allow_strict_directive);
+                debug!(
+                    "updated context.strict to {}, allowed?: {}",
+                    self.context.strict, self.context.allow_strict_directive
+                );
                 if !self.context.allow_strict_directive && self.context.strict {
                     return self.unexpected_token_error(&orig, "use strict in an invalid location");
                 }
@@ -862,7 +865,7 @@ where
                         return Err(Error::ContinueOutsideOfIteration(self.look_ahead_position));
                     }
                     Stmt::Continue(self.parse_continue_stmt(k)?)
-                },
+                }
                 Keyword::Debugger(k) => self.parse_debugger_stmt(k)?,
                 Keyword::Do(_) => Stmt::DoWhile(self.parse_do_while_stmt()?),
                 Keyword::For(_) => self.parse_for_stmt()?,
@@ -1025,7 +1028,8 @@ where
             if !self.context.in_iteration {
                 for part in &handler.body.0 {
                     if let ProgramPart::Stmt(Stmt::Continue(_)) = &part {
-                        return self.unexpected_token_error(&self.look_ahead, "continue in try catch");
+                        return self
+                            .unexpected_token_error(&self.look_ahead, "continue in try catch");
                     }
                 }
             }
@@ -1465,7 +1469,15 @@ where
             "{}: parse_for_in_loop {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        if let LoopLeft::Variable(kind, VarDecl { ref id, init: Some(_), .. }) = left {
+        if let LoopLeft::Variable(
+            kind,
+            VarDecl {
+                ref id,
+                init: Some(_),
+                ..
+            },
+        ) = left
+        {
             if kind != VarKind::Var || self.context.strict {
                 return Err(Error::ForOfInAssign(
                     self.look_ahead_position,
@@ -1473,12 +1485,13 @@ where
                 ));
             }
             match id {
-                Pat::Obj(_) 
-                | Pat::Array(_) => return Err(Error::ForOfInAssign(
+                Pat::Obj(_) | Pat::Array(_) => {
+                    return Err(Error::ForOfInAssign(
                         self.look_ahead_position,
                         "For in loop left hand side cannot contain an assignment".to_string(),
-                    )),
-                _ => ()
+                    ))
+                }
+                _ => (),
             }
             // else {
             //     return Err(Error::ForOfInAssign(
@@ -1665,7 +1678,10 @@ where
                     Stmt::Expr(expr)
                 } else if self.at_keyword(Keyword::Function(())) {
                     if self.context.strict {
-                        return Err(Error::UnexpectedToken(pos, "labeled statement bodies cannot be a function declaration".to_string()));
+                        return Err(Error::UnexpectedToken(
+                            pos,
+                            "labeled statement bodies cannot be a function declaration".to_string(),
+                        ));
                     }
                     let f = self.parse_function_decl(true)?;
                     let expr = Expr::Func(f);
@@ -1691,7 +1707,7 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         let ret = self.parse_expression()?;
-        
+
         self.consume_semicolon()?;
         Ok(ret)
     }
@@ -1789,7 +1805,10 @@ where
 
     #[inline]
     fn parse_variable_decl_list(&mut self, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
-        debug!("{} parse_variable_decl_list in_for: {}", self.look_ahead.span.start, in_for);
+        debug!(
+            "{} parse_variable_decl_list in_for: {}",
+            self.look_ahead.span.start, in_for
+        );
         let mut ret = vec![self.parse_variable_decl(in_for)?];
         while self.at_punct(Punct::Comma) {
             let _ = self.next_item()?;
@@ -1800,7 +1819,10 @@ where
 
     #[inline]
     fn parse_variable_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
-        debug!("{} parse_variable_decl in_for: {}", self.look_ahead.span.start, in_for);
+        debug!(
+            "{} parse_variable_decl in_for: {}",
+            self.look_ahead.span.start, in_for
+        );
         let start = self.look_ahead.clone();
         let (_, id) = self.parse_pattern(Some(VarKind::Var), &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&id) && !self.config.tolerant {
@@ -2004,7 +2026,7 @@ where
             None
         } else {
             Some(self.parse_var_ident(false)?)
-        }; 
+        };
         if super_class.is_none() && self.at_keyword(Keyword::Extends(())) {
             let _ = self.next_item()?;
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
@@ -2072,7 +2094,7 @@ where
             computed = self.at_punct(Punct::OpenBracket);
 
             let new_key = self.parse_object_property_key()?;
-            
+
             if Self::is_static(&new_key)
                 && (Self::qualified_prop_name(&self.look_ahead.token)
                     || self.at_punct(Punct::Asterisk))
@@ -2211,8 +2233,8 @@ where
     }
 
     #[inline]
-    /// Compares `key` with `other` to see if they 
-    /// match, this takes into account all of the 
+    /// Compares `key` with `other` to see if they
+    /// match, this takes into account all of the
     /// different shapes that `key` could be, including
     /// identifiers and literals
     fn is_key(key: &PropKey, other: &str) -> bool {
@@ -2565,10 +2587,10 @@ where
                 "strict mode reserved word as an identifer".to_string(),
             ));
         }
-        if self.look_ahead.token.is_ident() ||
-        (self.at_keyword(Keyword::Await(())) && self.context.allow_await) {
-            if ((self.context.is_module)
-                && self.at_keyword(Keyword::Await(())))
+        if self.look_ahead.token.is_ident()
+            || (self.at_keyword(Keyword::Await(())) && self.context.allow_await)
+        {
+            if ((self.context.is_module) && self.at_keyword(Keyword::Await(())))
                 && !self.config.tolerant
             {
                 return self.unexpected_token_error(
@@ -2666,7 +2688,7 @@ where
                 Ok(Expr::Ident(ident))
             } else if self.at_keyword(Keyword::Await(())) {
                 self.parse_await_expr()
-            } else {                
+            } else {
                 self.context.is_assignment_target = false;
                 self.context.is_binding_element = false;
                 if self.at_keyword(Keyword::Function(())) {
@@ -2796,7 +2818,7 @@ where
                         } else {
                             seq.into_iter().map(FuncArg::Expr).collect()
                         };
-                        
+
                         return Ok(Expr::ArrowParamPlaceHolder(args, false));
                     } else {
                         return Ok(Expr::ArrowParamPlaceHolder(vec![FuncArg::Expr(ex)], false));
@@ -3233,10 +3255,7 @@ where
         );
         let ident = self.next_item()?;
         match &ident.token {
-            Token::Ident(_)
-            | Token::Keyword(_) 
-            | Token::Boolean(_)
-            | Token::Null => (),
+            Token::Ident(_) | Token::Keyword(_) | Token::Boolean(_) | Token::Null => (),
             _ => return self.expected_token_error(&ident, &["identifier"]),
         }
         let ret = self.get_string(&ident.span)?;
@@ -3254,15 +3273,22 @@ where
         if ident.token.matches_keyword(Keyword::Yield(()))
             && (self.context.strict || !self.context.allow_yield)
         {
-            return Err(
-                Error::InvalidYield(ident.location.start)
-            )
+            return Err(Error::InvalidYield(ident.location.start));
         } else if !ident.token.is_ident() {
             if self.context.strict && ident.token.is_keyword() && ident.token.is_strict_reserved() {
-                return Err(Error::NonStrictFeatureInStrictContext(ident.location.start, format!("{} is a strict reserved word", self.get_string(&ident.span)?)))
-            } else if self.context.strict || (!ident.token.is_strict_reserved() &&
-                !ident.token.matches_keyword(Keyword::Let(()))
-                && !ident.token.matches_keyword(Keyword::Await(()))) || !is_var {
+                return Err(Error::NonStrictFeatureInStrictContext(
+                    ident.location.start,
+                    format!(
+                        "{} is a strict reserved word",
+                        self.get_string(&ident.span)?
+                    ),
+                ));
+            } else if self.context.strict
+                || (!ident.token.is_strict_reserved()
+                    && !ident.token.matches_keyword(Keyword::Let(()))
+                    && !ident.token.matches_keyword(Keyword::Await(())))
+                || !is_var
+            {
                 return self.expected_token_error(&ident, &["variable identifier", "let"]);
             }
         } else if (self.context.is_module || !self.context.allow_await)
@@ -3277,9 +3303,10 @@ where
             }
             Token::Keyword(ref k) => {
                 if k.is_reserved()
-                || k == &Keyword::Enum(())
-                || (self.context.strict && k.is_strict_reserved()) {
-                    return self.unexpected_token_error(&ident, "reserved word as ident")
+                    || k == &Keyword::Enum(())
+                    || (self.context.strict && k.is_strict_reserved())
+                {
+                    return self.unexpected_token_error(&ident, "reserved word as ident");
                 } else {
                     let s = self.get_string(&ident.span)?;
                     resast::Ident::from(s)
@@ -3725,16 +3752,16 @@ where
         match arg {
             FuncArg::Expr(Expr::Ident(ref ident)) => {
                 if ident.name == "arguments" || ident.name == "eval" {
-                true
-            } else {
-                false
+                    true
+                } else {
+                    false
                 }
             }
             FuncArg::Pat(Pat::Ident(ref ident)) => {
                 if ident.name == "arguments" || ident.name == "eval" {
-                true
-            } else {
-                false
+                    true
+                } else {
+                    false
                 }
             }
             _ => false,
@@ -4267,8 +4294,7 @@ where
     fn parse_unary_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_unary_expression {:?} allow_await: {}",
-            self.look_ahead.span.start, self.look_ahead.token, 
-            self.context.allow_await
+            self.look_ahead.span.start, self.look_ahead.token, self.context.allow_await
         );
         if self.at_punct(Punct::Plus)
             || self.at_punct(Punct::Dash)
@@ -4541,7 +4567,7 @@ where
 
     #[inline]
     /// Will parse a pending super expression.
-    /// 
+    ///
     /// > note: This will handle any invalid super expression
     /// scenarios
     fn parse_super(&mut self) -> Res<Expr<'b>> {
@@ -4551,9 +4577,12 @@ where
         }
         self.expect_keyword(Keyword::Super(()))?;
         if self.at_punct(Punct::OpenParen) && !self.context.allow_super_call {
-            return Err(Error::InvalidSuper(super_position))
+            return Err(Error::InvalidSuper(super_position));
         }
-        if !self.at_punct(Punct::OpenBracket) && !self.at_punct(Punct::Period) && !self.at_punct(Punct::OpenParen) {
+        if !self.at_punct(Punct::OpenBracket)
+            && !self.at_punct(Punct::Period)
+            && !self.at_punct(Punct::OpenParen)
+        {
             return self.expected_token_error(&self.look_ahead, &["[", ".", "("]);
         }
         Ok(Expr::Super)
@@ -5165,7 +5194,7 @@ where
     /// a contextual keyword like `async`
     #[inline]
     fn at_contextual_keyword(&self, s: &str) -> bool {
-       self.is_contextual_keyword(s, &self.look_ahead.span)
+        self.is_contextual_keyword(s, &self.look_ahead.span)
     }
     #[inline]
     fn is_contextual_keyword(&self, keyword: &str, span: &Span) -> bool {
@@ -5204,9 +5233,9 @@ where
     fn is_start_of_expr(&self) -> bool {
         let mut ret = true;
         let token = &self.look_ahead.token;
-        
+
         if token.is_punct() {
-             ret = token.matches_punct(Punct::OpenBracket)
+            ret = token.matches_punct(Punct::OpenBracket)
                 || token.matches_punct(Punct::OpenParen)
                 || token.matches_punct(Punct::OpenBracket)
                 || token.matches_punct(Punct::Plus)
