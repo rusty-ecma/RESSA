@@ -1673,9 +1673,6 @@ where
                 } else {
                     self.parse_statement()?
                 };
-                if Self::is_labeled_func(&body) {
-                    return Err(Error::UnexpectedToken(pos, "nested labeled statements cannot have a function expression as their inner statement".to_string()));
-                }
                 self.context.label_set.remove(&self.get_string(&start)?);
                 return Ok(Stmt::Labeled(LabeledStmt {
                     label: id,
@@ -1685,15 +1682,6 @@ where
         }
         self.consume_semicolon()?;
         Ok(Stmt::Expr(ret))
-    }
-
-    fn is_labeled_func(stmt: &Stmt) -> bool {
-        if let Stmt::Labeled(LabeledStmt { ref body, .. }) = stmt {
-            if let Stmt::Expr(Expr::Func(_)) = body.as_ref() {
-                return true;
-            }
-        }
-        false
     }
 
     #[inline]
@@ -1930,6 +1918,7 @@ where
         let prev_await = self.context.allow_await;
         let prev_yield = self.context.allow_yield;
         let prev_super = self.context.allow_super;
+        debug!("setting allow_await to {}", !is_async);
         self.context.allow_await = !is_async;
         self.context.allow_yield = !is_gen;
         debug!("setting allow_super to {}", false);
@@ -1942,10 +1931,8 @@ where
         let prev_allow_strict = self.context.allow_strict_directive;
         self.context.allow_strict_directive = formal_params.simple;
         let body = self.parse_function_source_el()?;
-        if self.context.strict {
-            if formal_params.found_restricted {
-                return Err(Error::StrictModeArgumentsOrEval(param_start));
-            }
+        if self.context.strict && formal_params.found_restricted {
+            return Err(Error::StrictModeArgumentsOrEval(param_start));
         }
         if self.context.strict && strict {
             return self.expected_token_error(&self.look_ahead, &[]);
@@ -2312,10 +2299,13 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         let prev_yield = self.context.allow_yield;
-        self.context.allow_yield = false;
+        let prev_strict = self.context.allow_strict_directive;
+        self.context.allow_yield = !self.context.strict;
         let params = self.parse_formal_params()?;
+        self.context.allow_strict_directive = params.simple;
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
+        self.context.allow_strict_directive = prev_strict;
         let func = Func {
             id: None,
             params: params.params,
@@ -2575,8 +2565,9 @@ where
                 "strict mode reserved word as an identifer".to_string(),
             ));
         }
-        if self.look_ahead.token.is_ident() {
-            if ((self.context.is_module || self.context.allow_await)
+        if self.look_ahead.token.is_ident() ||
+        (self.at_keyword(Keyword::Await(())) && self.context.allow_await) {
+            if ((self.context.is_module)
                 && self.at_keyword(Keyword::Await(())))
                 && !self.config.tolerant
             {
@@ -3263,13 +3254,16 @@ where
         if ident.token.matches_keyword(Keyword::Yield(()))
             && (self.context.strict || !self.context.allow_yield)
         {
-            return self.expected_token_error(&ident, &["variable identifier"]);
+            return Err(
+                Error::InvalidYield(ident.location.start)
+            )
         } else if !ident.token.is_ident() {
-            if self.context.strict && ident.token.is_strict_reserved() {
-                return self.expected_token_error(&ident, &["variable identifier"]);
-            }
-            if self.context.strict || ident.token.matches_keyword(Keyword::Let(())) || !is_var {
-                return self.expected_token_error(&ident, &["variable identifier"]);
+            if self.context.strict && ident.token.is_keyword() && ident.token.is_strict_reserved() {
+                return Err(Error::NonStrictFeatureInStrictContext(ident.location.start, format!("{} is a strict reserved word", self.get_string(&ident.span)?)))
+            } else if self.context.strict || (!ident.token.is_strict_reserved() &&
+                !ident.token.matches_keyword(Keyword::Let(()))
+                && !ident.token.matches_keyword(Keyword::Await(()))) || !is_var {
+                return self.expected_token_error(&ident, &["variable identifier", "let"]);
             }
         } else if (self.context.is_module || !self.context.allow_await)
             && &self.original[ident.span.start..ident.span.end] == "await"
@@ -3620,16 +3614,25 @@ where
                 let prev_await = self.context.allow_await;
                 self.context.allow_await = !is_async;
                 if let Some(params) = self.reinterpret_as_cover_formals_list(current.clone())? {
-                    if self.context.strict && params.iter().any(Self::check_arg_strict_mode) {
-                        return Err(Error::StrictModeArgumentsOrEval(self.current_position));
+                    let mut simple = true;
+                    for arg in &params {
+                        if self.context.strict && Self::check_arg_strict_mode(arg) {
+                            return Err(Error::StrictModeArgumentsOrEval(self.current_position));
+                        }
+                        if !Self::is_simple(arg) {
+                            simple = false;
+                        }
                     }
                     self.expect_fat_arrow()?;
                     if self.at_punct(Punct::OpenBrace) {
                         let prev_in = self.context.allow_in;
+                        let prev_strict = self.context.allow_strict_directive;
                         self.context.allow_in = true;
+                        self.context.allow_strict_directive = simple;
                         let body = self.parse_function_source_el()?;
                         self.context.allow_await = prev_await;
                         self.context.allow_in = prev_in;
+                        self.context.allow_strict_directive = prev_strict;
                         current = Expr::ArrowFunc(ArrowFuncExpr {
                             id: None,
                             expression: false,

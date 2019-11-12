@@ -230,6 +230,16 @@ fn arrow_funct_non_simple_args_use_strict_in_body() {
 }
 
 #[test]
+fn nested_await_ident() {
+    run_test("var await;
+async function i() {
+    function b() {
+        await = 0;
+    }
+}", false).unwrap();
+}
+
+#[test]
 fn super_in_class_expr_ctor() {
     let _ = env_logger::try_init();
     let js = "new class extends Other {
@@ -285,6 +295,16 @@ fn async_arrow_await() {
 }
 
 #[test]
+fn use_strict_in_complicated_arrow() {
+    run_test("f = (a = 0) => b => { 'use strict'; };", false).unwrap();
+}
+
+#[test]
+fn yield_as_param_in_method() {
+    run_test("var x = { y(yield) { return yield; } };", false).unwrap();
+}
+
+#[test]
 fn async_await() {
     run_test("var f = async function() {
         try {
@@ -305,6 +325,11 @@ fn for_in_head_let() {
 #[test]
 fn import_aliased_eval() {
     run_test("import { eval as _eval } from './other.js';", true).unwrap();
+}
+
+#[test]
+fn static_ident() {
+    run_test("var static = 0;", false).unwrap();
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
