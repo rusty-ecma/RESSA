@@ -343,6 +343,17 @@ fn static_ident() {
     run_test("var static = 0;", false).unwrap();
 }
 
+#[test]
+fn let_in_obj_init() {
+    run_test("var let = 1;
+var o = {let};", false).unwrap();
+}
+
+#[test]
+fn await_as_class_ident() {
+    run_test("class await {}", false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;

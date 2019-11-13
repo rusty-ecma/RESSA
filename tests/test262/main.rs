@@ -309,6 +309,7 @@ enum Flag {
 }
 
 static URL: &str = "https://github.com/tc39/test262/tarball/master";
+static PARSER_URL: &str = "https://github.com/tc39/test262-parser-tests/tarball/master";
 #[derive(Debug, Serialize, Clone)]
 struct TestFailure {
     pub path: PathBuf,
@@ -784,4 +785,138 @@ var \\u0079ield = 123;";
         Err(e) => println!("{}", e),
         _ => panic!("Unexpected successful parse of escaped yield as identifier"),
     }
+}
+
+
+#[test]
+fn test_262_parser() {
+    let path = Path::new("./test262-parser");
+    if !path.exists() {
+        get_parser_repo(path).expect("failed to get parser repo");
+    }
+    let (total, paths) = get_paths(&path);
+    let (early, fail, pass, pass_explicit) = categorize_paths(&paths);
+    let earlies = run_category(&early, true);
+    let fails = run_category(&fail, true);
+    let passes = run_category(&pass, false);
+    let explicits = run_category(&pass_explicit, false);
+    if !report_errors(total, &earlies, &fails, &passes, &explicits) {
+        panic!("Error in 262 parser tests");
+    }
+}
+fn report_errors(total: usize, earlies: &[String], fails: &[String], passes: &[String], explicits: &[String]) -> bool {
+    if earlies.is_empty() || fails.is_empty() || passes.is_empty() || explicits.is_empty() {
+        eprintln!("passed 100% of {} test", total);
+        return true;
+    }
+    let mut fail_ct = report_cat_errors("earlies", earlies);
+    fail_ct += report_cat_errors("fails", fails);
+    fail_ct += report_cat_errors("passes", passes);
+    fail_ct += report_cat_errors("explicits", explicits);
+    eprintln!("failed {} of {} ({:02.2}%)", fail_ct, total, (fail_ct as f32 / total as f32) * 100f32);
+    return false;
+}
+
+fn report_cat_errors(name: &str, cat: &[String]) -> usize {
+    if cat.is_empty() {
+        return 0;
+    }
+    eprintln!("----------\n{}\n----------\n", name);
+    for (i, msg) in cat.iter().enumerate() {
+        eprintln!("{}: {}", i, msg);
+    }
+    eprintln!("\n----------\n");
+    cat.len()
+}
+
+fn run_category(paths: &[PathBuf], should_fail: bool) -> Vec<String> {
+    let mut ret = Vec::new();
+    for path in paths.iter() {
+        let js = std::fs::read_to_string(&path).expect(&format!("failed to read {}", path.display()));
+        let is_mod = format!("{}", path.display()).contains("module");
+        let mut p = match Parser::builder()
+            .js(&js)
+            .module(is_mod)
+            .build() {
+                Ok(p) => p,
+                Err(e) => {
+                    if should_fail {
+                        ret.push(format!("{}\n\n{}", path.display(), e));
+                    }
+                    continue;
+                }
+            };
+        match p.parse() {
+            Ok(p) => if should_fail {
+                ret.push(format!("{}\n{:#?}", path.display(), p));
+            },
+            Err(e) => if !should_fail {
+                ret.push(format!("{}\n{}", path.display(), e))
+            }
+        }
+    }
+    ret
+}
+
+fn categorize_paths(paths: &[PathBuf]) -> (Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>) {
+    paths.into_iter().fold(
+        (vec![], vec![], vec![], vec![]), |mut acc, path| {
+            if let Some(parent) = path.parent() {
+                let parent_str = format!("{}", parent.display());
+                if parent_str.ends_with("early") {
+                    acc.0.push(path.to_path_buf());
+                } else if parent_str.ends_with("fail") {
+                    acc.1.push(path.to_path_buf());
+                } else if parent_str.ends_with("pass") {
+                    acc.2.push(path.to_path_buf());
+                } else if parent_str.ends_with("pass-explicit") {
+                    acc.3.push(path.to_path_buf());
+                }
+            }
+            acc
+        })
+}
+
+fn get_parser_repo(path: &Path) -> Res<()> {
+    let _ = ::std::fs::create_dir_all(path);
+    let mut response = reqwest::get(PARSER_URL)?;
+    let mut buf = Vec::new();
+    response.copy_to(&mut buf)?;
+
+    let gz = GzDecoder::new(buf.as_slice());
+    let mut t = tar::Archive::new(gz);
+    let mut target: Option<PathBuf> = None;
+    for entry in t.entries()? {
+        let mut entry = entry?;
+        let p = entry.path()?.into_owned();
+        if format!("{}", p.display()).ends_with(".gitignore")
+        || format!("{}", p.display()).ends_with("make-explicit.js") {
+            continue;
+        }
+        if target.is_none() && format!("{}", p.display()).starts_with("tc39") {
+            target = Some(p.clone());
+        }
+        if let Some(ext) = p.extension() {
+            if ext != "js" {
+                continue;
+            }
+        }
+        let stripped = if let Some(ref target) = target {
+            if p.starts_with(target) {
+                if let Ok(p2) = p.strip_prefix(target) {
+                    Some(p2.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if let Some(p2) = stripped {
+            entry.unpack(path.join(p2))?;
+        }
+    }
+    Ok(())
 }

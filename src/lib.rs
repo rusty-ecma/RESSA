@@ -462,7 +462,7 @@ where
         match &tok {
             Token::Keyword(ref k) => match k {
                 Keyword::Import(_) => {
-                    if self.at_import_call() {
+                    if self.at_import_call()? {
                         let stmt = self.parse_statement()?;
                         Ok(ProgramPart::Stmt(stmt))
                     } else {
@@ -2024,6 +2024,10 @@ where
         };
         let id = if opt_ident && !self.look_ahead.token.is_ident() {
             None
+        } else if self.at_keyword(Keyword::Await(())) {
+            let s = self.get_string(&self.look_ahead.span)?;
+            let _ = self.next_item()?;
+            Some(resast::Ident::from(s))
         } else {
             Some(self.parse_var_ident(false)?)
         };
@@ -2699,7 +2703,7 @@ where
                 } else if self.at_keyword(Keyword::Class(())) {
                     let cls = self.parse_class_decl(true)?;
                     Ok(Expr::Class(cls))
-                } else if self.at_import_call() {
+                } else if self.at_import_call()? {
                     // TODO: Double check this
                     let ident = self.parse_ident_name()?;
                     Ok(Expr::Ident(ident))
@@ -2927,7 +2931,9 @@ where
         let mut is_proto = false;
         let mut at_get = false;
         let mut at_set = false;
-        let (key, is_async, computed) = if start.token.is_ident() {
+        let (key, is_async, computed) = if start.token.is_ident() 
+        || (!self.context.strict
+            && start.token.matches_keyword(Keyword::Let(()))) {
             at_get = start.token.matches_ident_str("get");
             at_set = start.token.matches_ident_str("set");
             let _ = self.next_item()?;
@@ -3033,6 +3039,8 @@ where
                 })
             } else if start.token.is_ident()
                 || start.token == Token::Keyword(Keyword::Yield("yield"))
+                || (!self.context.strict
+                    && start.token.matches_keyword(Keyword::Let(())))
             {
                 if self.at_punct(Punct::Equal) {
                     self.context.first_covert_initialized_name_error =
@@ -5041,24 +5049,24 @@ where
             && !self.look_ahead.is_eof()
     }
     #[inline]
-    fn at_import_call(&mut self) -> bool {
+    fn at_import_call(&mut self) -> Res<bool> {
         debug!(
             "{}: at_import_call {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
         if self.at_keyword(Keyword::Import(())) {
             let state = self.scanner.get_state();
-            self.scanner.skip_comments().unwrap();
+            self.scanner.skip_comments()?;
             let ret = if let Some(next) = self.scanner.next() {
-                let next = next.unwrap();
+                let next = next?;
                 next.token.matches_punct(Punct::OpenParen)
             } else {
                 false
             };
             self.scanner.set_state(state);
-            ret
+            Ok(ret)
         } else {
-            false
+            Ok(false)
         }
     }
     #[inline]
