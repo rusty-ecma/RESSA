@@ -147,7 +147,7 @@ impl<'a> Default for Context<'a> {
         trace!("default context",);
         Self {
             is_module: false,
-            allow_await: false,
+            allow_await: true,
             allow_in: true,
             allow_strict_directive: true,
             allow_yield: true,
@@ -3282,7 +3282,7 @@ where
             && (self.context.strict || !self.context.allow_yield)
         {
             return Err(Error::InvalidYield(ident.location.start));
-        } else if !ident.token.is_ident() {
+        } else if !ident.token.is_ident() && !ident.token.matches_keyword(Keyword::Await(())) {
             if self.context.strict && ident.token.is_keyword() && ident.token.is_strict_reserved() {
                 return Err(Error::NonStrictFeatureInStrictContext(
                     ident.location.start,
@@ -3297,11 +3297,12 @@ where
                     && !ident.token.matches_keyword(Keyword::Await(())))
                 || !is_var
             {
-                return self.expected_token_error(&ident, &["variable identifier", "let"]);
+                return self.expected_token_error(&ident, &["variable identifier", "let", "await"]);
             }
         } else if (self.context.is_module || !self.context.allow_await)
             && &self.original[ident.span.start..ident.span.end] == "await"
         {
+            debug!("invalid await await: {}, module: {}", self.context.allow_await, self.context.is_module);
             return self.expected_token_error(&ident, &["variable identifier"]);
         }
         let i = match ident.token {
