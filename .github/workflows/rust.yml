@@ -1,0 +1,15 @@
+name: Rust
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: [ubuntu-latest, windows-latest, macOS-latest]
+    steps:
+    - env: 
+        RUST_MIN_SACK: 9999999
+    - uses: actions/checkout@v1
+    - name: Build
+      run: cargo build --verbose
+    - name: Run tests
+      run: cargo test_all --verbose
