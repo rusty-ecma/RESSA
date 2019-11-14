@@ -1309,7 +1309,7 @@ where
                 Token::Keyword(ref k) => match k {
                     Keyword::Const(_) => VarKind::Const,
                     Keyword::Let(_) => VarKind::Let,
-                    _ => unreachable!(),
+                    _ => return self.expected_token_error(&kind, &["const", "let"]),
                 },
                 _ => return self.expected_token_error(&kind, &["const", "let"]),
             };
