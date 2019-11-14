@@ -1261,9 +1261,6 @@ where
         let is_await = if self.at_keyword(Keyword::Await(())) {
             let _ = self.next_item()?;
             true
-        // for await ([lookahead ≠ let] LeftHandSideExpression [?Yield, ?Await] of AssignExpression [+In, ?Yield, ?Await]) Statement [?Yield, ?Await, ?Return]
-        // for await (var ForBinding [?Yield, ?Await] of AssignExpression [+In, ?Yield, ?Await]) Statement [?Yield, ?Await, ?Return]
-        // for await (ForDeclaration [?Yield, ?Await] of AssignExpression [+In, ?Yield, ?Await]) Statement[?Yield, ?Await, ?Return]
         } else {
             false
         };
