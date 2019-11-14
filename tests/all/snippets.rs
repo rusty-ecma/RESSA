@@ -354,6 +354,13 @@ fn await_as_class_ident() {
     run_test("class await {}", false).unwrap();
 }
 
+#[test]
+fn let_in_for_loop() {
+    run_test("let = 1;
+for ( let; ; )
+    break;", false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
