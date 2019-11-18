@@ -166,6 +166,11 @@ class B extends A {
 }
 
 #[test]
+fn super_in_async_method() {
+    run_test("var x = { async method(x = super.method()) { await 1; } }", false).unwrap();
+}
+
+#[test]
 #[should_panic = "super calls should only be allowed in ctors"]
 fn super_in_method_neg() {
     let _ = env_logger::try_init();
@@ -352,6 +357,10 @@ var o = {let};", false).unwrap();
 #[test]
 fn await_as_class_ident() {
     run_test("class await {}", false).unwrap();
+}
+#[test]
+fn await_as_class_ident_expr() {
+    run_test("var ctor = class a\\u0077ait {}", false).unwrap();
 }
 
 #[test]

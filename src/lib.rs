@@ -167,6 +167,12 @@ impl<'a> Default for Context<'a> {
         }
     }
 }
+impl<'a> Context<'a> {
+    pub fn set_allow_super(&mut self, value: bool) {
+        trace!("context.set_allow_super({})", value);
+        self.allow_super = value;
+    }
+}
 /// This is used to create a `Parser` using
 /// the builder method
 #[derive(Default)]
@@ -1941,7 +1947,7 @@ where
         self.context.allow_await = !is_async;
         self.context.allow_yield = !is_gen;
         debug!("setting allow_super to {}", false);
-        self.context.allow_super = false;
+        self.context.set_allow_super(false);
         let param_start = self.look_ahead_position;
         let formal_params = self.parse_formal_params()?;
         let strict = formal_params.strict;
@@ -1961,7 +1967,7 @@ where
         self.context.allow_await = prev_await;
         self.context.allow_yield = prev_yield;
         debug!("setting allow_super to {}", prev_super);
-        self.context.allow_super = prev_super;
+        self.context.set_allow_super(prev_super);
         Ok(Func {
             id,
             params,
@@ -2019,12 +2025,12 @@ where
         } else {
             None
         };
-        let id = if opt_ident && !self.look_ahead.token.is_ident() {
-            None
-        } else if self.at_keyword(Keyword::Await(())) {
+        let id = if self.at_keyword(Keyword::Await(())) {
             let s = self.get_string(&self.look_ahead.span)?;
             let _ = self.next_item()?;
             Some(resast::Ident::from(s))
+        } else if opt_ident && !self.look_ahead.token.is_ident() {
+            None
         } else {
             Some(self.parse_var_ident(false)?)
         };
@@ -2035,7 +2041,7 @@ where
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             super_class = Some(Box::new(new_super))
         }
-        self.context.allow_super = true;
+        self.context.set_allow_super(true);
         let body = self.parse_class_body()?;
 
         self.context.strict = prev_strict;
@@ -2890,6 +2896,8 @@ where
         self.expect_punct(Punct::OpenBrace)?;
         let mut props = Vec::new();
         let mut proto_ct = 0;
+        let prev_super = self.context.allow_super;
+        self.context.set_allow_super(true);
         while !self.at_punct(Punct::CloseBrace) {
             let prop = if self.at_punct(Punct::Ellipsis) {
                 let spread = self.parse_spread_element()?;
@@ -2907,6 +2915,7 @@ where
                 self.expect_comma_sep()?;
             }
         }
+        self.context.set_allow_super(prev_super);
         self.expect_punct(Punct::CloseBrace)?;
         if !self.at_punct(Punct::Equal) && proto_ct > 1 {
             Err(Error::Redecl(
@@ -2962,9 +2971,9 @@ where
         let prop = if at_get && at_qualified && !is_async {
             let computed = self.at_punct(Punct::OpenBracket);
             let key = self.parse_object_property_key()?;
-            self.context.allow_super = true;
+            self.context.set_allow_super(true);
             let value = self.parse_getter_method()?;
-            self.context.allow_super = prev_super;
+            self.context.set_allow_super(prev_super);
             ObjProp::Prop(Prop {
                 computed,
                 key,
@@ -2977,9 +2986,9 @@ where
         } else if at_set && at_qualified && !is_async {
             let computed = self.at_punct(Punct::OpenBracket);
             let key = self.parse_object_property_key()?;
-            self.context.allow_super = true;
+            self.context.set_allow_super(true);
             let value = self.parse_setter_method()?;
-            self.context.allow_super = prev_super;
+            self.context.set_allow_super(prev_super);
             ObjProp::Prop(Prop {
                 computed,
                 key,
@@ -3019,13 +3028,13 @@ where
                     is_static: false,
                 })
             } else if self.at_punct(Punct::OpenParen) {
-                self.context.allow_super = true;
+                self.context.set_allow_super(true);
                 let value = if is_async {
                     self.parse_async_property_method()?
                 } else {
                     self.parse_property_method()?
                 };
-                self.context.allow_super = prev_super;
+                self.context.set_allow_super(prev_super);
                 ObjProp::Prop(Prop {
                     computed,
                     key,
@@ -3186,7 +3195,7 @@ where
         let prev_yield = self.context.allow_yield;
         let prev_super = self.context.allow_super;
         debug!("setting allow_super to {}", false);
-        self.context.allow_super = false;
+        self.context.set_allow_super(false);
         debug!("setting allow_await to {}", is_async);
         self.context.allow_await = !is_async;
         self.context.allow_yield = !is_gen;
@@ -3229,7 +3238,7 @@ where
         self.context.allow_yield = prev_yield;
         self.context.allow_await = prev_await;
         debug!("setting allow_super to {}", prev_super);
-        self.context.allow_super = prev_super;
+        self.context.set_allow_super(prev_super);
         let func = Func {
             id,
             params: formal_params.params,
@@ -4606,7 +4615,7 @@ where
         let prev_in = self.context.allow_in;
         self.context.allow_in = true;
 
-        let mut expr = if self.at_keyword(Keyword::Super(())) && self.context.in_function_body {
+        let mut expr = if self.at_keyword(Keyword::Super(())) {
             self.parse_super()?
         } else {
             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
