@@ -2300,7 +2300,7 @@ where
         let prev_yield = self.context.allow_yield;
         let prev_await = self.context.allow_await;
         self.context.allow_yield = false;
-        self.context.allow_await = true;
+        self.context.allow_await = false;
         let params = self.parse_formal_params()?;
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
@@ -2928,23 +2928,24 @@ where
         let mut is_proto = false;
         let mut at_get = false;
         let mut at_set = false;
-        let (key, is_async, computed) = if start.token.is_ident() 
+        let (key, is_async, computed) = if self.look_ahead.token.is_ident()
         || (!self.context.strict
-            && start.token.matches_keyword(Keyword::Let(()))) {
-            at_get = start.token.matches_ident_str("get");
-            at_set = start.token.matches_ident_str("set");
-            let _ = self.next_item()?;
+            && self.look_ahead.token.matches_keyword(Keyword::Let(()))) {
+            at_get = self.look_ahead.token.matches_ident_str("get");
+            at_set = self.look_ahead.token.matches_ident_str("set");
+            let ident = self.next_item()?;
             let computed = self.at_punct(Punct::OpenBracket);
-            let is_async = self.context.has_line_term
-                && start.token.matches_ident_str("async")
+            let is_async = !self.context.has_line_term
+                && ident.token.matches_ident_str("async")
                 && !self.at_punct(Punct::Colon)
                 && !self.at_punct(Punct::Asterisk)
                 && !self.at_punct(Punct::Comma);
             let key = if is_async {
                 self.parse_object_property_key()?
             } else {
+                let s = self.get_string(&ident.span)?;
                 PropKey::Expr(Expr::Ident(resast::Ident::from(
-                    &self.original[start.span.start..start.span.end],
+                    s
                 )))
             };
             (Some(key), is_async, computed)
