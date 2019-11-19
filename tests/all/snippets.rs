@@ -366,7 +366,13 @@ fn await_as_class_ident_expr() {
 #[test]
 fn let_in_for_loop() {
     run_test("let = 1;
-for ( let; ; )
+for (let; ; )
+    break;", false).unwrap();
+}
+#[test]
+fn let_in_for_loop2() {
+    run_test("let = 1;
+for (let = 2; ; )
     break;", false).unwrap();
 }
 

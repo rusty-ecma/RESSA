@@ -1311,6 +1311,21 @@ where
             }
         } else if self.at_keyword(Keyword::Const(())) || self.at_keyword(Keyword::Let(())) {
             let kind = self.next_item()?;
+            if kind.token.matches_keyword(Keyword::Let(()))  {
+                if self.at_punct(Punct::SemiColon) {
+                    let ident = self.get_string(&kind.span)?;
+                    let ident = resast::Ident::from(ident);
+                    let ident = Expr::Ident(ident);
+                    let loop_init = LoopInit::Expr(ident);
+                    let for_stmt = self.parse_for_loop_cont(Some(loop_init))?;
+                    return Ok(Stmt::For(for_stmt));
+                } else if self.at_assign() {
+                    let left = self.get_string(&kind.span)?;
+                    let left = resast::Ident::from(left);
+                    let left = Expr::Ident(left);
+                    let assign = self.parse_assignment_after_start(left)?;
+                }
+            }
             let kind = match &kind.token {
                 Token::Keyword(ref k) => match k {
                     Keyword::Const(_) => VarKind::Const,
@@ -3705,62 +3720,66 @@ where
                     return self
                         .unexpected_token_error(&self.look_ahead, "Not at assignment target");
                 }
-                if self.context.strict && Self::is_ident(&current) {
-                    if let Expr::Ident(ref i) = current {
-                        if Self::is_restricted_word(i) || Self::is_strict_reserved(i) {
-                            return self.expected_token_error(
-                                &self.look_ahead,
-                                &[&format!("not {}", i.name)],
-                            );
-                        }
-                    }
-                }
-                let left = if !self.at_punct(Punct::Equal) {
-                    self.context.is_assignment_target = false;
-                    self.context.is_binding_element = false;
-                    AssignLeft::Expr(Box::new(current))
-                } else if !Self::is_ident(&current) && Self::is_reinterpret_target(&current) {
-                    AssignLeft::Pat(self.reinterpret_expr_as_pat(current)?)
-                } else {
-                    AssignLeft::Expr(Box::new(current))
-                };
-                let item = self.next_item()?;
-                let op = match item.token {
-                    Token::Punct(ref p) => {
-                        if let Some(op) = Self::assignment_operator(*p) {
-                            op
-                        } else {
-                            return self.expected_token_error(
-                                &item,
-                                &[
-                                    "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=",
-                                    "<<=", ">>=", ">>>=",
-                                ],
-                            );
-                        }
-                    }
-                    _ => {
-                        return self.expected_token_error(
-                            &item,
-                            &[
-                                "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=", "<<=",
-                                ">>=", ">>>=",
-                            ],
-                        );
-                    }
-                };
-                let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
-                let right = self.parse_assignment_expr()?;
-                self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-                self.context.first_covert_initialized_name_error = None;
-                return Ok(Expr::Assign(AssignExpr {
-                    operator: op,
-                    left,
-                    right: Box::new(right),
-                }));
+                let assign = self.parse_assignment_after_start(current)?;
+                return Ok(Expr::Assign(assign));
             }
             Ok(current)
         }
+    }
+    fn parse_assignment_after_start(&mut self, start: Expr<'b>) -> Res<AssignExpr<'b>> {
+        if self.context.strict && Self::is_ident(&start) {
+            if let Expr::Ident(ref i) = start {
+                if Self::is_restricted_word(i) || Self::is_strict_reserved(i) {
+                    return self.expected_token_error(
+                        &self.look_ahead,
+                        &[&format!("not {}", i.name)],
+                    );
+                }
+            }
+        }
+        let left = if !self.at_punct(Punct::Equal) {
+            self.context.is_assignment_target = false;
+            self.context.is_binding_element = false;
+            AssignLeft::Expr(Box::new(start))
+        } else if !Self::is_ident(&start) && Self::is_reinterpret_target(&start) {
+            AssignLeft::Pat(self.reinterpret_expr_as_pat(start)?)
+        } else {
+            AssignLeft::Expr(Box::new(start))
+        };
+        let item = self.next_item()?;
+        let op = match item.token {
+            Token::Punct(ref p) => {
+                if let Some(op) = Self::assignment_operator(*p) {
+                    op
+                } else {
+                    return self.expected_token_error(
+                        &item,
+                        &[
+                            "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=",
+                            "<<=", ">>=", ">>>=",
+                        ],
+                    );
+                }
+            }
+            _ => {
+                return self.expected_token_error(
+                    &item,
+                    &[
+                        "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=", "<<=",
+                        ">>=", ">>>=",
+                    ],
+                );
+            }
+        };
+        let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
+        let right = self.parse_assignment_expr()?;
+        self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
+        self.context.first_covert_initialized_name_error = None;
+        Ok(AssignExpr {
+            operator: op,
+            left,
+            right: Box::new(right),
+        })
     }
     /// Check if an arg is a strict mode restricted identifier
     /// returns true if the arg _is_ an error
