@@ -24,7 +24,6 @@ static INCLUDED_FEATURES: &[&str] = &[
     "Symbol.toStringTag",
     "Intl.DateTimeFormat-formatRange",
     "Symbol.split",
-
     "DataView.prototype.getFloat32",
     "globalThis",
     "DataView.prototype.getUint32",
