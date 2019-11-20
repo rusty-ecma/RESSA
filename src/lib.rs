@@ -695,6 +695,7 @@ where
                     DefaultExportDecl::Decl(decl)
                 } else {
                     let expr = self.parse_assignment_expr()?;
+                    self.consume_semicolon()?;
                     DefaultExportDecl::Expr(expr)
                 }
             } else {
@@ -712,6 +713,7 @@ where
                     DefaultExportDecl::Expr(expr)
                 } else {
                     let expr = self.parse_assignment_expr()?;
+                    self.consume_semicolon()?;
                     DefaultExportDecl::Expr(expr)
                 }
             };
