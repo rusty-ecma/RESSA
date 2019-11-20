@@ -381,6 +381,17 @@ fn async_obj_lit_method() {
     run_test("var x = { async m() { await 0 } }", false).unwrap();
 }
 
+#[test]
+fn await_as_label() {
+    run_test("await: 1;", false).unwrap();
+}
+
+#[test]
+#[should_panic]
+fn await_as_default_in_param() {
+    run_test("(q=await) => {}", false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;

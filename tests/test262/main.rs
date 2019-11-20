@@ -420,7 +420,7 @@ impl TestFailure {
             runner = runner,
             strict = strict,
             not = not,
-            js = self.js
+            js = self.js.lines().enumerate().map(|(i, l)| format!("/*{}*/{}\n", i+1, l)).collect::<String>(),
         )
     }
     pub fn get_first_id(&self, fallback: &str) -> String {

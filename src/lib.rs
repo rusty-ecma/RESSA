@@ -865,6 +865,9 @@ where
                 }
             }
             Token::Keyword(ref k) => match k {
+                Keyword::Await(_) if !self.context.is_module => {
+                    self.parse_labelled_statement()?
+                },
                 Keyword::Break(k) => Stmt::Break(self.parse_break_stmt(k)?),
                 Keyword::Continue(k) => {
                     if !self.context.in_iteration {
@@ -1324,6 +1327,11 @@ where
                     let left = resast::Ident::from(left);
                     let left = Expr::Ident(left);
                     let assign = self.parse_assignment_after_start(left)?;
+                    if self.at_punct(Punct::SemiColon) {
+                        let init = LoopInit::Expr(Expr::Assign(assign));
+                        let loop_stmt = self.parse_for_loop_cont(Some(init))?;
+                        return Ok(Stmt::For(loop_stmt))
+                    }
                 }
             }
             let kind = match &kind.token {
@@ -3680,6 +3688,9 @@ where
                         if !Self::is_simple(arg) {
                             simple = false;
                         }
+                        if Self::is_invalid_await(arg) {
+                            return Err(Error::InvalidParameter(start_pos, "Await used as the right hand side of a default pattern".to_string()))
+                        }
                     }
                     self.expect_fat_arrow()?;
                     if self.at_punct(Punct::OpenBrace) {
@@ -4001,6 +4012,21 @@ where
                 Expr::Ident(_) => true,
                 _ => false,
             },
+        }
+    }
+
+    #[inline]
+    fn is_invalid_await(arg: &FuncArg) -> bool {
+        match arg {
+            FuncArg::Expr(Expr::Assign(AssignExpr { right, ..}))
+            | FuncArg::Pat(Pat::Assign(AssignPat { right, ..})) => {
+                if let Expr::Ident(id) = &**right {
+                    id.name == "await"
+                } else {
+                    false
+                }
+            },
+            _ => false,
         }
     }
 
