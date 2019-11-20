@@ -11,31 +11,28 @@ use std::{
     error::Error,
     path::{Path, PathBuf},
 };
-
-static SKIPPED_FEATURES: &[&str] = &[
+static INCLUDED_FEATURES: &[&str] = &[
     "coalesce-expression",
     "IsHTMLDDA",
-    "Reflect.construct",
     "String.prototype.endsWith",
     "Array.prototype.flat",
     "template",
+    "super",
+    "for-of",
+    "Float64Array",
+    "Reflect.construct",
     "Symbol.toStringTag",
     "Intl.DateTimeFormat-formatRange",
-    "super",
     "Symbol.split",
-    "regexp-named-groups",
-    "Symbol.iterator",
+
     "DataView.prototype.getFloat32",
     "globalThis",
-    "object-rest",
-    "class-fields-public",
     "DataView.prototype.getUint32",
     "Symbol.prototype.description",
     "WeakRef",
     "Int32Array",
     "Uint8ClampedArray",
     "String.fromCodePoint",
-    "class-static-methods-private",
     "SharedArrayBuffer",
     "Intl.DateTimeFormat-fractionalSecondDigits",
     "Uint8Array",
@@ -46,43 +43,25 @@ static SKIPPED_FEATURES: &[&str] = &[
     "String.prototype.trimStart",
     "caller",
     "Uint16Array",
-    "Symbol.asyncIterator",
-    "destructuring-binding",
-    "BigInt",
     "Symbol.hasInstance",
     "DataView.prototype.getInt16",
-    "arrow-function",
     "string-trimming",
-    "class-methods-private",
     "optional-catch-binding",
-    "dynamic-import",
-    "let",
     "FinalizationGroup",
-    "Symbol",
     "Float32Array",
-    "import.meta",
     "Reflect.set",
     "WeakSet",
     "tail-call-optimization",
-    "class",
     "String.prototype.matchAll",
-    "export-star-as-namespace-from-module",
-    "Proxy",
-    "top-level-await",
     "Symbol.unscopables",
     "DataView.prototype.getInt32",
     "Symbol.search",
     "Intl.NumberFormat-unified",
     "Symbol.species",
-    "numeric-separator-literal",
     "Object.fromEntries",
     "cross-realm",
-    "object-spread",
-    "default-parameters",
     "DataView.prototype.getFloat64",
-    "optional-chaining",
     "Symbol.isConcatSpreadable",
-    "Symbol.toPrimitive",
     "String.prototype.trimEnd",
     "Array.prototype.values",
     "regexp-lookbehind",
@@ -94,43 +73,66 @@ static SKIPPED_FEATURES: &[&str] = &[
     "Intl.RelativeTimeFormat",
     "proxy-missing-checks",
     "DataView.prototype.getUint16",
-    "async-iteration",
     "Intl.ListFormat",
     "Intl.DateTimeFormat-quarter",
-    "computed-property-names",
-    "regexp-unicode-property-escapes",
     "Reflect",
-    "class-fields-private",
     "Symbol.match",
     "Intl.DateTimeFormat-dayPeriod",
-    "generators",
-    "async-functions",
     "Object.is",
     "Promise.allSettled",
     "Symbol.replace",
     "well-formed-json-stringify",
     "Intl.Locale",
-    "class-static-fields-public",
     "ArrayBuffer",
     "Set",
-    "new.target",
     "Intl.Segmenter",
     "Promise.prototype.finally",
-    "hashbang",
     "Int8Array",
-    "const",
     "WeakMap",
     "Array.prototype.flatMap",
     "DataView",
-    "for-of",
-    "Float64Array",
     "Atomics",
     "Symbol.matchAll",
-    "json-superset",
     "String.prototype.includes",
-    "class-static-fields-private",
     "Map",
+    
+    // "regexp-named-groups",
+    // "Symbol.iterator",
+    // "object-rest",
+    // "class-fields-public",
+    // "class-static-methods-private",
+    // "Symbol.asyncIterator",
+    // "destructuring-binding",
+    // "BigInt",
+    // "arrow-function",
+    // "class-methods-private",
+    // "dynamic-import",
+    // "let",
+    // "Symbol",
+    // "import.meta",
+    // "class-static-fields-public",
+    // "class",
+    // "export-star-as-namespace-from-module",
+    // "Proxy",
+    // "top-level-await",
+    // "numeric-separator-literal",
+    // "object-spread",
+    // "default-parameters",
+    // "optional-chaining",
+    // "Symbol.toPrimitive",
+    // "async-iteration",
+    // "computed-property-names",
+    // "regexp-unicode-property-escapes",
+    // "class-fields-private",
+    // "generators",
+    // "async-functions",
+    // "new.target",
+    // "hashbang",
+    // "const",
+    // "json-superset",
+    // "class-static-fields-private",
 ];
+
 type Res<T> = Result<T, Box<dyn Error>>;
 
 struct Test262Runner<'a> {
@@ -530,7 +532,11 @@ fn test262() -> Res<()> {
     );
     if write_failures {
         let mut collected = std::collections::HashMap::new();
+        let mut feature_count = std::collections::HashMap::new();
         for failure in failures {
+            for feat in &failure.desc.features {
+                *feature_count.entry(feat.clone()).or_insert(0) += 1;
+            }
             let id = failure.get_first_id("unknown");
             let sames = collected.entry(id).or_insert(vec![]);
             sames.push(failure.clone());
@@ -564,7 +570,12 @@ fn test262() -> Res<()> {
             </head>
             <body>", include_str!("./style.css"));
             root_file.write_all(head.as_bytes())?;
-            root_file.write_all(format!("<h1>Failures</h1><quote>{}</quote><button id=\"remove-neg-button\">positive only</button><ul>", report).as_bytes())?;
+            root_file.write_all(format!("<h1>Failures</h1><quote>{}</quote><button id=\"remove-neg-button\">positive only</button><ul id=\"feature-counts-list\">", report).as_bytes())?;
+
+            for (name, ct) in feature_count {
+                root_file.write_all(format!("<li class=\"feature-count-entry\"><span class=\"feature-name\">{}</span><span class=\"feature-count\">{}</span></li>", name, ct).as_bytes())?;
+            }
+            root_file.write_all(b"</ul><ul>").unwrap();
             for (id, list) in collected {
                 root_file.write_all(
                     format!(
@@ -610,6 +621,7 @@ fn test262() -> Res<()> {
             }
         }
     }
+    
     if len > 0 {
         panic!("{}", report);
     }
@@ -676,11 +688,11 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
         runner: TestStatus::Success,
         js: contents.clone(),
     };
-    if ret
+    if !ret
         .desc
         .features
         .iter()
-        .any(|f| SKIPPED_FEATURES.iter().any(|f2| f == f2))
+        .all(|f| INCLUDED_FEATURES.iter().any(|f2| f == f2))
     {
         SKIP_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         return None;
