@@ -2683,7 +2683,7 @@ where
             let _ = self.next_item()?;
             Ok(Expr::Lit(Lit::Null))
         } else if self.look_ahead.is_template() {
-            let lit = self.parse_template_lit()?;
+            let lit = self.parse_template_lit(false)?;
             Ok(Expr::Lit(Lit::Template(lit)))
         } else if self.look_ahead.token.is_punct() {
             let (prev_bind, prev_assign, prev_first) = self.inherit_cover_grammar();
@@ -3144,7 +3144,6 @@ where
     fn at_possible_ident(&self) -> bool {
         self.look_ahead.token.is_ident()
             || self.look_ahead.token.is_keyword()
-            // || self.look_ahead.token.is_bool()
             || self.look_ahead.token.is_null()
             || if let Token::Boolean(_) = self.look_ahead.token {
                 true
@@ -3154,7 +3153,7 @@ where
     }
 
     #[inline]
-    fn parse_template_lit(&mut self) -> Res<TemplateLit<'b>> {
+    fn parse_template_lit(&mut self, allow_octal_escape: bool) -> Res<TemplateLit<'b>> {
         debug!(
             "{}: parse_template_Lit {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -3165,12 +3164,12 @@ where
         }
         let mut expressions = Vec::new();
         let mut quasis = Vec::new();
-        let quasi = self.parse_template_element()?;
+        let quasi = self.parse_template_element(allow_octal_escape)?;
         let mut breaking = quasi.tail;
         quasis.push(quasi);
         while !breaking {
             expressions.push(self.parse_expression()?);
-            let quasi = self.parse_template_element()?;
+            let quasi = self.parse_template_element(allow_octal_escape)?;
             breaking = quasi.tail;
             quasis.push(quasi);
         }
@@ -3181,7 +3180,7 @@ where
     }
 
     #[inline]
-    fn parse_template_element(&mut self) -> Res<TemplateElement<'b>> {
+    fn parse_template_element(&mut self, allow_octal_escape: bool) -> Res<TemplateElement<'b>> {
         debug!(
             "{}: parse_template_element {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -3195,7 +3194,10 @@ where
                 Template::Tail(c) => (c, true),
                 Template::NoSub(c) => (c, true),
             };
-            Ok(TemplateElement::from(tail, cooked, raw))
+            if !allow_octal_escape && cooked.contains_octal_escape {
+                return Err(Error::OctalLiteral(item.location.start))
+            }
+            Ok(TemplateElement::from(tail, cooked.content, raw))
         } else {
             self.expected_token_error(&self.look_ahead, &["Template part"])
         }
@@ -4616,7 +4618,7 @@ where
                 };
                 expr = Expr::Member(member);
             } else if self.look_ahead.is_template() {
-                let quasi = self.parse_template_lit()?;
+                let quasi = self.parse_template_lit(true)?;
                 expr = Expr::TaggedTemplate(TaggedTemplateExpr {
                     tag: Box::new(expr),
                     quasi,
@@ -4723,7 +4725,7 @@ where
                 debug!(target: "look_ahead", "{:?}", member);
                 expr = Expr::Member(member);
             } else if self.look_ahead.token.is_template_head() {
-                let quasi = self.parse_template_lit()?;
+                let quasi = self.parse_template_lit(true)?;
                 let temp = TaggedTemplateExpr {
                     tag: Box::new(expr),
                     quasi,
