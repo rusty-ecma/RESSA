@@ -431,6 +431,22 @@ fn duplicate_params_arrow_obj_ident_pattern() {
     run_test("var fn = (x, {y, x}) => {}", false).unwrap();
 }
 
+#[test]
+fn html_comment_close() {
+    run_test("--> this is a comment
+  --> also a comment", false).unwrap()
+}
+#[test]
+#[should_panic]
+fn html_comment_close_module() {
+    run_test("/**/--> this is a comment", true).unwrap()
+}
+#[test]
+#[should_panic]
+fn html_comment_close_not_first_token() {
+    run_test(";--> this is not a comment", false).unwrap()
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;

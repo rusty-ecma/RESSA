@@ -5025,11 +5025,14 @@ where
                 }
                 self.look_ahead_position = look_ahead.location.start;
                 if look_ahead.token.is_comment() {
-                    trace!("next_item comment {}", self.context.has_line_term);
+                    trace!("next_item comment {} {:?}", self.context.has_line_term, look_ahead.token);
                     if let Token::Comment(ref inner) = look_ahead.token {
                         if inner.is_multi_line() {
                             comment_line_term =
                                 self.context.has_line_term || Self::comment_has_line_term(inner);
+                        } 
+                        if self.context.is_module && (inner.is_html() || inner.tail_content.is_some()) {
+                            return Err(Error::HtmlCommentInModule(self.look_ahead_position));
                         }
                     }
                     self.comment_handler.handle_comment(look_ahead);
