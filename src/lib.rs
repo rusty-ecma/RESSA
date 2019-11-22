@@ -2337,11 +2337,15 @@ where
             "{}: parse_property_method_async_fn",
             self.look_ahead.span.start
         );
+        let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
         let prev_await = self.context.allow_await;
         self.context.allow_yield = false;
         self.context.allow_await = false;
         let params = self.parse_formal_params()?;
+        if formal_params::have_duplicates(&params.params) {
+            return Err(Error::InvalidParameter(start, "Method arguments cannot contain duplicates".to_string()));
+        }
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
         self.context.allow_await = prev_await;
@@ -2361,10 +2365,14 @@ where
             "{}: parse_property_method {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
+        let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
         let prev_strict = self.context.allow_strict_directive;
         self.context.allow_yield = !self.context.strict;
         let params = self.parse_formal_params()?;
+        if formal_params::have_duplicates(&params.params) {
+            return Err(Error::InvalidParameter(start, "Method arguments cannot contain duplicates".to_string()));
+        }
         self.context.allow_strict_directive = params.simple;
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
@@ -2385,9 +2393,13 @@ where
             "{}: pares_generator_method {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
+        let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
         self.context.allow_yield = true;
         let params = self.parse_formal_params()?;
+        if formal_params::have_duplicates(&params.params) {
+            return Err(Error::InvalidParameter(start, "Method arguments cannot contain duplicates".to_string()));
+        }
         self.context.allow_yield = false;
         let body = self.parse_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
@@ -2408,9 +2420,13 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         let is_gen = false;
+        let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
         let start_position = self.look_ahead_position;
         let formal_params = self.parse_formal_params()?;
+        if formal_params::have_duplicates(&formal_params.params) {
+            return Err(Error::InvalidParameter(start, "Method arguments cannot contain duplicates".to_string()));
+        }
         if !formal_params.params.is_empty() {
             self.tolerate_error(Error::InvalidGetterParams(start_position))?;
         }
@@ -2454,10 +2470,14 @@ where
             "{}: parse_setter_method {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
+        let start = self.look_ahead_position;
         let prev_allow = self.context.allow_yield;
         self.context.allow_yield = true;
         let start_position = self.look_ahead_position;
         let params = self.parse_formal_params()?;
+        if formal_params::have_duplicates(&params.params) {
+            return Err(Error::InvalidParameter(start, "Method arguments cannot contain duplicates".to_string()));
+        }
         self.context.allow_yield = prev_allow;
         if params.params.len() != 1 {
             self.tolerate_error(Error::InvalidSetterParams(start_position))?;
@@ -3274,6 +3294,11 @@ where
             if !self.config.tolerant {
                 return self.unexpected_token_error(&start, "restricted ident in strict context");
             }
+        }
+        if !prev_strict && self.context.strict && formal_params::have_duplicates(&formal_params.params) {
+            return Err(
+                Error::NonStrictFeatureInStrictContext(start_pos, "duplicate function parameter names".to_string())
+            )
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow_strict_directive;

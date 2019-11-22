@@ -404,6 +404,11 @@ function fn(x, x) { }", false).unwrap();
 fn duplicate_params_strict_inner() {
     run_test("function fn(x, x) { 'use strict' }", false).unwrap();
 }
+#[test]
+#[should_panic]
+fn duplicate_params_strict_inner_expr() {
+    run_test("(function (x, x) { 'use strict' })", false).unwrap();
+}
 
 #[test]
 #[should_panic]
