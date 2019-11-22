@@ -392,6 +392,45 @@ fn await_as_default_in_param() {
     run_test("(q=await) => {}", false).unwrap();
 }
 
+#[test]
+#[should_panic]
+fn duplicate_params_strict() {
+    run_test("'use strict';
+function fn(x, x) { }", false).unwrap();
+}
+
+#[test]
+#[should_panic]
+fn duplicate_params_strict_inner() {
+    run_test("function fn(x, x) { 'use strict' }", false).unwrap();
+}
+
+#[test]
+#[should_panic]
+fn duplicate_params_arrow() {
+    run_test("var fn = (x, x) => {}", false).unwrap();
+}
+#[test]
+#[should_panic]
+fn duplicate_params_arrow_array_pattern() {
+    run_test("var fn = ([x, x]) => {}", false).unwrap();
+}
+#[test]
+#[should_panic]
+fn duplicate_params_arrow_array_ident_pattern() {
+    run_test("var fn = (x, [y, x]) => {}", false).unwrap();
+}
+#[test]
+#[should_panic]
+fn duplicate_params_arrow_obj_pattern() {
+    run_test("var fn = ({x, x}) => {}", false).unwrap();
+}
+#[test]
+#[should_panic]
+fn duplicate_params_arrow_obj_ident_pattern() {
+    run_test("var fn = (x, {y, x}) => {}", false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
