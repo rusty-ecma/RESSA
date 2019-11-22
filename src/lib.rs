@@ -3818,19 +3818,9 @@ where
     /// returns true if the arg _is_ an error
     fn check_arg_strict_mode(arg: &FuncArg<'b>) -> bool {
         match arg {
-            FuncArg::Expr(Expr::Ident(ref ident)) => {
-                if ident.name == "arguments" || ident.name == "eval" {
-                    true
-                } else {
-                    false
-                }
-            }
-            FuncArg::Pat(Pat::Ident(ref ident)) => {
-                if ident.name == "arguments" || ident.name == "eval" {
-                    true
-                } else {
-                    false
-                }
+            FuncArg::Expr(Expr::Ident(ref ident))
+            | FuncArg::Pat(Pat::Ident(ref ident)) => {
+                ident.name == "arguments" || ident.name == "eval"
             }
             _ => false,
         }
@@ -5483,12 +5473,4 @@ where
             Some(self.next_part())
         }
     }
-}
-
-#[allow(unused)]
-struct CoverFormalListOptions<'a> {
-    simple: bool,
-    params: Vec<FuncArg<'a>>,
-    stricted: bool,
-    first_restricted: Option<Expr<'a>>,
 }

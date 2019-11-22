@@ -137,18 +137,15 @@ fn update_with_prop<'a>(prop: &Prop<'a>, set: &mut HashSet<Cow<'a, str>>) -> Res
 
 fn update_with_lit<'a>(lit: &Lit<'a>, set: &mut HashSet<Cow<'a, str>>) -> Result<(), Cow<'a, str>> {
     trace!("update_with_lit {:?}, {:?}", lit, set);
-    match lit {
-        Lit::String(s) => {
-            match s {
-                resast::prelude::StringLit::Double(inner)
-                | resast::prelude::StringLit::Single(inner) => {
-                    if !set.insert(inner.clone()) {
-                        return Err(inner.clone())
-                    }
+    if let Lit::String(s) = lit {
+        match s {
+            resast::prelude::StringLit::Double(inner)
+            | resast::prelude::StringLit::Single(inner) => {
+                if !set.insert(inner.clone()) {
+                    return Err(inner.clone())
                 }
             }
-        },
-        _ => ()
+        }
     }
     Ok(())
 }
