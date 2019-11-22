@@ -65,6 +65,7 @@ pub use ress::Span;
 
 mod comment_handler;
 mod error;
+mod formal_params;
 
 pub use crate::comment_handler::CommentHandler;
 pub use crate::comment_handler::DefaultCommentHandler;
@@ -72,6 +73,7 @@ pub use crate::error::Error;
 use resast::prelude::*;
 use resast::ClassBody;
 use std::{collections::HashSet, mem::replace};
+use formal_params::FormalParams;
 
 /// The current configuration options.
 /// This will most likely increase over time
@@ -1930,6 +1932,7 @@ where
             "{}: parse_function_decl {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
+        let start_pos = self.look_ahead_position;
         let is_async = if self.at_contextual_keyword("async") {
             let _ = self.next_item()?;
             true
@@ -1975,6 +1978,9 @@ where
         self.context.set_allow_super(false);
         let param_start = self.look_ahead_position;
         let formal_params = self.parse_formal_params()?;
+        if self.context.strict && formal_params::have_duplicates(&formal_params.params) {
+            return Err(Error::InvalidParameter(start_pos, "Duplicate parameter in strict context".to_string()))
+        }
         let strict = formal_params.strict;
         let params = formal_params.params;
         let prev_strict = self.context.strict;
@@ -1983,6 +1989,9 @@ where
         let body = self.parse_function_source_el()?;
         if self.context.strict && formal_params.found_restricted {
             return Err(Error::StrictModeArgumentsOrEval(param_start));
+        }
+        if !prev_strict && self.context.strict && formal_params::have_duplicates(&params) {
+            return Err(Error::InvalidParameter(start_pos, "Duplicate parameter in function who's body is strict".to_string()));
         }
         if self.context.strict && strict {
             return self.expected_token_error(&self.look_ahead, &[]);
@@ -3249,7 +3258,7 @@ where
             None
         };
         let formal_params = self.parse_formal_params()?;
-        if self.context.strict && formal_params_have_duplicates(&formal_params.params) {
+        if self.context.strict && formal_params::have_duplicates(&formal_params.params) {
             return Err(
                 Error::NonStrictFeatureInStrictContext(start_pos, "duplicate function parameter names".to_string())
             )
@@ -3702,7 +3711,7 @@ where
                             return Err(Error::InvalidParameter(start_pos, "Await used as the right hand side of a default pattern".to_string()))
                         }
                     }
-                    if self.context.strict && formal_params_have_duplicates(&params) {
+                    if formal_params::have_duplicates(&params) {
                         return Err(Error::InvalidParameter(start_pos, "duplicate parameter name".to_string()));
                     }
                     self.expect_fat_arrow()?;
@@ -5475,187 +5484,6 @@ where
         }
     }
 }
-
-#[allow(unused)]
-struct FormalParams<'a> {
-    simple: bool,
-    params: Vec<FuncArg<'a>>,
-    strict: bool,
-    found_restricted: bool,
-}
-
-pub fn formal_params_have_duplicates<'a>(params: &[FuncArg<'a>]) -> bool {
-    let mut set = std::collections::HashSet::new();
-    for param in params.iter() {
-        match param {
-            FuncArg::Expr(expr) => {
-                if update_with_expr(expr, &mut set) {
-                    return true;
-                }
-            },
-            FuncArg::Pat(pat) => {
-                if update_with_pat(pat, &mut set) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-fn update_with_expr<'a>(expr: &Expr<'a>, set: &mut HashSet<std::borrow::Cow<'a, str>>) -> bool {
-    match expr {
-        Expr::Ident(id) => !set.insert(id.name.clone()),
-        Expr::Assign(AssignExpr { left, right, ..}) => {
-            match left {
-                AssignLeft::Expr(assign) => {
-                    if update_with_expr(assign, set) {
-                        return true;
-                    }
-                },
-                AssignLeft::Pat(pat) => {
-                    if update_with_pat(pat, set) {
-                        return true
-                    }
-                },
-            }
-            if update_with_expr(&*right, set) {
-                return true;
-            }
-            false
-        },
-        Expr::Obj(obj) => {
-            for prop in obj {
-                match prop {
-                    ObjProp::Prop(prop) => {
-                        match &prop.key {
-                            PropKey::Lit(lit) => {
-                                if update_with_lit(lit, set) {
-                                    return true;
-                                }
-                            },
-                            PropKey::Expr(expr) => {
-                                if update_with_expr(expr, set) {
-                                    return true;
-                                }
-                            },
-                            PropKey::Pat(pat) => {
-                                if update_with_pat(pat, set) {
-                                    return true;
-                                }
-                            }
-                        }
-                    },
-                    ObjProp::Spread(expr) => {
-                        if update_with_expr(expr, set) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            false
-        },
-        Expr::Func(func) => {
-            if let Some(id) = &func.id {
-                !set.insert(id.name.clone())
-            } else {
-                false
-            }
-        },
-        Expr::ArrowFunc(arrow) => {
-            if let Some(id) = &arrow.id {
-                !set.insert(id.name.clone())
-            } else {
-                false
-            }
-        }
-        _ => {
-            error!("expression parameter should only be an identifier, assignment, object literal or array -- {:?}", expr);
-            false
-        }
-    }
-}
-fn update_with_pat<'a>(pat: &Pat<'a>, set: &mut HashSet<std::borrow::Cow<'a, str>>) -> bool {
-    match pat {
-        Pat::Ident(id) => !set.insert(id.name.clone()),
-        Pat::Array(arr) => {
-            for part in arr {
-                if let Some(part) = part {
-                    match part {
-                        ArrayPatPart::Pat(pat) => {
-                            if update_with_pat(pat, set) {
-                                return true;
-                            }
-                        }
-                        ArrayPatPart::Expr(expr) => {
-                            if update_with_expr(expr, set) {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-            false
-        },
-        Pat::Obj(obj) => {
-            for part in obj {
-                match part {
-                    ObjPatPart::Assign(prop) => {
-                        match &prop.key {
-                            PropKey::Expr(expr) => {
-                                if update_with_expr(expr, set) {
-                                    return true;
-                                }
-                            },
-                            PropKey::Pat(pat) => {
-                                if update_with_pat(pat, set) {
-                                    return true;
-                                }
-                            },
-                            PropKey::Lit(lit) => {
-                                if update_with_lit(lit, set) {
-                                    return true;
-                                }
-                            }
-                        }
-                    },
-                    ObjPatPart::Rest(pat) => {
-                        if update_with_pat(&*pat, set) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            false
-        },
-        Pat::RestElement(inner) => {
-            if update_with_pat(&*inner, set) {
-                return true;
-            }
-            false
-        }
-        Pat::Assign(assign) => {
-            if update_with_pat(&*assign.left, set) {
-                return true;
-            }
-            false
-        }
-    }
-}
-fn update_with_lit<'a>(lit: &Lit<'a>, set: &mut HashSet<std::borrow::Cow<'a, str>>) -> bool {
-    match lit {
-        Lit::String(s) => {
-            match s {
-                resast::prelude::StringLit::Double(inner)
-                | resast::prelude::StringLit::Single(inner) => {
-                    !set.insert(inner.clone())
-                }
-            }
-        },
-        _ => false
-    }
-}
-
-
 
 #[allow(unused)]
 struct CoverFormalListOptions<'a> {
