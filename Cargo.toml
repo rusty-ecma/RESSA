@@ -16,9 +16,6 @@ resast = "0.4.0"
 log = "0.4"
 regex-syntax = { version = "0.6", features = ["unicode", "unicode-bool", "unicode-gencat", "unicode-perl",] }
 backtrace = "0"
-reqwest = { version = "0.9", optional = true }
-flate2 = { version = "1", optional = true }
-tar = { version = "0.4", optional = true }
 walkdir = { version = "2", optional = true }
 indicatif = { version = "0.12", optional = true, features = ["with_rayon"] }
 rayon = { version = "1.2", optional = true }
@@ -31,8 +28,8 @@ debug_look_ahead = []
 error_backtrace = []
 serialization = ["resast/serialization"]
 esprima = ["resast/esprima"]
-moz_central = ["reqwest", "flate2", "tar", "walkdir"]
-test_262 = ["reqwest", "flate2", "tar", "walkdir", "indicatif", "rayon", "pulldown-cmark"]
+moz_central = ["walkdir"]
+test_262 = ["indicatif", "rayon", "pulldown-cmark"]
 
 [dev-dependencies]
 term-painter = "0.2.4"

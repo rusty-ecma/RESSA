@@ -1,5 +1,4 @@
 #![cfg(test)]
-use flate2::read::GzDecoder;
 use ressa::{Builder, Error};
 use std::path::Path;
 use walkdir::WalkDir;
@@ -12,7 +11,7 @@ static ESPARSE: &str = "node_modules/.bin/esparse";
 fn moz_central() {
     let moz_central_path = Path::new("./moz-central");
     if !moz_central_path.exists() {
-        get_moz_central_test_files(&moz_central_path);
+        panic!("Unable to run this test without the files in ./moz-cenral see CONTRIBUTING.md for more information");
     }
     let failures = walk(&moz_central_path);
     let fail_count = failures
@@ -136,18 +135,4 @@ fn run(file: &Path) -> Result<(), Error> {
         let _part = part?;
     }
     Ok(())
-}
-
-fn get_moz_central_test_files(path: &Path) {
-    let mut response = reqwest::get(
-        "https://hg.mozilla.org/mozilla-central/archive/tip.tar.gz/js/src/jit-test/tests/",
-    )
-    .expect("Failed to get zip of moz-central");
-    let mut buf = Vec::new();
-    response
-        .copy_to(&mut buf)
-        .expect("failed to copy to BzDecoder");
-    let gz = GzDecoder::new(buf.as_slice());
-    let mut t = tar::Archive::new(gz);
-    t.unpack(path).expect("Failed to unpack gz");
 }

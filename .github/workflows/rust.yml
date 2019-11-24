@@ -18,9 +18,9 @@ jobs:
     - name: curl
       uses: wei/curl@master
       with:
-        args: https://hg.mozilla.org/mozilla-central/archive/tip.zip/js/src/jit-test/tests/ --output moz_central.zip
-    - name: unzip moz_central
-      run: unzip -qq moz_central -d moz_central
+        args: https://hg.mozilla.org/mozilla-central/archive/tip.zip/js/src/jit-test/tests/ --output moz-central.zip
+    - name: unzip moz-central
+      run: unzip -qq moz-central.zip -d moz-central
     - name: Run tests
       run: cargo test --features moz_central
       env:

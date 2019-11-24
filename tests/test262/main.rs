@@ -1,6 +1,5 @@
 #![cfg(feature = "test_262")]
 
-use flate2::read::GzDecoder;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ressa::Parser;
@@ -501,7 +500,7 @@ fn test262() -> Res<()> {
         .progress_chars("█▓▒░  ");
     let path = Path::new("./test262");
     if !path.exists() {
-        get_repo(path)?;
+        panic!("unable to run this test without the test262 test suite see CONTRIBUTING.md for more information");
     }
     pb.set_style(sty.clone());
     let (ct, paths) = get_paths(&path);
@@ -719,51 +718,14 @@ fn test_mapper(path: &PathBuf) -> Option<TestFailure> {
     }
 }
 
-fn get_repo(path: &Path) -> Res<()> {
-    let _ = ::std::fs::create_dir_all(path);
-    let mut response = reqwest::get(URL)?;
-    let mut buf = Vec::new();
-    response.copy_to(&mut buf)?;
-
-    let gz = GzDecoder::new(buf.as_slice());
-    let mut t = tar::Archive::new(gz);
-    let mut target: Option<PathBuf> = None;
-    for entry in t.entries()? {
-        let mut entry = entry?;
-        let p = entry.path()?.into_owned();
-        if target.is_none() && format!("{}", p.display()).starts_with("tc39") {
-            target = Some(p.clone().to_path_buf().join("test"));
-        }
-        let stripped = if let Some(ref target) = target {
-            if p.starts_with(target) {
-                if let Ok(p2) = p.strip_prefix(target) {
-                    Some(p2.clone())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        if let Some(p2) = stripped {
-            entry.unpack(path.join(p2))?;
-        }
-    }
-    Ok(())
-}
-
 #[test]
 fn yam() {
-    let yaml = "es6id: B.3.3.2
+    let yaml = "es6id: asdf
 flags: [onlyStrict]
 info: |
-    B.3.3.2 Changes to GlobalDeclarationInstantiation
-
-    1. 1. Let strict be IsStrict of script
-    2. If strict is *false*, then
-       [...]";
+    data
+    data
+    data";
     let res: serde_yaml::Mapping = serde_yaml::from_str(yaml).expect("failed to parse yaml");
     eprintln!("{:?}", res);
     let yaml2 = "[onlyStrict]";
@@ -800,7 +762,7 @@ var \\u0079ield = 123;";
 fn test_262_parser() {
     let path = Path::new("./test262-parser");
     if !path.exists() {
-        get_parser_repo(path).expect("failed to get parser repo");
+        panic!("Unable to run this test without the test262-parser test suite, see CONTRIBUTING.md for more information");
     }
     let (total, paths) = get_paths(&path);
     let (early, fail, pass, pass_explicit) = categorize_paths(&paths);
@@ -897,49 +859,4 @@ fn categorize_paths(paths: &[PathBuf]) -> (Vec<PathBuf>, Vec<PathBuf>, Vec<PathB
             }
             acc
         })
-}
-
-fn get_parser_repo(path: &Path) -> Res<()> {
-    let _ = ::std::fs::create_dir_all(path);
-    let mut response = reqwest::get(PARSER_URL)?;
-    let mut buf = Vec::new();
-    response.copy_to(&mut buf)?;
-
-    let gz = GzDecoder::new(buf.as_slice());
-    let mut t = tar::Archive::new(gz);
-    let mut target: Option<PathBuf> = None;
-    for entry in t.entries()? {
-        let mut entry = entry?;
-        let p = entry.path()?.into_owned();
-        if format!("{}", p.display()).ends_with(".gitignore")
-            || format!("{}", p.display()).ends_with("make-explicit.js")
-        {
-            continue;
-        }
-        if target.is_none() && format!("{}", p.display()).starts_with("tc39") {
-            target = Some(p.clone());
-        }
-        if let Some(ext) = p.extension() {
-            if ext != "js" {
-                continue;
-            }
-        }
-        let stripped = if let Some(ref target) = target {
-            if p.starts_with(target) {
-                if let Ok(p2) = p.strip_prefix(target) {
-                    Some(p2.clone())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        if let Some(p2) = stripped {
-            entry.unpack(path.join(p2))?;
-        }
-    }
-    Ok(())
 }

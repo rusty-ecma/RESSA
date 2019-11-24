@@ -1,14 +1,8 @@
 extern crate env_logger;
 #[macro_use]
 extern crate log;
-#[cfg(feature = "moz_central")]
-extern crate flate2;
-#[cfg(feature = "moz_central")]
-extern crate reqwest;
 extern crate ress;
 extern crate ressa;
-#[cfg(feature = "moz_central")]
-extern crate tar;
 #[macro_use]
 extern crate lazy_static;
 
