@@ -12,7 +12,6 @@ use std::{
     path::{Path, PathBuf},
 };
 static INCLUDED_FEATURES: &[&str] = &[
-    "coalesce-expression",
     "IsHTMLDDA",
     "String.prototype.endsWith",
     "Array.prototype.flat",
@@ -94,7 +93,7 @@ static INCLUDED_FEATURES: &[&str] = &[
     "Symbol.matchAll",
     "String.prototype.includes",
     "Map",
-    
+    // "coalesce-expression",
     // "regexp-named-groups",
     // "Symbol.iterator",
     // "object-rest",
@@ -421,7 +420,7 @@ impl TestFailure {
             runner = runner,
             strict = strict,
             not = not,
-            js = self.js.lines().enumerate().map(|(i, l)| format!("/*{}*/{}\n", i+1, l)).collect::<String>(),
+            js = self.js,
         )
     }
     pub fn get_first_id(&self, fallback: &str) -> String {
@@ -594,11 +593,10 @@ fn test262() -> Res<()> {
                         let mut f = BufWriter::new(File::create(&new_path)?);
                         f.write_all(head.as_bytes())?;
                         pulldown_cmark::html::write_html(&mut f, parser)?;
+                        f.write_all(br#"<script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@9.16.2/build/highlight.min.js"></script>"#)?;
                         f.write_all(
-                            format!(
-                                "<script>{};document.addEventListener('DOMContentLoaded', (event) => {{document.querySelectorAll('pre code').forEach((block) => {{hljs.highlightBlock(block);}});}});</script>",include_str!("./hilight.js")
-                            )
-                            .as_bytes(),
+                            format!("<script>{}</script>", include_str!("./addLineNumbers.js"))
+                                .as_bytes(),
                         )?;
                         f.write_all(b"</body></html>")?;
                     }
@@ -620,7 +618,7 @@ fn test262() -> Res<()> {
             }
         }
     }
-    
+
     if len > 0 {
         panic!("{}", report);
     }
@@ -798,7 +796,6 @@ var \\u0079ield = 123;";
     }
 }
 
-
 #[test]
 fn test_262_parser() {
     let path = Path::new("./test262-parser");
@@ -815,7 +812,13 @@ fn test_262_parser() {
         panic!("Error in 262 parser tests");
     }
 }
-fn report_errors(total: usize, earlies: &[String], fails: &[String], passes: &[String], explicits: &[String]) -> bool {
+fn report_errors(
+    total: usize,
+    earlies: &[String],
+    fails: &[String],
+    passes: &[String],
+    explicits: &[String],
+) -> bool {
     if earlies.is_empty() || fails.is_empty() || passes.is_empty() || explicits.is_empty() {
         eprintln!("passed 100% of {} test", total);
         return true;
@@ -824,7 +827,12 @@ fn report_errors(total: usize, earlies: &[String], fails: &[String], passes: &[S
     fail_ct += report_cat_errors("fails", fails);
     fail_ct += report_cat_errors("passes", passes);
     fail_ct += report_cat_errors("explicits", explicits);
-    eprintln!("failed {} of {} ({:02.2}%)", fail_ct, total, (fail_ct as f32 / total as f32) * 100f32);
+    eprintln!(
+        "failed {} of {} ({:02.2}%)",
+        fail_ct,
+        total,
+        (fail_ct as f32 / total as f32) * 100f32
+    );
     return false;
 }
 
@@ -843,26 +851,28 @@ fn report_cat_errors(name: &str, cat: &[String]) -> usize {
 fn run_category(paths: &[PathBuf], should_fail: bool) -> Vec<String> {
     let mut ret = Vec::new();
     for path in paths.iter() {
-        let js = std::fs::read_to_string(&path).expect(&format!("failed to read {}", path.display()));
+        let js =
+            std::fs::read_to_string(&path).expect(&format!("failed to read {}", path.display()));
         let is_mod = format!("{}", path.display()).contains("module");
-        let mut p = match Parser::builder()
-            .js(&js)
-            .module(is_mod)
-            .build() {
-                Ok(p) => p,
-                Err(e) => {
-                    if should_fail {
-                        ret.push(format!("{}\n\n{}", path.display(), e));
-                    }
-                    continue;
+        let mut p = match Parser::builder().js(&js).module(is_mod).build() {
+            Ok(p) => p,
+            Err(e) => {
+                if should_fail {
+                    ret.push(format!("{}\n\n{}", path.display(), e));
                 }
-            };
+                continue;
+            }
+        };
         match p.parse() {
-            Ok(p) => if should_fail {
-                ret.push(format!("{}\n{:#?}", path.display(), p));
-            },
-            Err(e) => if !should_fail {
-                ret.push(format!("{}\n{}", path.display(), e))
+            Ok(p) => {
+                if should_fail {
+                    ret.push(format!("{}\n{:#?}", path.display(), p));
+                }
+            }
+            Err(e) => {
+                if !should_fail {
+                    ret.push(format!("{}\n{}", path.display(), e))
+                }
             }
         }
     }
@@ -870,8 +880,9 @@ fn run_category(paths: &[PathBuf], should_fail: bool) -> Vec<String> {
 }
 
 fn categorize_paths(paths: &[PathBuf]) -> (Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>) {
-    paths.into_iter().fold(
-        (vec![], vec![], vec![], vec![]), |mut acc, path| {
+    paths
+        .into_iter()
+        .fold((vec![], vec![], vec![], vec![]), |mut acc, path| {
             if let Some(parent) = path.parent() {
                 let parent_str = format!("{}", parent.display());
                 if parent_str.ends_with("early") {
@@ -901,7 +912,8 @@ fn get_parser_repo(path: &Path) -> Res<()> {
         let mut entry = entry?;
         let p = entry.path()?.into_owned();
         if format!("{}", p.display()).ends_with(".gitignore")
-        || format!("{}", p.display()).ends_with("make-explicit.js") {
+            || format!("{}", p.display()).ends_with("make-explicit.js")
+        {
             continue;
         }
         if target.is_none() && format!("{}", p.display()).starts_with("tc39") {

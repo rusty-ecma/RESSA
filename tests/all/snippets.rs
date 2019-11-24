@@ -167,7 +167,11 @@ class B extends A {
 
 #[test]
 fn super_in_async_method() {
-    run_test("var x = { async method(x = super.method()) { await 1; } }", false).unwrap();
+    run_test(
+        "var x = { async method(x = super.method()) { await 1; } }",
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -350,8 +354,12 @@ fn static_ident() {
 
 #[test]
 fn let_in_obj_init() {
-    run_test("var let = 1;
-var o = {let};", false).unwrap();
+    run_test(
+        "var let = 1;
+var o = {let};",
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -365,15 +373,23 @@ fn await_as_class_ident_expr() {
 
 #[test]
 fn let_in_for_loop() {
-    run_test("let = 1;
+    run_test(
+        "let = 1;
 for (let; ; )
-    break;", false).unwrap();
+    break;",
+        false,
+    )
+    .unwrap();
 }
 #[test]
 fn let_in_for_loop2() {
-    run_test("let = 1;
+    run_test(
+        "let = 1;
 for (let = 2; ; )
-    break;", false).unwrap();
+    break;",
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -395,8 +411,12 @@ fn await_as_default_in_param() {
 #[test]
 #[should_panic]
 fn duplicate_params_strict() {
-    run_test("'use strict';
-function fn(x, x) { }", false).unwrap();
+    run_test(
+        "'use strict';
+function fn(x, x) { }",
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -438,8 +458,12 @@ fn duplicate_params_arrow_obj_ident_pattern() {
 
 #[test]
 fn html_comment_close() {
-    run_test("--> this is a comment
-  --> also a comment", false).unwrap()
+    run_test(
+        "--> this is a comment
+  --> also a comment",
+        false,
+    )
+    .unwrap()
 }
 #[test]
 #[should_panic]

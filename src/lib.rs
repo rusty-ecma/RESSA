@@ -66,14 +66,15 @@ pub use ress::Span;
 mod comment_handler;
 mod error;
 mod formal_params;
+mod regex;
 
 pub use crate::comment_handler::CommentHandler;
 pub use crate::comment_handler::DefaultCommentHandler;
 pub use crate::error::Error;
+use formal_params::FormalParams;
 use resast::prelude::*;
 use resast::ClassBody;
 use std::{collections::HashSet, mem::replace};
-use formal_params::FormalParams;
 
 /// The current configuration options.
 /// This will most likely increase over time
@@ -869,9 +870,7 @@ where
                 }
             }
             Token::Keyword(ref k) => match k {
-                Keyword::Await(_) if !self.context.is_module => {
-                    self.parse_labelled_statement()?
-                },
+                Keyword::Await(_) if !self.context.is_module => self.parse_labelled_statement()?,
                 Keyword::Break(k) => Stmt::Break(self.parse_break_stmt(k)?),
                 Keyword::Continue(k) => {
                     if !self.context.in_iteration {
@@ -956,6 +955,8 @@ where
         };
         if Self::is_func_decl(&body) {
             Err(Error::InvalidFuncPosition(start_pos, "Function declaration cannot be the body of a do while loop, maybe wrap this in a block statement?".to_string()))
+        } else if let Stmt::Expr(Expr::Class(_)) = body {
+            Err(Error::InvalidClassPosition(start_pos, "Class declaration cannot be the body of a do while loop, maybe wrap this in a block statement?".to_string()))
         } else {
             Ok(WhileStmt {
                 test,
@@ -1318,7 +1319,7 @@ where
             }
         } else if self.at_keyword(Keyword::Const(())) || self.at_keyword(Keyword::Let(())) {
             let kind = self.next_item()?;
-            if kind.token.matches_keyword(Keyword::Let(()))  {
+            if kind.token.matches_keyword(Keyword::Let(())) {
                 if self.at_punct(Punct::SemiColon) {
                     let ident = self.get_string(&kind.span)?;
                     let ident = resast::Ident::from(ident);
@@ -1334,7 +1335,7 @@ where
                     if self.at_punct(Punct::SemiColon) {
                         let init = LoopInit::Expr(Expr::Assign(assign));
                         let loop_stmt = self.parse_for_loop_cont(Some(init))?;
-                        return Ok(Stmt::For(loop_stmt))
+                        return Ok(Stmt::For(loop_stmt));
                     }
                 }
             }
@@ -1979,7 +1980,10 @@ where
         let param_start = self.look_ahead_position;
         let formal_params = self.parse_formal_params()?;
         if self.context.strict && formal_params::have_duplicates(&formal_params.params) {
-            return Err(Error::InvalidParameter(start_pos, "Duplicate parameter in strict context".to_string()))
+            return Err(Error::InvalidParameter(
+                start_pos,
+                "Duplicate parameter in strict context".to_string(),
+            ));
         }
         let strict = formal_params.strict;
         let params = formal_params.params;
@@ -1991,7 +1995,10 @@ where
             return Err(Error::StrictModeArgumentsOrEval(param_start));
         }
         if !prev_strict && self.context.strict && formal_params::have_duplicates(&params) {
-            return Err(Error::InvalidParameter(start_pos, "Duplicate parameter in function who's body is strict".to_string()));
+            return Err(Error::InvalidParameter(
+                start_pos,
+                "Duplicate parameter in function who's body is strict".to_string(),
+            ));
         }
         if self.context.strict && strict {
             return self.expected_token_error(&self.look_ahead, &[]);
@@ -2344,7 +2351,10 @@ where
         self.context.allow_await = false;
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
-            return Err(Error::InvalidParameter(start, "Method arguments cannot contain duplicates".to_string()));
+            return Err(Error::InvalidParameter(
+                start,
+                "Method arguments cannot contain duplicates".to_string(),
+            ));
         }
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
@@ -2371,7 +2381,10 @@ where
         self.context.allow_yield = !self.context.strict;
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
-            return Err(Error::InvalidParameter(start, "Method arguments cannot contain duplicates".to_string()));
+            return Err(Error::InvalidParameter(
+                start,
+                "Method arguments cannot contain duplicates".to_string(),
+            ));
         }
         self.context.allow_strict_directive = params.simple;
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
@@ -2398,7 +2411,10 @@ where
         self.context.allow_yield = true;
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
-            return Err(Error::InvalidParameter(start, "Method arguments cannot contain duplicates".to_string()));
+            return Err(Error::InvalidParameter(
+                start,
+                "Method arguments cannot contain duplicates".to_string(),
+            ));
         }
         self.context.allow_yield = false;
         let body = self.parse_method_body(params.simple, params.found_restricted)?;
@@ -2425,7 +2441,10 @@ where
         let start_position = self.look_ahead_position;
         let formal_params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&formal_params.params) {
-            return Err(Error::InvalidParameter(start, "Method arguments cannot contain duplicates".to_string()));
+            return Err(Error::InvalidParameter(
+                start,
+                "Method arguments cannot contain duplicates".to_string(),
+            ));
         }
         if !formal_params.params.is_empty() {
             self.tolerate_error(Error::InvalidGetterParams(start_position))?;
@@ -2476,7 +2495,10 @@ where
         let start_position = self.look_ahead_position;
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
-            return Err(Error::InvalidParameter(start, "Method arguments cannot contain duplicates".to_string()));
+            return Err(Error::InvalidParameter(
+                start,
+                "Method arguments cannot contain duplicates".to_string(),
+            ));
         }
         self.context.allow_yield = prev_allow;
         if params.params.len() != 1 {
@@ -2642,6 +2664,7 @@ where
             "{}: parse_primary_expression {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
+        let start_pos = self.look_ahead_position;
         if self.context.strict && self.look_ahead.token.is_strict_reserved() {
             return Err(Error::NonStrictFeatureInStrictContext(
                 self.look_ahead_position,
@@ -2734,7 +2757,9 @@ where
             let lit = match regex.token {
                 Token::RegEx(r) => {
                     let flags = if let Some(f) = r.flags { f } else { "" };
-                    resast::prelude::RegEx::from(&r.body, flags)
+                    let re = resast::prelude::RegEx::from(&r.body, flags);
+                    crate::regex::validate_regex(&re, start_pos)?;
+                    re
                 }
                 _ => unreachable!(),
             };
@@ -2992,8 +3017,8 @@ where
         let mut at_get = false;
         let mut at_set = false;
         let (key, is_async, computed) = if self.look_ahead.token.is_ident()
-        || (!self.context.strict
-            && self.look_ahead.token.matches_keyword(Keyword::Let(()))) {
+            || (!self.context.strict && self.look_ahead.token.matches_keyword(Keyword::Let(())))
+        {
             at_get = self.look_ahead.token.matches_ident_str("get");
             at_set = self.look_ahead.token.matches_ident_str("set");
             let ident = self.next_item()?;
@@ -3007,9 +3032,7 @@ where
                 self.parse_object_property_key()?
             } else {
                 let s = self.get_string(&ident.span)?;
-                PropKey::Expr(Expr::Ident(resast::Ident::from(
-                    s
-                )))
+                PropKey::Expr(Expr::Ident(resast::Ident::from(s)))
             };
             (Some(key), is_async, computed)
         } else if self.at_punct(Punct::Asterisk) {
@@ -3100,8 +3123,7 @@ where
                 })
             } else if start.token.is_ident()
                 || start.token == Token::Keyword(Keyword::Yield("yield"))
-                || (!self.context.strict
-                    && start.token.matches_keyword(Keyword::Let(())))
+                || (!self.context.strict && start.token.matches_keyword(Keyword::Let(())))
             {
                 if self.at_punct(Punct::Equal) {
                     self.context.first_covert_initialized_name_error =
@@ -3224,7 +3246,7 @@ where
                 Template::NoSub(c) => (c, true),
             };
             if !allow_octal_escape && cooked.contains_octal_escape {
-                return Err(Error::OctalLiteral(item.location.start))
+                return Err(Error::OctalLiteral(item.location.start));
             }
             Ok(TemplateElement::from(tail, cooked.content, raw))
         } else {
@@ -3279,9 +3301,10 @@ where
         };
         let formal_params = self.parse_formal_params()?;
         if self.context.strict && formal_params::have_duplicates(&formal_params.params) {
-            return Err(
-                Error::NonStrictFeatureInStrictContext(start_pos, "duplicate function parameter names".to_string())
-            )
+            return Err(Error::NonStrictFeatureInStrictContext(
+                start_pos,
+                "duplicate function parameter names".to_string(),
+            ));
         }
         found_restricted = found_restricted || formal_params.found_restricted;
         let prev_strict = self.context.strict;
@@ -3295,10 +3318,14 @@ where
                 return self.unexpected_token_error(&start, "restricted ident in strict context");
             }
         }
-        if !prev_strict && self.context.strict && formal_params::have_duplicates(&formal_params.params) {
-            return Err(
-                Error::NonStrictFeatureInStrictContext(start_pos, "duplicate function parameter names".to_string())
-            )
+        if !prev_strict
+            && self.context.strict
+            && formal_params::have_duplicates(&formal_params.params)
+        {
+            return Err(Error::NonStrictFeatureInStrictContext(
+                start_pos,
+                "duplicate function parameter names".to_string(),
+            ));
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow_strict_directive;
@@ -3376,7 +3403,10 @@ where
         } else if (self.context.is_module || !self.context.allow_await)
             && &self.original[ident.span.start..ident.span.end] == "await"
         {
-            debug!("invalid await await: {}, module: {}", self.context.allow_await, self.context.is_module);
+            debug!(
+                "invalid await await: {}, module: {}",
+                self.context.allow_await, self.context.is_module
+            );
             return self.expected_token_error(&ident, &["variable identifier"]);
         }
         let i = match ident.token {
@@ -3733,11 +3763,18 @@ where
                             simple = false;
                         }
                         if Self::is_invalid_await(arg) {
-                            return Err(Error::InvalidParameter(start_pos, "Await used as the right hand side of a default pattern".to_string()))
+                            return Err(Error::InvalidParameter(
+                                start_pos,
+                                "Await used as the right hand side of a default pattern"
+                                    .to_string(),
+                            ));
                         }
                     }
                     if formal_params::have_duplicates(&params) {
-                        return Err(Error::InvalidParameter(start_pos, "duplicate parameter name".to_string()));
+                        return Err(Error::InvalidParameter(
+                            start_pos,
+                            "duplicate parameter name".to_string(),
+                        ));
                     }
                     self.expect_fat_arrow()?;
                     if self.at_punct(Punct::OpenBrace) {
@@ -3788,10 +3825,8 @@ where
         if self.context.strict && Self::is_ident(&start) {
             if let Expr::Ident(ref i) = start {
                 if Self::is_restricted_word(i) || Self::is_strict_reserved(i) {
-                    return self.expected_token_error(
-                        &self.look_ahead,
-                        &[&format!("not {}", i.name)],
-                    );
+                    return self
+                        .expected_token_error(&self.look_ahead, &[&format!("not {}", i.name)]);
                 }
             }
         }
@@ -3813,8 +3848,8 @@ where
                     return self.expected_token_error(
                         &item,
                         &[
-                            "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=",
-                            "<<=", ">>=", ">>>=",
+                            "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=", "<<=",
+                            ">>=", ">>>=",
                         ],
                     );
                 }
@@ -3823,8 +3858,8 @@ where
                 return self.expected_token_error(
                     &item,
                     &[
-                        "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=", "<<=",
-                        ">>=", ">>>=",
+                        "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=", "<<=", ">>=",
+                        ">>>=",
                     ],
                 );
             }
@@ -3843,8 +3878,7 @@ where
     /// returns true if the arg _is_ an error
     fn check_arg_strict_mode(arg: &FuncArg<'b>) -> bool {
         match arg {
-            FuncArg::Expr(Expr::Ident(ref ident))
-            | FuncArg::Pat(Pat::Ident(ref ident)) => {
+            FuncArg::Expr(Expr::Ident(ref ident)) | FuncArg::Pat(Pat::Ident(ref ident)) => {
                 ident.name == "arguments" || ident.name == "eval"
             }
             _ => false,
@@ -4055,14 +4089,14 @@ where
     #[inline]
     fn is_invalid_await(arg: &FuncArg) -> bool {
         match arg {
-            FuncArg::Expr(Expr::Assign(AssignExpr { right, ..}))
-            | FuncArg::Pat(Pat::Assign(AssignPat { right, ..})) => {
+            FuncArg::Expr(Expr::Assign(AssignExpr { right, .. }))
+            | FuncArg::Pat(Pat::Assign(AssignPat { right, .. })) => {
                 if let Expr::Ident(id) = &**right {
                     id.name == "await"
                 } else {
                     false
                 }
-            },
+            }
             _ => false,
         }
     }
@@ -5050,13 +5084,19 @@ where
                 }
                 self.look_ahead_position = look_ahead.location.start;
                 if look_ahead.token.is_comment() {
-                    trace!("next_item comment {} {:?}", self.context.has_line_term, look_ahead.token);
+                    trace!(
+                        "next_item comment {} {:?}",
+                        self.context.has_line_term,
+                        look_ahead.token
+                    );
                     if let Token::Comment(ref inner) = look_ahead.token {
                         if inner.is_multi_line() {
                             comment_line_term =
                                 self.context.has_line_term || Self::comment_has_line_term(inner);
-                        } 
-                        if self.context.is_module && (inner.is_html() || inner.tail_content.is_some()) {
+                        }
+                        if self.context.is_module
+                            && (inner.is_html() || inner.tail_content.is_some())
+                        {
                             return Err(Error::HtmlCommentInModule(self.look_ahead_position));
                         }
                     }

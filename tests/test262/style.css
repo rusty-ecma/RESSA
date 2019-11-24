@@ -42,3 +42,13 @@ li>a {
 .error-text > span {
     margin-left: 5px;
 }
+
+.code-gutter {
+    background: black;
+    font-family: sans-serif;
+    color: white;
+    position: absolute;
+    display: flex;
+    flex-flow: column;
+    padding-top: .5em;
+}
