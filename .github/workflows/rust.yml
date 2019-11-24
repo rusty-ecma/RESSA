@@ -1,0 +1,41 @@
+name: Rust
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Setup Node.js for use with actions
+      uses: actions/setup-node@v1.1.0
+    - name: install js test libs from npm
+      run: npm install
+    - name: Build
+      run: cargo build
+    - name: curl
+      uses: wei/curl@master
+      with:
+        args: https://hg.mozilla.org/mozilla-central/archive/tip.zip/js/src/jit-test/tests/ --output moz_central.zip
+    - name: unzip moz_central
+      run: unzip -qq moz_central -d moz_central
+    - name: Run tests
+      run: cargo test --features moz_central
+      env:
+        RUST_MIN_STACK: 9999999
+    - name: Check syntax
+      run: cargo fmt --all -- --check
+    - name: Cache node_modules
+      uses: actions/cache@v1.0.3
+      with:
+        path: ./node_modules
+        key: ${{ runner.os }}.node_modules
+    - name: before cargo cache
+      run: rm -rf ~/.cargo/registry
+    - name: Cache cargo directory
+      uses: actions/cache@v1.0.3
+      with:
+        key: ${{ runner.os }}.cargo
+        path: ~/.cargo
