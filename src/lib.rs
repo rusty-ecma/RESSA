@@ -2664,7 +2664,6 @@ where
             "{}: parse_primary_expression {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        let start_pos = self.look_ahead_position;
         if self.context.strict && self.look_ahead.token.is_strict_reserved() {
             return Err(Error::NonStrictFeatureInStrictContext(
                 self.look_ahead_position,
@@ -2758,7 +2757,7 @@ where
                 Token::RegEx(r) => {
                     let flags = if let Some(f) = r.flags { f } else { "" };
                     let re = resast::prelude::RegEx::from(&r.body, flags);
-                    crate::regex::validate_regex(&re, start_pos)?;
+                    crate::regex::validate_regex(self.get_string(&regex.span)?)?;
                     re
                 }
                 _ => unreachable!(),

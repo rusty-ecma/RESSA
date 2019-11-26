@@ -307,8 +307,6 @@ enum Flag {
     NonDeterministic,
 }
 
-static URL: &str = "https://github.com/tc39/test262/tarball/master";
-static PARSER_URL: &str = "https://github.com/tc39/test262-parser-tests/tarball/master";
 #[derive(Debug, Serialize, Clone)]
 struct TestFailure {
     pub path: PathBuf,
