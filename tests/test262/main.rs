@@ -571,7 +571,11 @@ fn test262() -> Res<()> {
                 root_file.write_all(format!("<li class=\"feature-count-entry\"><span class=\"feature-name\">{}</span><span class=\"feature-count\">{}</span></li>", name, ct).as_bytes())?;
             }
             root_file.write_all(b"</ul><ul>").unwrap();
-            for (id, list) in collected {
+            let mut sorted = collected
+                .into_iter()
+                .collect::<Vec<(String, Vec<TestFailure>)>>();
+            sorted.sort_by(|(_, lhs), (_, rhs)| rhs.len().cmp(&lhs.len()));
+            for (id, list) in sorted {
                 root_file.write_all(
                     format!(
                         "<li class=\"single-error-list\"><h2>{} ({})</h2><ol>",

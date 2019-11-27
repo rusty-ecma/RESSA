@@ -32,6 +32,7 @@ pub enum Error {
     OctalLiteral(Position),
     HtmlCommentInModule(Position),
     InvalidRegEx(Position, String),
+    InvalidTrailingComma(Position),
     Scanner(ress::error::Error),
     Other(Box<dyn ::std::error::Error>),
 }
@@ -68,7 +69,8 @@ impl Display for Error {
             Error::InvalidParameter(ref pos, ref msg) => write!(f, "Invalid paramter at {} -- {}", pos, msg),
             Error::OctalLiteral(ref pos) => write!(f, "Invalid use of octal literal at {}", pos),
             Error::HtmlCommentInModule(ref pos) => write!(f, "HTML Comments are not available in module code: {}", pos),
-            Error::InvalidRegEx(ref pos, msg) => write!(f, "Invalid regular expression literal at {} -- {}", pos, msg),
+            Error::InvalidRegEx(ref pos, ref msg) => write!(f, "Invalid regular expression literal at {} -- {}", pos, msg),
+            Error::InvalidTrailingComma(ref pos) => write!(f, "Invalid trailing comma at {}", pos),
             Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
             Error::Other(ref e) => write!(f, "{}", e),
         }

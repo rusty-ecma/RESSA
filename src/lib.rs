@@ -923,9 +923,14 @@ where
             }
         } else {
             self.expect_punct(Punct::CloseParen)?;
+            let body_start = self.look_ahead_position;
+            let body = self.parse_statement()?;
+            if Self::is_func_decl(&body) || Self::is_labeled_func(&body) {
+                return Err(Error::InvalidFuncPosition(body_start, "labeled function declarations cannot be the body of a with statement".to_string()))
+            }
             WithStmt {
                 object: obj,
-                body: Box::new(self.parse_statement()?),
+                body: Box::new(body),
             }
         })
     }
@@ -953,7 +958,7 @@ where
             self.context.in_iteration = prev_iter;
             body
         };
-        if Self::is_func_decl(&body) {
+        if Self::is_func_decl(&body) || Self::is_labeled_func(&body) {
             Err(Error::InvalidFuncPosition(start_pos, "Function declaration cannot be the body of a do while loop, maybe wrap this in a block statement?".to_string()))
         } else if let Stmt::Expr(Expr::Class(_)) = body {
             Err(Error::InvalidClassPosition(start_pos, "Class declaration cannot be the body of a do while loop, maybe wrap this in a block statement?".to_string()))
@@ -1388,11 +1393,17 @@ where
                         let left = LoopLeft::Variable(kind, decl);
                         let _in = self.next_item()?;
                         let right = self.parse_expression()?;
-                        Ok(Stmt::ForIn(ForInStmt {
-                            left,
-                            right,
-                            body: Box::new(self.parse_loop_body()?),
-                        }))
+                        let body_start = self.look_ahead_position;
+                        let body = self.parse_loop_body()?;
+                        if Self::is_labeled_func(&body) || Self::is_labeled_func(&body) {
+                            Err(Error::InvalidFuncPosition(body_start, "Loop body cannot be a function or labeled function".to_string()))
+                        } else {
+                            Ok(Stmt::ForIn(ForInStmt {
+                                left,
+                                right,
+                                body: Box::new(body),
+                            }))
+                        }
                     } else if decl.init.is_none() && self.at_contextual_keyword("of") {
                         let left = LoopLeft::Variable(kind, decl);
                         Ok(Stmt::ForOf(self.parse_for_of_loop(left, is_await)?))
@@ -1424,22 +1435,28 @@ where
                 }
                 let left = LoopLeft::Expr(init);
                 let right = self.parse_expression()?;
+                let body = self.parse_loop_body()?;
                 Ok(Stmt::ForIn(ForInStmt {
                     left,
                     right,
-                    body: Box::new(self.parse_loop_body()?),
+                    body: Box::new(body),
                 }))
             } else if self.at_contextual_keyword("of") {
                 let _ = self.next_item()?;
                 let left = LoopLeft::Expr(init);
                 let right = self.parse_assignment_expr()?;
+                let body_start = self.look_ahead_position;
                 let body = self.parse_loop_body()?;
-                Ok(Stmt::ForOf(ForOfStmt {
-                    left,
-                    right,
-                    body: Box::new(body),
-                    is_await,
-                }))
+                if Self::is_labeled_func(&body) {
+                    Err(Error::InvalidFuncPosition(body_start, "Invalid function position as body of for of loop".to_string()))
+                } else {
+                    Ok(Stmt::ForOf(ForOfStmt {
+                        left,
+                        right,
+                        body: Box::new(body),
+                        is_await,
+                    }))
+                }
             } else {
                 let init = if self.at_punct(Punct::Comma) {
                     let mut seq = vec![init];
@@ -1535,21 +1552,20 @@ where
                 }
                 _ => (),
             }
-            // else {
-            //     return Err(Error::ForOfInAssign(
-            //         self.look_ahead_position,
-            //         "For in loop left hand side cannot contain an assignment".to_string(),
-            //     ));
-            // }
         }
         let _ = self.next_item()?;
         let right = self.parse_expression()?;
+        let body_start = self.look_ahead_position;
         let body = self.parse_loop_body()?;
-        Ok(ForInStmt {
-            left,
-            right,
-            body: Box::new(body),
-        })
+        if Self::is_func_decl(&body) || Self::is_labeled_func(&body) {
+            Err(Error::InvalidFuncPosition(body_start, "Loop body cannot be a function declaration or labeled function declaration".to_string()))
+        } else {
+            Ok(ForInStmt {
+                left,
+                right,
+                body: Box::new(body),
+            })
+        }
     }
 
     #[inline]
@@ -1566,13 +1582,18 @@ where
         }
         let _ = self.next_item()?;
         let right = self.parse_assignment_expr()?;
+        let body_start = self.look_ahead_position;
         let body = self.parse_loop_body()?;
-        Ok(ForOfStmt {
-            left,
-            right,
-            body: Box::new(body),
-            is_await,
-        })
+        if Self::is_func_decl(&body) || Self::is_labeled_func(&body) {
+            Err(Error::InvalidFuncPosition(body_start, "Loop body cannot be a function declaration or labeled function declaration".to_string()))
+        } else {
+            Ok(ForOfStmt {
+                left,
+                right,
+                body: Box::new(body),
+                is_await,
+            })
+        }
     }
 
     #[inline]
@@ -1602,7 +1623,7 @@ where
         let prev_iter = self.context.in_iteration;
         self.context.in_iteration = true;
         let body = self.parse_statement()?;
-        if Self::is_func_decl(&body) {
+        if Self::is_func_decl(&body) || Self::is_labeled_func(&body) {
             return Err(Error::InvalidFuncPosition(start_pos, "Function declaration cannot be the body of a do while loop, maybe wrap this in a block statement?".to_string()));
         }
         self.context.in_iteration = prev_iter;
@@ -4101,10 +4122,21 @@ where
         match arg {
             FuncArg::Expr(Expr::Assign(AssignExpr { right, .. }))
             | FuncArg::Pat(Pat::Assign(AssignPat { right, .. })) => {
-                if let Expr::Ident(id) = &**right {
-                    id.name == "await"
-                } else {
-                    false
+                match &**right {
+                    Expr::Ident(id) => id.name == "await",
+                    Expr::Func(Func { id, params, ..})
+                    | Expr::ArrowFunc(ArrowFuncExpr { id, params, ..}) => {
+                        id.as_ref().map(|id| id.name == "await").unwrap_or(false)
+                        || params.iter().any(|param| Self::is_await(param))
+                    }
+                    Expr::Spread(expr) => {
+                        if let Expr::Ident(id) = expr.as_ref() {
+                            id.name == "await"
+                        } else {
+                            false
+                        }
+                    },
+                    _ => false,
                 }
             }
             _ => false,
@@ -4636,6 +4668,14 @@ where
             true
         } else {
             false
+        }
+    }
+
+    #[inline]
+    fn is_labeled_func(stmt: &Stmt) -> bool {
+        match stmt {
+            Stmt::Labeled(stmt) => Self::is_func_decl(&stmt.body) || Self::is_labeled_func(&stmt.body),
+            _ => false,
         }
     }
 
