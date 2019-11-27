@@ -584,10 +584,11 @@ fn test262() -> Res<()> {
                     )
                     .as_bytes(),
                 )?;
-                for fail in list {
-                    let new_path = fail.path.with_extension("html");
-                    if let Some(file_name) = new_path.file_name() {
-                        let new_path = base_path.join(file_name);
+                for (i, fail) in list.iter().enumerate() {
+                    
+                    if let Some(file_name) = fail.path.file_stem() {
+                        let file_name = format!("{}{}.html", file_name.to_str().unwrap(), i);
+                        let new_path = base_path.join(&file_name);
                         root_file.write(fail.as_list_item(&file_name).as_bytes())?;
                         let md = fail.to_markdown();
                         let parser = pulldown_cmark::Parser::new(&md);
