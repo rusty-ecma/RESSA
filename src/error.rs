@@ -53,7 +53,7 @@ impl Display for Error {
             Error::InvalidExportError(ref pos) => write!(f, "Inavlid use of es6 export syntax at {}", pos),
             Error::InvalidUseOfContextualKeyword(ref pos, ref ident) => write!(f, "Inavlid use of contextual keyword {} at {}", pos, ident),
             Error::TryWithNoCatchOrFinally(ref pos) => write!(f, "Try catch block must have catch or finally clause at {}", pos),
-            Error::InvalidCatchArg(ref pos) => write!(f, "Catch block with parentheses must have 1 argument: {}", pos),
+            Error::InvalidCatchArg(ref pos) => write!(f, "Inavlid parameter in catch block at {}", pos),
             Error::ThrowWithNoArg(ref pos) => write!(f, "Throw statements without an argument {}", pos),
             Error::UnknownOptionalLabel(ref pos, ref key, ref label) => write!(f, "Attempt to {0} {1} but {1} is unknown in this scope at {2}", key.to_string(), label, pos),
             Error::InvalidOptionalLabel(ref pos) => write!(f, "Attempt to break with no label is not allowed unless in an iteration or switch: {}", pos),

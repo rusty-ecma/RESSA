@@ -1078,10 +1078,21 @@ where
             if self.at_punct(Punct::CloseParen) {
                 return Err(Error::InvalidCatchArg(self.current_position));
             }
+            let param_pos = self.look_ahead_position;
             let mut params = Vec::new();
             let (_, param) = self.parse_pattern(None, &mut params)?;
             if self.context.strict && Self::is_restricted(&param) {
                 return Err(Error::StrictModeArgumentsOrEval(self.current_position));
+            }
+            match param {
+                Pat::Array(_)
+                | Pat::Obj(_) => {
+                    let mut args = HashSet::new();
+                    if let Err(_) = formal_params::update_with_pat(&param, &mut args) {
+                        return Err(Error::InvalidCatchArg(param_pos));
+                    }
+                },
+                _ => ()
             }
             if !self.at_punct(Punct::CloseParen) {
                 return Err(Error::InvalidCatchArg(self.current_position));
