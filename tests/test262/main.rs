@@ -585,7 +585,6 @@ fn test262() -> Res<()> {
                     .as_bytes(),
                 )?;
                 for (i, fail) in list.iter().enumerate() {
-                    
                     if let Some(file_name) = fail.path.file_stem() {
                         let file_name = format!("{}{}.html", file_name.to_str().unwrap(), i);
                         let new_path = base_path.join(&file_name);
