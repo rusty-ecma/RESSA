@@ -9,5 +9,4 @@ pub fn validate_regex(regex: &str) -> Res<()> {
         .parse()
         .map_err(|e| Error::Other(Box::new(e)))?;
     Ok(())
-    
 }

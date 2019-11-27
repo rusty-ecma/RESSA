@@ -926,7 +926,11 @@ where
             let body_start = self.look_ahead_position;
             let body = self.parse_statement()?;
             if Self::is_func_decl(&body) || Self::is_labeled_func(&body) {
-                return Err(Error::InvalidFuncPosition(body_start, "labeled function declarations cannot be the body of a with statement".to_string()))
+                return Err(Error::InvalidFuncPosition(
+                    body_start,
+                    "labeled function declarations cannot be the body of a with statement"
+                        .to_string(),
+                ));
             }
             WithStmt {
                 object: obj,
@@ -1090,14 +1094,13 @@ where
                 return Err(Error::StrictModeArgumentsOrEval(self.current_position));
             }
             match param {
-                Pat::Array(_)
-                | Pat::Obj(_) => {
+                Pat::Array(_) | Pat::Obj(_) => {
                     let mut args = HashSet::new();
                     if let Err(_) = formal_params::update_with_pat(&param, &mut args) {
                         return Err(Error::InvalidCatchArg(param_pos));
                     }
-                },
-                _ => ()
+                }
+                _ => (),
             }
             if !self.at_punct(Punct::CloseParen) {
                 return Err(Error::InvalidCatchArg(self.current_position));
@@ -1396,7 +1399,10 @@ where
                         let body_start = self.look_ahead_position;
                         let body = self.parse_loop_body()?;
                         if Self::is_labeled_func(&body) || Self::is_labeled_func(&body) {
-                            Err(Error::InvalidFuncPosition(body_start, "Loop body cannot be a function or labeled function".to_string()))
+                            Err(Error::InvalidFuncPosition(
+                                body_start,
+                                "Loop body cannot be a function or labeled function".to_string(),
+                            ))
                         } else {
                             Ok(Stmt::ForIn(ForInStmt {
                                 left,
@@ -1448,7 +1454,10 @@ where
                 let body_start = self.look_ahead_position;
                 let body = self.parse_loop_body()?;
                 if Self::is_labeled_func(&body) {
-                    Err(Error::InvalidFuncPosition(body_start, "Invalid function position as body of for of loop".to_string()))
+                    Err(Error::InvalidFuncPosition(
+                        body_start,
+                        "Invalid function position as body of for of loop".to_string(),
+                    ))
                 } else {
                     Ok(Stmt::ForOf(ForOfStmt {
                         left,
@@ -1558,7 +1567,11 @@ where
         let body_start = self.look_ahead_position;
         let body = self.parse_loop_body()?;
         if Self::is_func_decl(&body) || Self::is_labeled_func(&body) {
-            Err(Error::InvalidFuncPosition(body_start, "Loop body cannot be a function declaration or labeled function declaration".to_string()))
+            Err(Error::InvalidFuncPosition(
+                body_start,
+                "Loop body cannot be a function declaration or labeled function declaration"
+                    .to_string(),
+            ))
         } else {
             Ok(ForInStmt {
                 left,
@@ -1585,7 +1598,11 @@ where
         let body_start = self.look_ahead_position;
         let body = self.parse_loop_body()?;
         if Self::is_func_decl(&body) || Self::is_labeled_func(&body) {
-            Err(Error::InvalidFuncPosition(body_start, "Loop body cannot be a function declaration or labeled function declaration".to_string()))
+            Err(Error::InvalidFuncPosition(
+                body_start,
+                "Loop body cannot be a function declaration or labeled function declaration"
+                    .to_string(),
+            ))
         } else {
             Ok(ForOfStmt {
                 left,
@@ -4121,24 +4138,22 @@ where
     fn is_invalid_await(arg: &FuncArg) -> bool {
         match arg {
             FuncArg::Expr(Expr::Assign(AssignExpr { right, .. }))
-            | FuncArg::Pat(Pat::Assign(AssignPat { right, .. })) => {
-                match &**right {
-                    Expr::Ident(id) => id.name == "await",
-                    Expr::Func(Func { id, params, ..})
-                    | Expr::ArrowFunc(ArrowFuncExpr { id, params, ..}) => {
-                        id.as_ref().map(|id| id.name == "await").unwrap_or(false)
+            | FuncArg::Pat(Pat::Assign(AssignPat { right, .. })) => match &**right {
+                Expr::Ident(id) => id.name == "await",
+                Expr::Func(Func { id, params, .. })
+                | Expr::ArrowFunc(ArrowFuncExpr { id, params, .. }) => {
+                    id.as_ref().map(|id| id.name == "await").unwrap_or(false)
                         || params.iter().any(|param| Self::is_await(param))
-                    }
-                    Expr::Spread(expr) => {
-                        if let Expr::Ident(id) = expr.as_ref() {
-                            id.name == "await"
-                        } else {
-                            false
-                        }
-                    },
-                    _ => false,
                 }
-            }
+                Expr::Spread(expr) => {
+                    if let Expr::Ident(id) = expr.as_ref() {
+                        id.name == "await"
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            },
             _ => false,
         }
     }
@@ -4674,7 +4689,9 @@ where
     #[inline]
     fn is_labeled_func(stmt: &Stmt) -> bool {
         match stmt {
-            Stmt::Labeled(stmt) => Self::is_func_decl(&stmt.body) || Self::is_labeled_func(&stmt.body),
+            Stmt::Labeled(stmt) => {
+                Self::is_func_decl(&stmt.body) || Self::is_labeled_func(&stmt.body)
+            }
             _ => false,
         }
     }

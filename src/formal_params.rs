@@ -66,7 +66,10 @@ pub fn update_with_expr<'a>(
     }
     Ok(())
 }
-pub fn update_with_pat<'a>(pat: &Pat<'a>, set: &mut HashSet<Cow<'a, str>>) -> Result<(), Cow<'a, str>> {
+pub fn update_with_pat<'a>(
+    pat: &Pat<'a>,
+    set: &mut HashSet<Cow<'a, str>>,
+) -> Result<(), Cow<'a, str>> {
     trace!("update_with_pat {:?} {:?}", pat, set);
     match pat {
         Pat::Ident(id) => {
