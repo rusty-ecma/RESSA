@@ -33,6 +33,7 @@ pub enum Error {
     HtmlCommentInModule(Position),
     InvalidRegEx(Position, String),
     InvalidTrailingComma(Position),
+    InvalidEscape(Position, String),
     Scanner(ress::error::Error),
     Other(Box<dyn ::std::error::Error>),
 }
@@ -71,6 +72,7 @@ impl Display for Error {
             Error::HtmlCommentInModule(ref pos) => write!(f, "HTML Comments are not available in module code: {}", pos),
             Error::InvalidRegEx(ref pos, ref msg) => write!(f, "Invalid regular expression literal at {} -- {}", pos, msg),
             Error::InvalidTrailingComma(ref pos) => write!(f, "Invalid trailing comma at {}", pos),
+            Error::InvalidEscape(ref pos, ref msg) => write!(f, "{} at {}", msg, pos),
             Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
             Error::Other(ref e) => write!(f, "{}", e),
         }

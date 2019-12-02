@@ -3252,7 +3252,7 @@ where
     }
 
     #[inline]
-    fn parse_template_lit(&mut self, allow_octal_escape: bool) -> Res<TemplateLit<'b>> {
+    fn parse_template_lit(&mut self, is_tagged: bool) -> Res<TemplateLit<'b>> {
         debug!(
             "{}: parse_template_Lit {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -3263,12 +3263,12 @@ where
         }
         let mut expressions = Vec::new();
         let mut quasis = Vec::new();
-        let quasi = self.parse_template_element(allow_octal_escape)?;
+        let quasi = self.parse_template_element(is_tagged)?;
         let mut breaking = quasi.tail;
         quasis.push(quasi);
         while !breaking {
             expressions.push(self.parse_expression()?);
-            let quasi = self.parse_template_element(allow_octal_escape)?;
+            let quasi = self.parse_template_element(is_tagged)?;
             breaking = quasi.tail;
             quasis.push(quasi);
         }
@@ -3279,7 +3279,7 @@ where
     }
 
     #[inline]
-    fn parse_template_element(&mut self, allow_octal_escape: bool) -> Res<TemplateElement<'b>> {
+    fn parse_template_element(&mut self, is_tagged: bool) -> Res<TemplateElement<'b>> {
         debug!(
             "{}: parse_template_element {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -3293,8 +3293,14 @@ where
                 Template::Tail(c) => (c, true),
                 Template::NoSub(c) => (c, true),
             };
-            if !allow_octal_escape && cooked.contains_octal_escape {
+            if !is_tagged && cooked.contains_octal_escape {
                 return Err(Error::OctalLiteral(item.location.start));
+            }
+            if !is_tagged && cooked.contains_invalid_unicode_escape {
+                return Err(Error::InvalidEscape(
+                    item.location.start,
+                    "Invalid unicode escape in template literal".to_string(),
+                ));
             }
             Ok(TemplateElement::from(tail, cooked.content, raw))
         } else {
