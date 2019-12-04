@@ -2259,7 +2259,7 @@ where
             } else {
                 self.context.allow_super_call = false;
             }
-            kind = Some(PropKind::Init);
+            kind = Some(PropKind::Method);
             method = true;
             value = Some(if is_async {
                 self.parse_async_property_method()?
@@ -3164,7 +3164,7 @@ where
                     computed,
                     key,
                     value,
-                    kind,
+                    kind: PropKind::Method,
                     method: true,
                     short_hand: false,
                     is_static: false,

@@ -1049,21 +1049,21 @@ lazy_static! {
             obj_prop(
                 obj_key_number("1"),
                 obj_value_fn(empty_anon_fn(vec![])),
-                PropKind::Init,
+                PropKind::Method,
                 true,
                 true,
                 false,
             ),
-            obj_prop_ident_fn("a", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_sstr_fn("b", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_dstr_fn("c", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_number_fn("0", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_number_fn(".1", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_number_fn("1.", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_number_fn("1e1", empty_anon_fn(vec![]), PropKind::Init),
+            obj_prop_ident_fn("a", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_sstr_fn("b", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_dstr_fn("c", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_number_fn("0", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_number_fn(".1", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_number_fn("1.", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_number_fn("1e1", empty_anon_fn(vec![]), PropKind::Method),
             obj_prop_ident_fn("var", empty_anon_fn(
                 long_args()
-            ), PropKind::Init),
+            ), PropKind::Method),
             obj_prop_ident_setter("in", vec![
                 FuncArg::Pat(
                     Pat::Array(
@@ -1104,7 +1104,7 @@ lazy_static! {
             obj_prop_ident_fn(
                 "__proto__",
                 empty_anon_fn(vec![]),
-                PropKind::Init
+                PropKind::Method
             )
         ]),
         member_number_ident_part("0.", "a"),
@@ -2938,21 +2938,21 @@ lazy_static! {
             obj_prop(
                 obj_key_number("1"),
                 obj_value_fn(empty_anon_fn(vec![])),
-                PropKind::Init,
+                PropKind::Method,
                 true,
                 true,
                 false,
             ),
-            obj_prop_ident_fn("a", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_sstr_fn("b", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_dstr_fn("c", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_number_fn("0", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_number_fn(".1", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_number_fn("1.", empty_anon_fn(vec![]), PropKind::Init),
-            obj_prop_number_fn("1e1", empty_anon_fn(vec![]), PropKind::Init),
+            obj_prop_ident_fn("a", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_sstr_fn("b", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_dstr_fn("c", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_number_fn("0", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_number_fn(".1", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_number_fn("1.", empty_anon_fn(vec![]), PropKind::Method),
+            obj_prop_number_fn("1e1", empty_anon_fn(vec![]), PropKind::Method),
             obj_prop_ident_fn("var", empty_anon_fn(
                 long_args()
-            ), PropKind::Init),
+            ), PropKind::Method),
             obj_prop_ident_setter("in", vec![
                 FuncArg::Pat(
                     Pat::Array(
@@ -2993,7 +2993,7 @@ lazy_static! {
             obj_prop_ident_fn(
                 "__proto__",
                 empty_anon_fn(vec![]),
-                PropKind::Init
+                PropKind::Method
             )
         ]),
         member_number_ident_part("0.", "a"),
