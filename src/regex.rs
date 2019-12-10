@@ -4,9 +4,9 @@ use res_regex::RegexParser;
 /// literal does not contain any illegal constructs
 /// like a duplicate flag or invalid class range
 pub fn validate_regex(regex: &str) -> Res<()> {
-    let _regex = RegexParser::new(regex)
+    RegexParser::new(regex)
         .map_err(|e| Error::Other(Box::new(e)))?
-        .parse()
+        .validate()
         .map_err(|e| Error::Other(Box::new(e)))?;
     Ok(())
 }
