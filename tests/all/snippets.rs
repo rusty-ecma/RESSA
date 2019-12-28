@@ -476,6 +476,24 @@ fn html_comment_close_not_first_token() {
     run_test(";--> this is not a comment", false).unwrap()
 }
 
+#[test]
+fn asdf() {
+    run_test(r#"const regularGrandfathered = [
+        {
+            tag: "art-lojban",
+            canonical: "jbo",
+            maximized: "jbo-Latn-001",
+        },
+    ];
+    
+    for (const {tag} of regularGrandfathered) {
+        
+    }
+    
+    for (const {tag} of regularGrandfathered) {
+        
+    }"#, false).unwrap();
+}
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;

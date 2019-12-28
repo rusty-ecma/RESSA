@@ -62,11 +62,13 @@ extern crate backtrace;
 
 use ress::prelude::*;
 pub use ress::Span;
+use hash_chain::ChainMap;
 
 mod comment_handler;
 mod error;
 mod formal_params;
 mod regex;
+mod lexical_names;
 
 pub use crate::comment_handler::CommentHandler;
 pub use crate::comment_handler::DefaultCommentHandler;
@@ -74,7 +76,7 @@ pub use crate::error::Error;
 use formal_params::FormalParams;
 use resast::prelude::*;
 use resast::ClassBody;
-use std::{collections::HashSet, mem::replace};
+use std::{collections::HashSet, mem::replace, borrow::Cow};
 
 /// The current configuration options.
 /// This will most likely increase over time
@@ -128,6 +130,7 @@ struct Context<'a> {
     /// If the current scope has a `'use strict';` directive
     /// in the prelude
     strict: bool,
+    lexical_names: ChainMap<Cow<'a, str>, ()>,
     /// If the scanner has a pending line terminator
     /// before the next token
     has_line_term: bool,
@@ -164,6 +167,7 @@ impl<'a> Default for Context<'a> {
             in_switch: false,
             label_set: HashSet::new(),
             strict: false,
+            lexical_names: ChainMap::default(),
             has_line_term: false,
             past_prolog: false,
             errored: false,
@@ -1298,6 +1302,7 @@ where
             false
         };
         self.expect_punct(Punct::OpenParen)?;
+        self.context.lexical_names.new_child();
         if self.at_punct(Punct::SemiColon) {
             // any semi-colon would mean standard C style for loop
             // for (;;) {}
@@ -1626,6 +1631,7 @@ where
         let ret = self.parse_statement()?;
         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
         self.context.in_iteration = prev_iter;
+        self.context.lexical_names.pop();
         Ok(ret)
     }
 
@@ -1825,6 +1831,7 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         self.expect_punct(Punct::OpenBrace)?;
+        self.context.lexical_names.new_child();
         let mut ret = Vec::new();
         loop {
             if self.at_punct(Punct::CloseBrace) {
@@ -1845,6 +1852,7 @@ where
             ret.push(part);
         }
         self.expect_punct(Punct::CloseBrace)?;
+        self.context.lexical_names.pop();
         Ok(BlockStmt(ret))
     }
 
@@ -1875,7 +1883,8 @@ where
             "{}: parse_binding_list {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        let mut ret = vec![self.parse_lexical_binding(kind, in_for)?];
+        let first = self.parse_lexical_binding(kind, in_for)?;
+        let mut ret = vec![first];
         while self.at_punct(Punct::Comma) {
             let _comma = self.next_item()?;
             ret.push(self.parse_lexical_binding(kind, in_for)?)
@@ -1938,10 +1947,12 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         let start = self.look_ahead.clone();
+        let start_pos = self.look_ahead_position;
         let (_, id) = self.parse_pattern(Some(kind), &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&id) && !self.config.tolerant {
             return self.unexpected_token_error(&start, "restricted word");
         }
+        lexical_names::add_pat(&mut self.context.lexical_names, &id, start_pos)?;
         let init = if kind == VarKind::Const {
             if !self.at_keyword(Keyword::In(())) && !self.at_contextual_keyword("of") {
                 if self.at_punct(Punct::Equal) {
@@ -2074,6 +2085,7 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         self.expect_punct(Punct::OpenBrace)?;
+        self.context.lexical_names.new_child();
         let mut body = self.parse_directive_prologues()?;
         let prev_label = self.context.label_set.clone();
         let prev_iter = self.context.in_iteration;
@@ -2090,6 +2102,7 @@ where
             body.push(self.parse_statement_list_item()?)
         }
         self.expect_punct(Punct::CloseBrace)?;
+        self.context.lexical_names.pop();
         self.context.label_set = prev_label;
         self.context.in_iteration = prev_iter;
         self.context.in_switch = prev_switch;
@@ -2151,6 +2164,7 @@ where
         let mut ret = Vec::new();
         let mut has_ctor = false;
         self.expect_punct(Punct::OpenBrace)?;
+        self.context.lexical_names.new_child();
         while !self.at_punct(Punct::CloseBrace) {
             if self.at_punct(Punct::SemiColon) {
                 let _ = self.next_item()?;
@@ -2161,6 +2175,7 @@ where
             }
         }
         self.expect_punct(Punct::CloseBrace)?;
+        self.context.lexical_names.pop();
         Ok(ClassBody(ret))
     }
 
