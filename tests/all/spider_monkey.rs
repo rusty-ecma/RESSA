@@ -11,7 +11,7 @@ static ESPARSE: &str = "node_modules/.bin/esparse";
 fn moz_central() {
     let moz_central_path = Path::new("./moz-central");
     if !moz_central_path.exists() {
-        panic!("Unable to run this test without the files in ./moz-cenral see CONTRIBUTING.md for more information");
+        panic!("Unable to run this test without the files in ./moz-central see CONTRIBUTING.md for more information");
     }
     let failures = walk(&moz_central_path);
     let fail_count = failures
@@ -35,7 +35,7 @@ fn moz_central() {
 fn walk(path: &Path) -> Vec<(String, bool)> {
     let mut ret = Vec::new();
     for file_path in WalkDir::new(path).into_iter() {
-        let file_path = file_path.unwrap();
+        let file_path = file_path.expect(&format!("Error for file {}", path.display()));
         if file_path.path().is_file() {
             let test = if let Some(ext) = file_path.path().extension() {
                 ext == "js"
