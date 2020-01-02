@@ -2,6 +2,7 @@ use resast::prelude::*;
 use std::borrow::Cow;
 use hash_chain::ChainMap;
 use super::{Res, Position, Error};
+type LexMap<'a> = ChainMap<Cow<'a, str>, ()>;
 
 
 pub fn check_for_ident<'a>(map: &LexMap<'a>, i: &Ident<'a>, start: Position) -> Res<()> {
