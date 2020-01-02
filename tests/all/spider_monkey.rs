@@ -90,7 +90,8 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                             let name = file_path.file_name();
                             let failures_path = Path::new("failures");
                             if !failures_path.exists() {
-                                std::fs::create_dir_all(&failures_path).expect("Failed to create out path for failures");
+                                std::fs::create_dir_all(&failures_path)
+                                    .expect("Failed to create out path for failures");
                             }
                             let mut out_path = failures_path.join(name);
                             out_path.set_extension("json");
