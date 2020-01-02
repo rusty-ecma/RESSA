@@ -478,7 +478,8 @@ fn html_comment_close_not_first_token() {
 
 #[test]
 fn asdf() {
-    run_test(r#"const regularGrandfathered = [
+    run_test(
+        r#"const regularGrandfathered = [
         {
             tag: "art-lojban",
             canonical: "jbo",
@@ -492,7 +493,10 @@ fn asdf() {
     
     for (const {tag} of regularGrandfathered) {
         
-    }"#, false).unwrap();
+    }"#,
+        false,
+    )
+    .unwrap();
 }
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();

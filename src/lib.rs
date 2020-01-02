@@ -60,15 +60,15 @@ extern crate ress;
 extern crate log;
 extern crate backtrace;
 
+use hash_chain::ChainMap;
 use ress::prelude::*;
 pub use ress::Span;
-use hash_chain::ChainMap;
 
 mod comment_handler;
 mod error;
 mod formal_params;
-mod regex;
 mod lexical_names;
+mod regex;
 
 pub use crate::comment_handler::CommentHandler;
 pub use crate::comment_handler::DefaultCommentHandler;
@@ -76,7 +76,7 @@ pub use crate::error::Error;
 use formal_params::FormalParams;
 use resast::prelude::*;
 use resast::ClassBody;
-use std::{collections::HashSet, mem::replace, borrow::Cow};
+use std::{borrow::Cow, collections::HashSet, mem::replace};
 
 /// The current configuration options.
 /// This will most likely increase over time
