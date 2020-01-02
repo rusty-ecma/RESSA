@@ -88,13 +88,17 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                             Some(msg2)
                         } else {
                             let name = file_path.file_name();
-                            let mut out_path = Path::new("failures").join(name);
+                            let failures_path = Path::new("failures");
+                            if !failures_path.exists() {
+                                std::fs::create_dir_all(&failures_path).expect("Failed to create out path for failures");
+                            }
+                            let mut out_path = failures_path.join(name);
                             out_path.set_extension("json");
                             ::std::fs::write(
                                 &out_path,
                                 String::from_utf8_lossy(&op.stdout).to_string(),
                             )
-                            .unwrap();
+                            .expect(&format!("failed to wirte {}", out_path.display()));
                             None
                         }
                     }
