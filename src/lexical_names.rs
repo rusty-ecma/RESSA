@@ -4,15 +4,25 @@ use hash_chain::ChainMap;
 use super::{Res, Position, Error};
 
 
-pub fn add_pat<'a>(map: &mut ChainMap<Cow<'a, str>, ()>, pat: &Pat<'a>, start: Position) -> Res<()> {
-    match pat {
-        Pat::Ident(ref i) => {
-            log::trace!("add_pat ident {:?}", i.name);
+pub fn check_for_ident<'a>(map: &LexMap<'a>, i: &Ident<'a>, start: Position) -> Res<()> {
+    if map.get(&i.name).is_some() {
+        Err(Error::LexicalRedecl(start, format!("{} was previously declared", i.name)))
+    } else {
+        Ok(())
+    }
+}
+pub fn add_ident<'a>(map: &mut LexMap<'a>, i: &Ident<'a>, start: Position) -> Res<()> {
             if map.insert(i.name.clone(), ()).is_some() {
                 Err(Error::LexicalRedecl(start, format!("{} was previously declared", i.name)))
             } else {
                 Ok(())
             }
+}
+pub fn add_pat<'a>(map: &mut LexMap<'a>, pat: &Pat<'a>, start: Position) -> Res<()> {
+    match pat {
+        Pat::Ident(ref i) => {
+            log::trace!("add_pat ident {:?}", i.name);
+            add_ident(map, i, start)
         },
         Pat::Array(ref a) => {
             for part in a {
@@ -49,14 +59,10 @@ pub fn add_pat<'a>(map: &mut ChainMap<Cow<'a, str>, ()>, pat: &Pat<'a>, start: P
     }
 }
 
-pub fn add_expr<'a>(map: &mut ChainMap<Cow<'a, str>, ()>, expr: &Expr<'a>, start: Position) -> Res<()> {
+pub fn add_expr<'a>(map: &mut LexMap<'a>, expr: &Expr<'a>, start: Position) -> Res<()> {
     if let Expr::Ident(ref i) = expr {
         log::trace!("add_expr ident {:?}", i.name);
-        if map.insert(i.name.clone(), ()).is_some() {
-            Err(Error::LexicalRedecl(start, format!("{} was previously declared", i.name)))
-        } else {
-            Ok(())
-        }
+        add_ident(map, i, start)
     } else {
         Ok(())
     }

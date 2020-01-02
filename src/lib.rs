@@ -2119,6 +2119,7 @@ where
         let prev_strict = self.context.strict;
         self.context.strict = true;
         self.expect_keyword(Keyword::Class(()))?;
+        let start = self.look_ahead_position;
         let mut super_class = if self.at_keyword(Keyword::Extends(())) {
             let _ = self.next_item()?;
             let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
@@ -2143,6 +2144,9 @@ where
             let new_super = self.parse_left_hand_side_expr()?;
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             super_class = Some(Box::new(new_super))
+        }
+        if let Some(ref i) = id {
+            lexical_names::add_ident(&mut self.context.lexical_names, i, start)?;
         }
         self.context.set_allow_super(true);
         let body = self.parse_class_body()?;
@@ -3349,8 +3353,10 @@ where
         self.context.allow_yield = !is_gen;
         let mut found_restricted = false;
         let id = if !self.at_punct(Punct::OpenParen) {
+            let id_pos = self.look_ahead_position;
             let item = self.look_ahead.clone();
             let id = self.parse_fn_name(is_gen)?;
+            lexical_names::check_for_ident(&self.context.lexical_names, &id, id_pos)?;
             if item.token.is_restricted() {
                 if self.context.strict {
                     if !self.config.tolerant {
