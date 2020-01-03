@@ -1888,7 +1888,7 @@ where
         let first = self.parse_lexical_binding(kind, in_for)?;
         lexical_names::add_pat(&mut self.context.lexical_names, &first.id, start_pos)?;
         let mut ret = vec![first];
-        
+
         while self.at_punct(Punct::Comma) {
             let _comma = self.next_item()?;
             let start_pos = self.look_ahead_position;
@@ -1958,7 +1958,7 @@ where
         if self.context.strict && Self::is_restricted(&id) && !self.config.tolerant {
             return self.unexpected_token_error(&start, "restricted word");
         }
-        
+
         let init = if kind == VarKind::Const {
             if !self.at_keyword(Keyword::In(())) && !self.at_contextual_keyword("of") {
                 if self.at_punct(Punct::Equal) {
