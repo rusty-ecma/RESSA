@@ -1884,11 +1884,17 @@ where
             "{}: parse_binding_list {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
+        let start_pos = self.look_ahead_position;
         let first = self.parse_lexical_binding(kind, in_for)?;
+        lexical_names::add_pat(&mut self.context.lexical_names, &first.id, start_pos)?;
         let mut ret = vec![first];
+        
         while self.at_punct(Punct::Comma) {
             let _comma = self.next_item()?;
-            ret.push(self.parse_lexical_binding(kind, in_for)?)
+            let start_pos = self.look_ahead_position;
+            let next = self.parse_lexical_binding(kind, in_for)?;
+            lexical_names::add_pat(&mut self.context.lexical_names, &next.id, start_pos)?;
+            ret.push(next);
         }
         Ok(ret)
     }
@@ -1948,12 +1954,11 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         let start = self.look_ahead.clone();
-        let start_pos = self.look_ahead_position;
         let (_, id) = self.parse_pattern(Some(kind), &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&id) && !self.config.tolerant {
             return self.unexpected_token_error(&start, "restricted word");
         }
-        lexical_names::add_pat(&mut self.context.lexical_names, &id, start_pos)?;
+        
         let init = if kind == VarKind::Const {
             if !self.at_keyword(Keyword::In(())) && !self.at_contextual_keyword("of") {
                 if self.at_punct(Punct::Equal) {
@@ -2147,7 +2152,7 @@ where
             super_class = Some(Box::new(new_super))
         }
         if let Some(ref i) = id {
-            lexical_names::add_ident(&mut self.context.lexical_names, i, start)?;
+            lexical_names::check_for_ident(&mut self.context.lexical_names, i, start)?;
         }
         self.context.set_allow_super(true);
         let body = self.parse_class_body()?;
