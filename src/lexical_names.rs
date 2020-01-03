@@ -3,6 +3,51 @@ use hash_chain::ChainMap;
 use resast::prelude::*;
 use std::borrow::Cow;
 type LexMap<'a> = ChainMap<Cow<'a, str>, ()>;
+type LexMap2<'a> = ChainMap<Cow<'a, str>, Position>;
+pub enum DeclKind {
+    Lex,
+    Var,
+    Func,
+}
+
+pub struct DuplicateNameDetector<'a> {
+    lex: LexMap2<'a>,
+    var: LexMap2<'a>,
+    func: LexMap2<'a>,
+}
+
+impl<'a> DuplicateNameDetector<'a> {
+    pub fn declare(&mut self, i: &Cow<'a, str>, kind: DeclKind, pos: Position) -> Res<()> {
+        match kind {
+            DeclKind::Lex => {
+                self.check_var(i, pos)?;
+                self.check_func(i, pos)?;
+                self.add_lex(i, pos)
+            }
+            DeclKind::Var => unimplemented!(),
+            DeclKind::Func => unimplemented!(),
+        }
+    }
+    fn check_var(&self, i: &Cow<'a, str>, pos: Position) -> Res<()> {
+        check(&self.var, i, pos)
+    }
+    fn add_var(&mut self, i: &Cow<'a, str>, pos: Position) -> Res<()> {
+        add(&mut self.var, i, pos)
+    }
+
+    fn check_func(&self, i: &Cow<'a, str>, pos: Position) -> Res<()> {
+        check(&self.func, i, pos)
+    }
+    fn add_func(&mut self, i: &Cow<'a, str>, pos: Position) -> Res<()> {
+        add(&mut self.func, i, pos)
+    }
+    fn check_lex(&self, i: &Cow<'a, str>, pos: Position) -> Res<()> {
+        check(&self.lex, i, pos)
+    }
+    fn add_lex(&mut self, i: &Cow<'a, str>, pos: Position) -> Res<()> {
+        add(&mut self.lex, i, pos)
+    }
+}
 
 pub fn check_for_ident<'a>(map: &LexMap<'a>, i: &Ident<'a>, start: Position) -> Res<()> {
     if map.get(&i.name).is_some() {
@@ -14,11 +59,32 @@ pub fn check_for_ident<'a>(map: &LexMap<'a>, i: &Ident<'a>, start: Position) -> 
         Ok(())
     }
 }
+fn check<'a>(map: &LexMap2<'a>, i: &Cow<'a, str>, pos: Position) -> Res<()> {
+    if let Some(old_pos) = map.get(i) {
+        Err(Error::LexicalRedecl(
+            pos,
+            format!("{} was previously declared ({})", i, old_pos),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 pub fn add_ident<'a>(map: &mut LexMap<'a>, i: &Ident<'a>, start: Position) -> Res<()> {
     if map.insert(i.name.clone(), ()).is_some() {
         Err(Error::LexicalRedecl(
             start,
             format!("{} was previously declared", i.name),
+        ))
+    } else {
+        Ok(())
+    }
+}
+pub fn add<'a>(map: &mut LexMap2<'a>, i: &Cow<'a, str>, start: Position) -> Res<()> {
+    if map.insert(i.clone(), start).is_some() {
+        Err(Error::LexicalRedecl(
+            start,
+            format!("{} was previously declared", i),
         ))
     } else {
         Ok(())
