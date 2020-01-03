@@ -1154,7 +1154,7 @@ where
         let discriminant = self.parse_expression()?;
         self.expect_punct(Punct::CloseParen)?;
         self.expect_punct(Punct::OpenBrace)?;
-
+        self.context.lexical_names.new_child();
         let prev_sw = self.context.in_switch;
         self.context.in_switch = true;
         let mut found_default = false;
@@ -1173,6 +1173,7 @@ where
             cases.push(case);
         }
         self.expect_punct(Punct::CloseBrace)?;
+        self.context.lexical_names.pop();
         self.context.in_switch = prev_sw;
         Ok(SwitchStmt {
             discriminant,
