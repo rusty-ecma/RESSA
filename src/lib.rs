@@ -1898,15 +1898,19 @@ where
         };
         let start_pos = self.look_ahead_position;
         let first = self.parse_lexical_binding(kind, in_for)?;
-        self.context.lexical_names.declare_pat(&first.id, k, start_pos)?;
+        self.context
+            .lexical_names
+            .declare_pat(&first.id, k, start_pos)?;
         let mut ret = vec![first];
 
         while self.at_punct(Punct::Comma) {
             let _comma = self.next_item()?;
             let start_pos = self.look_ahead_position;
             let next = self.parse_lexical_binding(kind, in_for)?;
-            
-            self.context.lexical_names.declare_pat(&next.id, k, start_pos)?;
+
+            self.context
+                .lexical_names
+                .declare_pat(&next.id, k, start_pos)?;
             ret.push(next);
         }
         Ok(ret)
@@ -2166,7 +2170,9 @@ where
             super_class = Some(Box::new(new_super))
         }
         if let Some(ref i) = id {
-            self.context.lexical_names.declare(&i.name, lexical_names::DeclKind::Lex, start)?;
+            self.context
+                .lexical_names
+                .declare(&i.name, lexical_names::DeclKind::Lex, start)?;
         }
         self.context.set_allow_super(true);
         let body = self.parse_class_body()?;
@@ -3379,7 +3385,11 @@ where
             let item = self.look_ahead.clone();
             let id = self.parse_fn_name(is_gen)?;
             // TODO, DeclKind::Func(true) is looser than it should be.
-            self.context.lexical_names.declare(&id.name, lexical_names::DeclKind::Func(true), id_pos)?;
+            self.context.lexical_names.declare(
+                &id.name,
+                lexical_names::DeclKind::Func(true),
+                id_pos,
+            )?;
             if item.token.is_restricted() {
                 if self.context.strict {
                     if !self.config.tolerant {

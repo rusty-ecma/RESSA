@@ -30,14 +30,14 @@ impl<'a> DuplicateNameDetector<'a> {
                     check_exhaustive(&self.func, i, pos)?;
                 }
                 self.add_var(i, pos)
-            },
+            }
             DeclKind::Func(as_var) => {
                 self.check_lex(i, pos)?;
                 if !as_var {
                     self.check_var(i, pos)?;
                 }
                 self.add_func(i, pos)
-            },
+            }
         }
     }
     pub fn declare_pat(&mut self, pat: &Pat<'a>, kind: DeclKind, pos: Position) -> Res<()> {
@@ -118,7 +118,10 @@ fn check<'a>(map: &mut LexMap<'a>, i: &Cow<'a, str>, pos: Position) -> Res<()> {
     let child = if let Some(ch) = map.pop() {
         ch
     } else {
-        return Err(Error::LexicalRedecl(pos, "Invalid lexical map state".to_string()))
+        return Err(Error::LexicalRedecl(
+            pos,
+            "Invalid lexical map state".to_string(),
+        ));
     };
     let ret = if let Some(old_pos) = child.get(i) {
         Err(Error::LexicalRedecl(
@@ -142,7 +145,6 @@ fn check_exhaustive<'a>(map: &LexMap<'a>, i: &Cow<'a, str>, pos: Position) -> Re
         Ok(())
     }
 }
-
 
 pub fn add<'a>(map: &mut LexMap<'a>, i: &Cow<'a, str>, start: Position) -> Res<()> {
     if let Some(old_pos) = map.insert(i.clone(), start) {
