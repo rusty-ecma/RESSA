@@ -475,6 +475,11 @@ fn html_comment_close_module() {
 fn html_comment_close_not_first_token() {
     run_test(";--> this is not a comment", false).unwrap()
 }
+#[test]
+#[ignore]
+fn dupe_ident_let_then_var() {
+    run_test("{let a; var a;}", false).unwrap()
+}
 
 #[test]
 fn asdf() {
