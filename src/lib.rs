@@ -504,7 +504,7 @@ where
                     Ok(ProgramPart::Decl(decl))
                 }
                 Keyword::Class(_) => {
-                    let class = self.parse_class_decl(false)?;
+                    let class = self.parse_class_decl(false, true)?;
                     let decl = Decl::Class(class);
                     Ok(ProgramPart::Decl(decl))
                 }
@@ -692,7 +692,7 @@ where
                 let func = Decl::Func(self.parse_function_decl(true)?);
                 DefaultExportDecl::Decl(func)
             } else if self.at_keyword(Keyword::Class(())) {
-                let class = Decl::Class(self.parse_class_decl(true)?);
+                let class = Decl::Class(self.parse_class_decl(true, true)?);
                 DefaultExportDecl::Decl(class)
             } else if self.at_contextual_keyword("async") {
                 if self.at_async_function() {
@@ -751,7 +751,7 @@ where
                 self.consume_semicolon()?;
                 Ok(ModExport::Named(decl))
             } else if self.look_ahead.token.matches_keyword(Keyword::Class(())) {
-                let class = self.parse_class_decl(true)?;
+                let class = self.parse_class_decl(true, true)?;
                 let decl = Decl::Class(class);
                 let decl = NamedExportDecl::Decl(decl);
                 Ok(ModExport::Named(decl))
@@ -997,17 +997,23 @@ where
             "{} parse_var_decl_list {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        // let start = self.look_ahead_position;
+        let start = self.look_ahead_position;
         let first = self.parse_var_decl(in_for)?;
-        // self.context.lexical_names.declare_pat(&first.id,
-        //     lexical_names::DeclKind::Var(self.context.is_module), start)?;
+        self.context.lexical_names.declare_pat(
+            &first.id,
+            lexical_names::DeclKind::Var(self.context.is_module),
+            start,
+        )?;
         let mut ret = vec![first];
         while self.at_punct(Punct::Comma) {
             let _ = self.next_item()?;
-            // let start = self.look_ahead_position;
+            let start = self.look_ahead_position;
             let next = self.parse_var_decl(in_for)?;
-            // self.context.lexical_names.declare_pat(&next.id,
-            //     lexical_names::DeclKind::Var(self.context.is_module), start)?;
+            self.context.lexical_names.declare_pat(
+                &next.id,
+                lexical_names::DeclKind::Var(self.context.is_module),
+                start,
+            )?;
             ret.push(next);
         }
         Ok(ret)
@@ -1093,13 +1099,13 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         self.expect_keyword(Keyword::Catch(()))?;
-        self.context.lexical_names.new_child(false);
+        let mut param_pos = self.look_ahead_position;
         let param = if self.at_punct(Punct::OpenParen) {
             self.expect_punct(Punct::OpenParen)?;
             if self.at_punct(Punct::CloseParen) {
                 return Err(Error::InvalidCatchArg(self.current_position));
             }
-            let param_pos = self.look_ahead_position;
+            param_pos = self.look_ahead_position;
             let mut params = Vec::new();
             let (_, param) = self.parse_pattern(None, &mut params)?;
             if self.context.strict && Self::is_restricted(&param) {
@@ -1122,7 +1128,24 @@ where
         } else {
             None
         };
+        if let Some(ref p) = param {
+            let (kind, scope) = if let Pat::Ident(_) = p {
+                (
+                    lexical_names::DeclKind::SimpleCatch,
+                    lexical_names::Scope::SimpleCatch,
+                )
+            } else {
+                (lexical_names::DeclKind::Lex, lexical_names::Scope::Other)
+            };
+            self.context.lexical_names.new_child(scope);
+            self.context.lexical_names.declare_pat(p, kind, param_pos)?;
+        } else {
+            self.context
+                .lexical_names
+                .new_child(lexical_names::Scope::Other);
+        }
         let body = self.parse_block(false)?;
+        self.context.lexical_names.remove_child();
         Ok(CatchClause { param, body })
     }
 
@@ -1162,7 +1185,9 @@ where
         let discriminant = self.parse_expression()?;
         self.expect_punct(Punct::CloseParen)?;
         self.expect_punct(Punct::OpenBrace)?;
-        self.context.lexical_names.new_child(false);
+        self.context
+            .lexical_names
+            .new_child(lexical_names::Scope::Other);
         let prev_sw = self.context.in_switch;
         self.context.in_switch = true;
         let mut found_default = false;
@@ -1311,7 +1336,9 @@ where
             false
         };
         self.expect_punct(Punct::OpenParen)?;
-        self.context.lexical_names.new_child(false);
+        self.context
+            .lexical_names
+            .new_child(lexical_names::Scope::Other);
         if self.at_punct(Punct::SemiColon) {
             // any semi-colon would mean standard C style for loop
             // for (;;) {}
@@ -1844,7 +1871,9 @@ where
         );
         self.expect_punct(Punct::OpenBrace)?;
         if new_scope {
-            self.context.lexical_names.new_child(false);
+            self.context
+                .lexical_names
+                .new_child(lexical_names::Scope::Other);
         }
         let mut ret = Vec::new();
         loop {
@@ -2077,11 +2106,13 @@ where
         debug!("setting allow_super to {}", false);
         self.context.set_allow_super(false);
         let param_start = self.look_ahead_position;
-        self.context.lexical_names.new_child(true);
+        self.context
+            .lexical_names
+            .new_child(lexical_names::Scope::FuncTop);
         let formal_params = self.parse_formal_params()?;
         if self.context.strict && formal_params::have_duplicates(&formal_params.params) {
             return Err(Error::InvalidParameter(
-                start_pos,
+                param_start,
                 "Duplicate parameter in strict context".to_string(),
             ));
         }
@@ -2151,7 +2182,7 @@ where
     }
 
     #[inline]
-    fn parse_class_decl(&mut self, opt_ident: bool) -> Res<Class<'b>> {
+    fn parse_class_decl(&mut self, opt_ident: bool, check_id: bool) -> Res<Class<'b>> {
         debug!(
             "{}: parse_class_decl {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -2185,10 +2216,12 @@ where
             self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
             super_class = Some(Box::new(new_super))
         }
-        if let Some(ref i) = id {
-            self.context
-                .lexical_names
-                .declare(&i.name, lexical_names::DeclKind::Lex, start)?;
+        if check_id {
+            if let Some(ref i) = id {
+                self.context
+                    .lexical_names
+                    .declare(&i.name, lexical_names::DeclKind::Lex, start)?;
+            }
         }
         self.context.set_allow_super(true);
         let body = self.parse_class_body()?;
@@ -2457,7 +2490,9 @@ where
         let prev_await = self.context.allow_await;
         self.context.allow_yield = false;
         self.context.allow_await = false;
-        self.context.lexical_names.new_child(true);
+        self.context
+            .lexical_names
+            .new_child(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
             return Err(Error::InvalidParameter(
@@ -2488,7 +2523,9 @@ where
         let prev_yield = self.context.allow_yield;
         let prev_strict = self.context.allow_strict_directive;
         self.context.allow_yield = !self.context.strict;
-        self.context.lexical_names.new_child(true);
+        self.context
+            .lexical_names
+            .new_child(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
             return Err(Error::InvalidParameter(
@@ -2602,7 +2639,9 @@ where
         let start = self.look_ahead_position;
         let prev_allow = self.context.allow_yield;
         self.context.allow_yield = true;
-        self.context.lexical_names.new_child(true);
+        self.context
+            .lexical_names
+            .new_child(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
             return Err(Error::InvalidParameter(
@@ -2893,7 +2932,7 @@ where
                     let _ = self.next_item()?;
                     Ok(Expr::This)
                 } else if self.at_keyword(Keyword::Class(())) {
-                    let cls = self.parse_class_decl(true)?;
+                    let cls = self.parse_class_decl(true, false)?;
                     Ok(Expr::Class(cls))
                 } else if self.at_import_call()? {
                     // TODO: Double check this
@@ -3395,7 +3434,9 @@ where
         self.context.allow_await = !is_async;
         self.context.allow_yield = !is_gen;
         let mut found_restricted = false;
-        self.context.lexical_names.new_child(true);
+        self.context
+            .lexical_names
+            .new_child(lexical_names::Scope::FuncTop);
         let id = if !self.at_punct(Punct::OpenParen) {
             let id_pos = self.look_ahead_position;
             let item = self.look_ahead.clone();
@@ -3876,7 +3917,6 @@ where
                 let prev_strict = self.context.allow_strict_directive;
                 let prev_await = self.context.allow_await;
                 self.context.allow_await = !is_async;
-                self.context.lexical_names.new_child(false);
                 if let Some(params) = self.reinterpret_as_cover_formals_list(current.clone())? {
                     let mut simple = true;
                     for arg in &params {

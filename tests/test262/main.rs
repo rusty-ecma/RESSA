@@ -145,7 +145,7 @@ enum E262 {
 impl ::std::fmt::Display for E262 {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match self {
-            E262::General(ref s) => write!(f, "{}", s),
+            E262::General(ref s) => write!(f, "General Error:\n{}", s),
             E262::Success(_) => write!(f, "Unexpected Successful Parsing"),
         }
     }
@@ -227,7 +227,7 @@ impl<'a> Test262Runner<'a> {
             .module(module)
             .js(js)
             .build()
-            .map_err(|e| E262::new(&format!("{:?}", e)))?;
+            .map_err(|e| E262::new(&format!("Error constructing parser{:?}", e)))?;
         match p.parse() {
             Ok(program) => {
                 if let Some(n) = &self.desc.negative {

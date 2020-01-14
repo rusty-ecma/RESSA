@@ -127,6 +127,9 @@ fn run(file: &Path) -> Result<(), Error> {
         contents = format!("//{}", contents);
     }
     if let Some(first) = contents.lines().next() {
+        if first.contains("SyntaxError") {
+            return Ok(());
+        }
         if first.contains("error:InternalError")
         /*--> in last line*/
         {

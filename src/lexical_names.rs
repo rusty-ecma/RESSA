@@ -8,26 +8,43 @@ pub enum DeclKind {
     Lex,
     Var(bool),
     Func(bool),
+    SimpleCatch,
 }
 #[derive(Default)]
 pub struct DuplicateNameDetector<'a> {
-    states: Vec<ScopeState>,
+    states: Vec<Scope>,
     lex: LexMap<'a>,
     var: LexMap<'a>,
     func: LexMap<'a>,
-}
-#[derive(Clone, Copy)]
-pub struct ScopeState {
-    top: bool,
-    top_of_func: bool,
+    last_lex: Cow<'a, str>,
 }
 
-impl Default for ScopeState {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Scope {
+    Top,
+    FuncTop,
+    SimpleCatch,
+    Other,
+}
+impl Default for Scope {
     fn default() -> Self {
-        Self {
-            top: true,
-            top_of_func: false,
-        }
+        Self::Top
+    }
+}
+
+impl Scope {
+    pub fn is_top(self) -> bool {
+        self == Scope::Top
+    }
+    pub fn is_func_top(self) -> bool {
+        self == Scope::FuncTop
+    }
+    pub fn is_simple_catch(self) -> bool {
+        self == Scope::SimpleCatch
+    }
+
+    pub fn funcs_as_var(self, is_module: bool) -> bool {
+        self.is_func_top() || !is_module && self.is_top()
     }
 }
 
@@ -41,21 +58,44 @@ impl<'a> DuplicateNameDetector<'a> {
                 self.add_lex(i, pos)
             }
             DeclKind::Var(is_module) => {
-                check_exhaustive(&self.lex, i, pos)?;
-                self.check_func_exhaustive(i, pos, is_module)?;
-                self.add_var(i, pos)
+                for (idx, scope) in self.states.iter().enumerate().rev() {
+                    if self.lex.has_at(idx, i) && !(scope.is_simple_catch() && &self.last_lex == i)
+                        || scope.funcs_as_var(is_module) && self.func.has_at(idx, i)
+                    {
+                        let ret = match self.func.get_before(idx + 1, i) {
+                            Some(p) => Err(Error::LexicalRedecl(
+                                pos,
+                                format!("previously declared lexical value at {}", p),
+                            )),
+                            None => Err(Error::LexicalRedecl(
+                                pos,
+                                format!("couldn't find {} before {}", i, idx),
+                            )),
+                        };
+                        return ret;
+                    }
+                    if scope.is_func_top() || scope.is_top() {
+                        break;
+                    }
+                }
+                self.var.insert(i.clone(), pos);
+                Ok(())
             }
             DeclKind::Func(is_module) => {
                 let state = if let Some(state) = self.states.last() {
                     *state
                 } else {
-                    ScopeState::default()
+                    Scope::default()
                 };
                 self.check_lex(i, pos)?;
-                if state.top_of_func || (!is_module && state.top) {
+                if state.funcs_as_var(is_module) {
                     self.check_var(i, pos)?;
                 }
                 self.add_func(i, pos)
+            }
+            DeclKind::SimpleCatch => {
+                self.lex.insert(i.clone(), pos);
+                Ok(())
             }
         }
     }
@@ -105,33 +145,9 @@ impl<'a> DuplicateNameDetector<'a> {
     fn check_var(&mut self, i: &Cow<'a, str>, pos: Position) -> Res<()> {
         check(&mut self.var, i, pos)
     }
-    fn add_var(&mut self, i: &Cow<'a, str>, pos: Position) -> Res<()> {
-        add(&mut self.var, i, pos)
-    }
 
     fn check_func(&mut self, i: &Cow<'a, str>, pos: Position) -> Res<()> {
         check(&mut self.func, i, pos)
-    }
-    fn check_func_exhaustive(
-        &mut self,
-        i: &Cow<'a, str>,
-        pos: Position,
-        is_module: bool,
-    ) -> Res<()> {
-        let mut ret = Ok(());
-        for (idx, state) in self.states.iter().enumerate().rev() {
-            if self.func.has_at(idx, i) {
-                let old_pos = self.func.get_before(idx + 1, i).unwrap();
-                if !(state.top_of_func && (!is_module && state.top)) {
-                    ret = Err(Error::LexicalRedecl(
-                        pos,
-                        format!("{} was previously declared ({})", i, old_pos),
-                    ));
-                }
-                break;
-            }
-        }
-        ret
     }
     fn add_func(&mut self, i: &Cow<'a, str>, pos: Position) -> Res<()> {
         add(&mut self.func, i, pos)
@@ -140,16 +156,15 @@ impl<'a> DuplicateNameDetector<'a> {
         check(&mut self.lex, i, pos)
     }
     fn add_lex(&mut self, i: &Cow<'a, str>, pos: Position) -> Res<()> {
-        add(&mut self.lex, i, pos)
+        add(&mut self.lex, i, pos)?;
+        self.last_lex = i.clone();
+        Ok(())
     }
-    pub fn new_child(&mut self, top_of_func: bool) {
+    pub fn new_child(&mut self, scope: Scope) {
         self.lex.new_child();
         self.var.new_child();
         self.func.new_child();
-        self.states.push(ScopeState {
-            top: false,
-            top_of_func,
-        })
+        self.states.push(scope)
     }
     pub fn remove_child(&mut self) {
         let _ = self.lex.remove_child();
@@ -162,25 +177,16 @@ impl<'a> DuplicateNameDetector<'a> {
 /// check the last tier in the chain map for an identifier
 fn check<'a>(map: &mut LexMap<'a>, i: &Cow<'a, str>, pos: Position) -> Res<()> {
     if map.last_has(i) {
-        let old_pos = map.get(i).unwrap();
-        Err(Error::LexicalRedecl(
-            pos,
-            format!("Invalid lexical map state ({})", old_pos),
-        ))
-    } else {
-        Ok(())
+        if let Some(old_pos) = map.get(i) {
+            if *old_pos < pos {
+                return Err(Error::LexicalRedecl(
+                    pos,
+                    format!("{} was previously declared ({})", i, old_pos),
+                ));
+            }
+        }
     }
-}
-/// check the full chain map for an identifier
-fn check_exhaustive<'a>(map: &LexMap<'a>, i: &Cow<'a, str>, pos: Position) -> Res<()> {
-    if let Some(old_pos) = map.get(i) {
-        Err(Error::LexicalRedecl(
-            pos,
-            format!("{} was previously declared ({})", i, old_pos),
-        ))
-    } else {
-        Ok(())
-    }
+    Ok(())
 }
 
 pub fn add<'a>(map: &mut LexMap<'a>, i: &Cow<'a, str>, start: Position) -> Res<()> {
