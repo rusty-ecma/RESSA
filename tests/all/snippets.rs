@@ -478,11 +478,11 @@ fn html_comment_close_not_first_token() {
 
 #[test]
 #[should_panic = "previously declared"]
+#[ignore]
 fn dupe_ident_let_then_var() {
     run_test("{let a; var a;}", false).unwrap()
 }
 #[test]
-#[ignore]
 fn dupe_ident_var_then_var() {
     run_test(
         "function q() {
