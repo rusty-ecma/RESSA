@@ -118,26 +118,18 @@ impl<'a> DuplicateNameDetector<'a> {
         pos: Position,
         is_module: bool,
     ) -> Res<()> {
-        let mut scopes = Vec::new();
         let mut ret = Ok(());
-        for state in self.states.iter().rev() {
-            if let Some(scope) = self.func.pop() {
-                if let Some(old_pos) = scope.get(i) {
-                    if !(state.top_of_func && (!is_module && state.top)) {
-                        ret = Err(Error::LexicalRedecl(
-                            pos,
-                            format!("{} was previously declared ({})", i, old_pos),
-                        ));
-                    }
-                    break;
+        for (idx, state) in self.states.iter().enumerate().rev() {
+            if self.func.has_at(idx, i) {
+                let old_pos = self.func.get_before(idx + 1, i).unwrap();
+                if !(state.top_of_func && (!is_module && state.top)) {
+                    ret = Err(Error::LexicalRedecl(
+                        pos,
+                        format!("{} was previously declared ({})", i, old_pos),
+                    ));
                 }
-                scopes.push(scope);
-            } else {
                 break;
             }
-        }
-        for scope in scopes {
-            self.func.new_child_with(scope);
         }
         ret
     }
@@ -160,33 +152,24 @@ impl<'a> DuplicateNameDetector<'a> {
         })
     }
     pub fn remove_child(&mut self) {
-        let _ = self.lex.pop();
-        let _ = self.var.pop();
-        let _ = self.func.pop();
+        let _ = self.lex.remove_child();
+        let _ = self.var.remove_child();
+        let _ = self.func.remove_child();
         let _ = self.states.pop();
     }
 }
 
 /// check the last tier in the chain map for an identifier
 fn check<'a>(map: &mut LexMap<'a>, i: &Cow<'a, str>, pos: Position) -> Res<()> {
-    let child = if let Some(ch) = map.pop() {
-        ch
-    } else {
-        return Err(Error::LexicalRedecl(
-            pos,
-            "Invalid lexical map state".to_string(),
-        ));
-    };
-    let ret = if let Some(old_pos) = child.get(i) {
+    if map.last_has(i) {
+        let old_pos = map.get(i).unwrap();
         Err(Error::LexicalRedecl(
             pos,
-            format!("{} was previously declared ({})", i, old_pos),
+            format!("Invalid lexical map state ({})", old_pos),
         ))
     } else {
         Ok(())
-    };
-    map.new_child_with(child);
-    ret
+    }
 }
 /// check the full chain map for an identifier
 fn check_exhaustive<'a>(map: &LexMap<'a>, i: &Cow<'a, str>, pos: Position) -> Res<()> {
