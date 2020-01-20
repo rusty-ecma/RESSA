@@ -478,9 +478,13 @@ fn html_comment_close_not_first_token() {
 
 #[test]
 #[should_panic = "previously declared"]
-#[ignore]
 fn dupe_ident_let_then_var() {
     run_test("{let a; var a;}", false).unwrap()
+}
+#[test]
+#[should_panic = "previously declared"]
+fn dupe_in_switch_let_then_var() {
+    run_test("switch (true) { case 1: let q; default: var q; }", false).unwrap();
 }
 #[test]
 fn dupe_ident_var_then_var() {
@@ -491,6 +495,16 @@ fn dupe_ident_var_then_var() {
         false,
     )
     .unwrap()
+}
+
+#[test]
+fn dupe_simple_catch() {
+    run_test("try { } catch (e) { var e = 'stuff'; }", false).unwrap();
+}
+#[test]
+#[should_panic = "previously declared"]
+fn dupe_switch_func_then_let() {
+    run_test("switch (true) { case 0: function a() {}; default: let a; }", false).unwrap();
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {

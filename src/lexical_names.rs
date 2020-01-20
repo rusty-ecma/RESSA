@@ -10,13 +10,25 @@ pub enum DeclKind {
     Func(bool),
     SimpleCatch,
 }
-#[derive(Default)]
+
 pub struct DuplicateNameDetector<'a> {
     states: Vec<Scope>,
     lex: LexMap<'a>,
     var: LexMap<'a>,
     func: LexMap<'a>,
     last_lex: Cow<'a, str>,
+}
+
+impl<'a> Default for DuplicateNameDetector<'a> {
+    fn default() -> Self {
+        Self {
+            states: vec![Scope::default()],
+            lex: LexMap::default(),
+            var: LexMap::default(),
+            func: LexMap::default(),
+            last_lex: Cow::default(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -60,9 +72,8 @@ impl<'a> DuplicateNameDetector<'a> {
             DeclKind::Var(is_module) => {
                 for (idx, scope) in self.states.iter().enumerate().rev() {
                     if self.lex.has_at(idx, i) && !(scope.is_simple_catch() && &self.last_lex == i)
-                        || scope.funcs_as_var(is_module) && self.func.has_at(idx, i)
                     {
-                        let ret = match self.func.get_before(idx + 1, i) {
+                        let ret = match self.lex.get_before(idx + 1, i) {
                             Some(p) => Err(Error::LexicalRedecl(
                                 pos,
                                 format!("previously declared lexical value at {}", p),
@@ -73,6 +84,18 @@ impl<'a> DuplicateNameDetector<'a> {
                             )),
                         };
                         return ret;
+                    } else if scope.funcs_as_var(is_module) && self.func.has_at(idx, i) {
+                            let ret = match self.func.get_before(idx + 1, i) {
+                                Some(p) => Err(Error::LexicalRedecl(
+                                    pos,
+                                    format!("previously declared lexical value at {}", p),
+                                )),
+                                None => Err(Error::LexicalRedecl(
+                                    pos,
+                                    format!("couldn't find {} before {}", i, idx),
+                                )),
+                            };
+                            return ret;
                     }
                     if scope.is_func_top() || scope.is_top() {
                         break;
@@ -95,6 +118,7 @@ impl<'a> DuplicateNameDetector<'a> {
             }
             DeclKind::SimpleCatch => {
                 self.lex.insert(i.clone(), pos);
+                self.last_lex = i.clone();
                 Ok(())
             }
         }

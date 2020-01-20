@@ -508,13 +508,19 @@ where
                     let decl = Decl::Class(class);
                     Ok(ProgramPart::Decl(decl))
                 }
-                Keyword::Let(_) => Ok(if self.at_lexical_decl() {
-                    let decl = self.parse_lexical_decl(false)?;
-                    ProgramPart::Decl(decl)
-                } else {
-                    let stmt = self.parse_statement()?;
-                    ProgramPart::Stmt(stmt)
-                }),
+                Keyword::Let(s) => {
+                    if s.contains("\\u") {
+
+                    }
+                    let part = if self.at_lexical_decl() {
+                        let decl = self.parse_lexical_decl(false)?;
+                        ProgramPart::Decl(decl)
+                    } else {
+                        let stmt = self.parse_statement()?;
+                        ProgramPart::Stmt(stmt)
+                    };
+                    Ok(part)
+                },
                 Keyword::Var(_) => {
                     let _var = self.next_item()?;
                     let decls = self.parse_var_decl_list(false)?;
@@ -1114,7 +1120,7 @@ where
             match param {
                 Pat::Array(_) | Pat::Obj(_) => {
                     let mut args = HashSet::new();
-                    if let Err(_) = formal_params::update_with_pat(&param, &mut args) {
+                    if formal_params::update_with_pat(&param, &mut args).is_err() {
                         return Err(Error::InvalidCatchArg(param_pos));
                     }
                 }
@@ -1400,7 +1406,7 @@ where
                     }
                 }
             }
-            let kind = match &kind.token {
+            let var_kind = match &kind.token {
                 Token::Keyword(ref k) => match k {
                     Keyword::Const(_) => VarKind::Const,
                     Keyword::Let(_) => VarKind::Let,
@@ -1411,7 +1417,7 @@ where
             if !self.context.strict && self.look_ahead.token.matches_keyword(Keyword::In(())) {
                 let _in = self.next_item()?;
                 //const or let becomes an ident
-                let k = match kind {
+                let k = match var_kind {
                     VarKind::Var => "var",
                     VarKind::Let => "let",
                     VarKind::Const => "const",
@@ -1426,7 +1432,7 @@ where
             } else {
                 let prev_in = self.context.allow_in;
                 self.context.allow_in = false;
-                let mut decls = self.parse_binding_list(kind, true)?;
+                let mut decls = self.parse_binding_list(var_kind, true)?;
                 self.context.allow_in = prev_in;
                 if decls.len() == 1 {
                     let decl = if let Some(d) = decls.pop() {
@@ -1435,7 +1441,7 @@ where
                         return self.expected_token_error(&self.look_ahead, &["variable decl"]);
                     };
                     if decl.init.is_none() && self.at_keyword(Keyword::In(())) {
-                        let left = LoopLeft::Variable(kind, decl);
+                        let left = LoopLeft::Variable(var_kind, decl);
                         let _in = self.next_item()?;
                         let right = self.parse_expression()?;
                         let body_start = self.look_ahead_position;
@@ -1453,15 +1459,15 @@ where
                             }))
                         }
                     } else if decl.init.is_none() && self.at_contextual_keyword("of") {
-                        let left = LoopLeft::Variable(kind, decl);
+                        let left = LoopLeft::Variable(var_kind, decl);
                         Ok(Stmt::ForOf(self.parse_for_of_loop(left, is_await)?))
                     } else {
-                        let init = LoopInit::Variable(kind, vec![decl]);
+                        let init = LoopInit::Variable(var_kind, vec![decl]);
                         let stmt = self.parse_for_loop_cont(Some(init))?;
                         Ok(Stmt::For(stmt))
                     }
                 } else {
-                    let init = LoopInit::Variable(kind, decls);
+                    let init = LoopInit::Variable(var_kind, decls);
                     let stmt = self.parse_for_loop_cont(Some(init))?;
                     Ok(Stmt::For(stmt))
                 }
@@ -2755,7 +2761,6 @@ where
             };
             Ok(PropKey::Lit(id))
         } else if item.token.is_ident()
-            // || item.token.is_bool()
             || item.token.is_null()
             || item.token.is_keyword()
             || match item.token {
@@ -5415,6 +5420,11 @@ where
     /// `{`, or `[`
     #[inline]
     fn at_lexical_decl(&mut self) -> bool {
+        if let Token::Keyword(Keyword::Let(ref s)) = self.look_ahead.token {
+            if s.contains("\\u") {
+                return false;
+            }
+        }
         let state = self.scanner.get_state();
         self.scanner.skip_comments().unwrap();
         let ret = if let Some(next) = self.scanner.next() {
