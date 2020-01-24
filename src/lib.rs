@@ -1135,7 +1135,7 @@ where
             None
         };
         if let Some(ref p) = param {
-            let (kind, scope) = if let Pat::Ident(_) = p {
+            let (kind, scope) = if let Pat::Ident(_id) = p {
                 (
                     lexical_names::DeclKind::SimpleCatch,
                     lexical_names::Scope::SimpleCatch,
