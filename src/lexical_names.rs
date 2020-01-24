@@ -109,7 +109,7 @@ impl<'a> DuplicateNameDetector<'a> {
                     Scope::default()
                 };
                 self.check_lex(i, pos)?;
-                if state.funcs_as_var(is_module) {
+                if !state.funcs_as_var(is_module) {
                     self.check_var(i, pos)?;
                 }
                 self.add_func(i, pos)
