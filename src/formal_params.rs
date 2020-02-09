@@ -18,7 +18,7 @@ pub fn have_duplicates<'a>(params: &[FuncArg<'a>]) -> bool {
     }
 }
 pub fn find_duplicate<'a>(params: &[FuncArg<'a>]) -> Result<(), Cow<'a, str>> {
-    let mut set = std::collections::HashSet::new();
+    let mut set = HashSet::new();
     for param in params.iter() {
         match param {
             FuncArg::Expr(expr) => {

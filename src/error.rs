@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter, Result};
 pub enum Error {
     UnexpectedEoF,
     ParseAfterEoF,
+    RestrictedIdent(Position),
     UnexpectedToken(Position, String),
     UnableToReinterpret(Position, String, String),
     Redecl(Position, String),
@@ -34,7 +35,8 @@ pub enum Error {
     InvalidRegEx(Position, String),
     InvalidTrailingComma(Position),
     InvalidEscape(Position, String),
-    LexicalRedecl(Position, String),
+    LexicalRedecl(Position, Position, String),
+    InvalidLHS(Position),
     Scanner(ress::error::Error),
     Other(Box<dyn ::std::error::Error>),
 }
@@ -45,6 +47,7 @@ impl Display for Error {
             Error::UnexpectedToken(ref pos, ref msg) => write!(f, "Unexpected Token at {}: {}", pos, msg),
             Error::UnexpectedEoF => write!(f, "Unexpectedly found the end of the file"),
             Error::ParseAfterEoF => write!(f, "Parser attempted to get the next token after finding the end of the file"),
+            Error::RestrictedIdent(pos) => write!(f, "Restricted word used as identifier at {}", pos),
             Error::UnableToReinterpret(ref pos, ref from, ref to) => write!(f, "Unable to re-interpret from {} to {} at {}", from, to, pos),
             Error::Redecl(ref pos, ref ident) => write!(f, "Nested label at {} shadows parent: {}", pos, ident),
             Error::OperationError(ref pos, ref msg) => write!(f, "Invalid operation, {}: {}", pos, msg),
@@ -74,7 +77,8 @@ impl Display for Error {
             Error::InvalidRegEx(ref pos, ref msg) => write!(f, "Invalid regular expression literal at {} -- {}", pos, msg),
             Error::InvalidTrailingComma(ref pos) => write!(f, "Invalid trailing comma at {}", pos),
             Error::InvalidEscape(ref pos, ref msg) => write!(f, "{} at {}", msg, pos),
-            Error::LexicalRedecl(ref pos, ref msg) => write!(f, "{} at {}", msg, pos),
+            Error::LexicalRedecl(ref orig, ref redecl, ref id) => write!(f, "identifier {} was previously declared at {} and again at {}", id, orig, redecl),
+            Error::InvalidLHS(ref pos) => write!(f, "invalid left hand side at {}", pos),
             Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
             Error::Other(ref e) => write!(f, "{}", e),
         }

@@ -258,6 +258,26 @@ async function i() {
 }
 
 #[test]
+fn nested_dupe_ident() {
+    run_test(
+        "(function() {})(function() {
+            function offset (token, separator) {
+            addFormatToken(token, 0, 0, function () {
+                var offset = this.utcOffset();
+                var sign = '+';
+                if (offset < 0) {
+                    offset = -offset;
+                    sign = '-';
+                }
+                return sign + zeroFill(~~(offset / 60), 2) + separator + zeroFill(~~(offset) % 60, 2);
+            });
+        }
+        })",
+        false,
+    ).unwrap();
+}
+
+#[test]
 fn super_in_class_expr_ctor() {
     let _ = env_logger::try_init();
     let js = "new class extends Other {
@@ -477,21 +497,19 @@ fn html_comment_close_not_first_token() {
 }
 
 #[test]
-#[should_panic = "previously declared"]
+#[should_panic = "LexicalRedecl"]
 fn dupe_ident_let_then_var() {
     run_test("{let a; var a;}", false).unwrap()
 }
 #[test]
-#[should_panic = "previously declared"]
+#[should_panic = "LexicalRedecl"]
 fn dupe_in_switch_let_then_var() {
     run_test("switch (true) { case 1: let q; default: var q; }", false).unwrap();
 }
 #[test]
 fn dupe_ident_var_then_var() {
     run_test(
-        "function q() {
-        { var a; var a }
-    }",
+        "function q() { { var a; var a } }",
         false,
     )
     .unwrap()
@@ -502,9 +520,32 @@ fn dupe_simple_catch() {
     run_test("try { } catch (e) { var e = 'stuff'; }", false).unwrap();
 }
 #[test]
-#[should_panic = "previously declared"]
+#[should_panic = "LexicalRedecl"]
 fn dupe_switch_func_then_let() {
-    run_test("switch (true) { case 0: function a() {}; default: let a; }", false).unwrap();
+    run_test(
+        "switch (true) { case 0: function a() {}; default: let a; }",
+        false,
+    )
+    .unwrap();
+}
+
+#[test]
+fn dupe_func_at_top() {
+    run_test("
+function f() { return; }
+function f() { return 0; }
+", false).unwrap();
+}
+
+#[test]
+fn labeled_function() {
+    run_test("label: function g() {}", false).unwrap();
+}
+
+#[test]
+#[should_panic]
+fn dupe_for_of_loop_array() {
+    run_test("for (let [x, x] of []) {}", false).unwrap();
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {

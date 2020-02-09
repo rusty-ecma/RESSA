@@ -67,6 +67,7 @@ mod comment_handler;
 mod error;
 mod formal_params;
 mod lexical_names;
+mod lhs;
 mod regex;
 
 pub use crate::comment_handler::CommentHandler;
@@ -463,9 +464,9 @@ where
     /// statement or declaration (import/export/function/const/let/class)
     /// otherwise we move on to `Parser::parse_statement`
     #[inline]
-    fn parse_statement_list_item(&mut self) -> Res<ProgramPart<'b>> {
+    fn parse_statement_list_item(&mut self, ctx: Option<StmtCtx>) -> Res<ProgramPart<'b>> {
         debug!(
-            "{}: parse_statement_list_item_script",
+            "{}: parse_statement_list_item",
             self.look_ahead.span.start
         );
         self.context.is_assignment_target = true;
@@ -475,7 +476,7 @@ where
             Token::Keyword(ref k) => match k {
                 Keyword::Import(_) => {
                     if self.at_import_call()? {
-                        let stmt = self.parse_statement()?;
+                        let stmt = self.parse_statement(ctx)?;
                         Ok(ProgramPart::Stmt(stmt))
                     } else {
                         if !self.context.is_module {
@@ -499,7 +500,8 @@ where
                     Ok(ProgramPart::Decl(decl))
                 }
                 Keyword::Function(_) => {
-                    let func = self.parse_function_decl(true)?;
+                    // let func = self.parse_function_decl(true)?;
+                    let func = self.parse_fn_stmt(ctx.is_none())?;
                     let decl = Decl::Func(func);
                     Ok(ProgramPart::Decl(decl))
                 }
@@ -509,18 +511,16 @@ where
                     Ok(ProgramPart::Decl(decl))
                 }
                 Keyword::Let(s) => {
-                    if s.contains("\\u") {
-
-                    }
+                    if s.contains("\\u") {}
                     let part = if self.at_lexical_decl() {
                         let decl = self.parse_lexical_decl(false)?;
                         ProgramPart::Decl(decl)
                     } else {
-                        let stmt = self.parse_statement()?;
+                        let stmt = self.parse_statement(ctx)?;
                         ProgramPart::Stmt(stmt)
                     };
                     Ok(part)
-                },
+                }
                 Keyword::Var(_) => {
                     let _var = self.next_item()?;
                     let decls = self.parse_var_decl_list(false)?;
@@ -528,12 +528,12 @@ where
                     Ok(ProgramPart::Decl(Decl::Var(VarKind::Var, decls)))
                 }
                 _ => {
-                    let stmt = self.parse_statement()?;
+                    let stmt = self.parse_statement(ctx)?;
                     Ok(ProgramPart::Stmt(stmt))
                 }
             },
             _ => {
-                let stmt = self.parse_statement()?;
+                let stmt = self.parse_statement(ctx)?;
                 Ok(ProgramPart::Stmt(stmt))
             }
         }
@@ -836,7 +836,7 @@ where
     }
 
     #[inline]
-    fn parse_statement(&mut self) -> Res<Stmt<'b>> {
+    fn parse_statement(&mut self, ctx: Option<StmtCtx>) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_statement {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -890,7 +890,11 @@ where
                 Keyword::Debugger(k) => self.parse_debugger_stmt(k)?,
                 Keyword::Do(_) => Stmt::DoWhile(self.parse_do_while_stmt()?),
                 Keyword::For(_) => self.parse_for_stmt()?,
-                Keyword::Function(_) => Stmt::Expr(self.parse_fn_stmt()?),
+                Keyword::Function(_) => {
+                    let f = self.parse_fn_stmt(ctx.is_none())?;
+                    let expr = Expr::Func(f);
+                    Stmt::Expr(expr)
+                },
                 Keyword::If(_) => Stmt::If(self.parse_if_stmt()?),
                 Keyword::Return(_) => Stmt::Return(self.parse_return_stmt()?),
                 Keyword::Switch(_) => Stmt::Switch(self.parse_switch_stmt()?),
@@ -933,7 +937,7 @@ where
         } else {
             self.expect_punct(Punct::CloseParen)?;
             let body_start = self.look_ahead_position;
-            let body = self.parse_statement()?;
+            let body = self.parse_statement(Some(StmtCtx::With))?;
             if Self::is_func_decl(&body) || Self::is_labeled_func(&body) {
                 return Err(Error::InvalidFuncPosition(
                     body_start,
@@ -967,7 +971,7 @@ where
             self.expect_punct(Punct::CloseParen)?;
             let prev_iter = self.context.in_iteration;
             self.context.in_iteration = true;
-            let body = self.parse_statement()?;
+            let body = self.parse_statement(Some(StmtCtx::While))?;
             self.context.in_iteration = prev_iter;
             body
         };
@@ -1141,17 +1145,15 @@ where
                     lexical_names::Scope::SimpleCatch,
                 )
             } else {
-                (lexical_names::DeclKind::Lex, lexical_names::Scope::Other)
+                (lexical_names::DeclKind::Lex, lexical_names::Scope::Catch)
             };
-            self.context.lexical_names.new_child(scope);
+            self.add_scope(scope);
             self.context.lexical_names.declare_pat(p, kind, param_pos)?;
         } else {
-            self.context
-                .lexical_names
-                .new_child(lexical_names::Scope::Other);
+            self.add_scope(lexical_names::Scope::Catch);
         }
         let body = self.parse_block(false)?;
-        self.context.lexical_names.remove_child();
+        self.remove_scope();
         Ok(CatchClause { param, body })
     }
 
@@ -1191,9 +1193,7 @@ where
         let discriminant = self.parse_expression()?;
         self.expect_punct(Punct::CloseParen)?;
         self.expect_punct(Punct::OpenBrace)?;
-        self.context
-            .lexical_names
-            .new_child(lexical_names::Scope::Other);
+        self.add_scope(lexical_names::Scope::Switch);
         let prev_sw = self.context.in_switch;
         self.context.in_switch = true;
         let mut found_default = false;
@@ -1212,7 +1212,7 @@ where
             cases.push(case);
         }
         self.expect_punct(Punct::CloseBrace)?;
-        self.context.lexical_names.remove_child();
+        self.remove_scope();
         self.context.in_switch = prev_sw;
         Ok(SwitchStmt {
             discriminant,
@@ -1242,7 +1242,7 @@ where
             {
                 break;
             }
-            consequent.push(self.parse_statement_list_item()?)
+            consequent.push(self.parse_statement_list_item(None)?)
         }
         Ok(SwitchCase { test, consequent })
     }
@@ -1279,6 +1279,7 @@ where
             "{}: parse_if_stmt {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
+
         self.expect_keyword(Keyword::If(()))?;
         self.expect_punct(Punct::OpenParen)?;
         let test = self.parse_expression()?;
@@ -1314,17 +1315,24 @@ where
         if self.context.strict && self.at_keyword(Keyword::Function(())) && !self.config.tolerant {
             return self.unexpected_token_error(&self.look_ahead, "");
         }
-        self.parse_statement()
+        self.parse_statement(Some(StmtCtx::If))
     }
 
     #[inline]
-    fn parse_fn_stmt(&mut self) -> Res<Expr<'b>> {
+    fn parse_fn_stmt(&mut self, decl_pos: bool) -> Res<Func<'b>> {
         debug!(
-            "{}: parse_fn_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            "{}: parse_fn_stmt {:?} {}",
+            self.look_ahead.span.start, self.look_ahead.token, decl_pos,
         );
-        let decl = self.parse_function_decl(true)?;
-        Ok(Expr::Func(decl))
+        let is_async = if self.at_contextual_keyword("async") {
+            let _async = self.next_item()?;
+            true
+        } else {
+            false
+        };
+        let _function = self.next_item();
+        let decl = self.parse_func(true, false, !decl_pos, is_async)?;
+        Ok(decl)
     }
 
     #[inline]
@@ -1333,7 +1341,7 @@ where
             "{}: parse_for_stmt {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-
+        let start = self.look_ahead_position;
         self.expect_keyword(Keyword::For(()))?;
         let is_await = if self.at_keyword(Keyword::Await(())) {
             let _ = self.next_item()?;
@@ -1342,16 +1350,14 @@ where
             false
         };
         self.expect_punct(Punct::OpenParen)?;
-        self.context
-            .lexical_names
-            .new_child(lexical_names::Scope::Other);
+        self.add_scope(lexical_names::Scope::For);
         if self.at_punct(Punct::SemiColon) {
             // any semi-colon would mean standard C style for loop
             // for (;;) {}
             let stmt = self.parse_for_loop(VarKind::Var)?;
             return Ok(Stmt::For(stmt));
         }
-
+        let init_start = self.look_ahead_position;
         let ret = if self.at_keyword(Keyword::Var(())) {
             let _ = self.next_item()?;
             let kind = VarKind::Var;
@@ -1401,7 +1407,7 @@ where
                     if self.at_punct(Punct::SemiColon) {
                         let init = LoopInit::Expr(Expr::Assign(assign));
                         let loop_stmt = self.parse_for_loop_cont(Some(init))?;
-                        self.context.lexical_names.remove_child();
+                        self.remove_scope();
                         return Ok(Stmt::For(loop_stmt));
                     }
                 }
@@ -1432,6 +1438,7 @@ where
             } else {
                 let prev_in = self.context.allow_in;
                 self.context.allow_in = false;
+                let init_start = self.look_ahead_position;
                 let mut decls = self.parse_binding_list(var_kind, true)?;
                 self.context.allow_in = prev_in;
                 if decls.len() == 1 {
@@ -1530,9 +1537,10 @@ where
                 Ok(Stmt::For(self.parse_for_loop_cont(Some(init))?))
             }
         };
-        self.context.lexical_names.remove_child();
+        self.remove_scope();
         ret
     }
+    
 
     #[inline]
     fn parse_for_loop(&mut self, kind: VarKind) -> Res<ForStmt<'b>> {
@@ -1673,10 +1681,9 @@ where
         let prev_iter = self.context.in_iteration;
         self.context.in_iteration = true;
         let (prev_bind, prev_assign, prev_first) = self.isolate_cover_grammar();
-        let ret = self.parse_statement()?;
+        let ret = self.parse_statement(Some(StmtCtx::For))?;
         self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
         self.context.in_iteration = prev_iter;
-        self.context.lexical_names.remove_child();
         Ok(ret)
     }
 
@@ -1690,7 +1697,7 @@ where
         self.expect_keyword(Keyword::Do(()))?;
         let prev_iter = self.context.in_iteration;
         self.context.in_iteration = true;
-        let body = self.parse_statement()?;
+        let body = self.parse_statement(Some(StmtCtx::Do))?;
         if Self::is_func_decl(&body) || Self::is_labeled_func(&body) {
             return Err(Error::InvalidFuncPosition(start_pos, "Function declaration cannot be the body of a do while loop, maybe wrap this in a block statement?".to_string()));
         }
@@ -1814,11 +1821,12 @@ where
                             "labeled statement bodies cannot be a function declaration".to_string(),
                         ));
                     }
-                    let f = self.parse_function_decl(true)?;
+                    let _function = self.next_item()?;
+                    let f = self.parse_func(true, true, false, false)?;
                     let expr = Expr::Func(f);
                     Stmt::Expr(expr)
                 } else {
-                    self.parse_statement()?
+                    self.parse_statement(Some(StmtCtx::Label))?
                 };
                 self.context.label_set.remove(&self.get_string(&start)?);
                 return Ok(Stmt::Labeled(LabeledStmt {
@@ -1877,16 +1885,14 @@ where
         );
         self.expect_punct(Punct::OpenBrace)?;
         if new_scope {
-            self.context
-                .lexical_names
-                .new_child(lexical_names::Scope::Other);
+            self.add_scope(lexical_names::Scope::Block);
         }
         let mut ret = Vec::new();
         loop {
             if self.at_punct(Punct::CloseBrace) {
                 break;
             }
-            let part = self.parse_statement_list_item()?;
+            let part = self.parse_statement_list_item(None)?;
             if let ProgramPart::Decl(ref decl) = part {
                 match decl {
                     Decl::Export(_) => {
@@ -1902,7 +1908,7 @@ where
         }
         self.expect_punct(Punct::CloseBrace)?;
         if new_scope {
-            self.context.lexical_names.remove_child();
+            self.remove_scope();
         }
         Ok(BlockStmt(ret))
     }
@@ -2099,6 +2105,7 @@ where
             } else {
                 None
             };
+
             (Some(id), first_restricted)
         } else {
             (None, None)
@@ -2112,9 +2119,7 @@ where
         debug!("setting allow_super to {}", false);
         self.context.set_allow_super(false);
         let param_start = self.look_ahead_position;
-        self.context
-            .lexical_names
-            .new_child(lexical_names::Scope::FuncTop);
+        self.add_scope(lexical_names::Scope::FuncTop);
         let formal_params = self.parse_formal_params()?;
         if self.context.strict && formal_params::have_duplicates(&formal_params.params) {
             return Err(Error::InvalidParameter(
@@ -2146,6 +2151,7 @@ where
         self.context.allow_yield = prev_yield;
         debug!("setting allow_super to {}", prev_super);
         self.context.set_allow_super(prev_super);
+        self.remove_scope();
         Ok(Func {
             id,
             params,
@@ -2153,6 +2159,109 @@ where
             generator: is_gen,
             is_async,
         })
+    }
+
+    fn parse_func(&mut self, is_stmt: bool, opt_id: bool, is_hanging: bool, is_async: bool) -> Res<Func<'b>> {
+        debug!("{} parse_func( is_stmt: {}, opt_id: {}, is_hanging: {}, is_async: {}",
+            self.look_ahead.span.start,
+            is_stmt,
+            opt_id, is_hanging, is_async
+        );
+        let is_gen = if let Token::Punct(Punct::Asterisk) = &self.look_ahead.token {
+            let _star = self.next_item()?;
+            true
+        } else {
+            false
+        };
+        let id = if is_stmt {
+            if opt_id && !self.look_ahead.token.is_ident() {
+                None
+            } else {
+                let start = self.look_ahead_position;
+                if self.context.strict && self.look_ahead.token.is_restricted() {
+                    return Err(Error::RestrictedIdent(start));
+                }
+                let id = self.parse_var_ident(false)?;
+                if !is_hanging {
+                    trace!("function not hanging, strict: {}, generator: {}, async: {}", self.context.strict, is_gen, is_async);
+                    trace!("last scope: {:?}\n{:?}", self.context.lexical_names.last_scope(), self.context.lexical_names.states);
+                    let kind = if self.context.strict || is_gen || is_async {
+                        if self.context.lexical_names.current_funcs_as_var(self.context.is_module) {
+                            lexical_names::DeclKind::Var(self.context.is_module)
+                        } else {
+                            lexical_names::DeclKind::Lex
+                        }
+                    } else {
+                        lexical_names::DeclKind::Func(self.context.is_module)
+                    };
+                    self.context.lexical_names.declare(id.name.clone(), kind, start)?;
+                }
+                Some(id)
+            }
+        } else if self.look_ahead.token.is_ident() {
+            let id = self.parse_var_ident(false)?;
+            Some(id)
+        } else {
+            None
+        };
+        let prev_await = self.context.allow_await;
+        let prev_yield = self.context.allow_yield;
+        let prev_super = self.context.allow_super;
+        self.context.allow_await = !is_async;
+        self.context.allow_yield = !is_gen;
+        self.context.set_allow_super(false);
+        let param_start = self.look_ahead_position;
+        self.add_scope(lexical_names::Scope::FuncTop);
+        let params = self.parse_func_params()?;
+        let prev_strict = self.context.strict;
+        let prev_allow_strict = self.context.allow_strict_directive;
+        self.context.allow_strict_directive = params.simple;
+        
+        let body = self.parse_function_source_el()?;
+        if !prev_strict && self.context.strict && formal_params::have_duplicates(&params.params) {
+            return Err(Error::InvalidParameter(
+                param_start,
+                "Duplicate parameter in function who's body is strict".to_string(),
+            ));
+        }
+        if self.context.strict && params.strict {
+            return self.expected_token_error(&self.look_ahead, &[]);
+        }
+        self.context.strict = prev_strict;
+        self.context.allow_strict_directive = prev_allow_strict;
+        self.context.allow_await = prev_await;
+        self.context.allow_yield = prev_yield;
+        self.context.set_allow_super(prev_super);
+        self.remove_scope();
+        let f = Func {
+            id,
+            params: params.params,
+            body,
+            is_async,
+            generator: is_gen
+        };
+        
+        Ok(f)
+    }
+    fn remove_scope(&mut self) {
+        trace!("{} remove_scope", self.look_ahead.span.start);
+        self.context.lexical_names.remove_child();
+    }
+    fn add_scope(&mut self, scope: lexical_names::Scope) {
+        trace!("{} add_scope {:?}", self.look_ahead.span.start, scope);
+        self.context.lexical_names.new_child(scope);
+    }
+
+    fn parse_func_params(&mut self) -> Res<FormalParams<'b>> {
+        let start = self.look_ahead_position;
+        let formal_params = self.parse_formal_params()?;
+        if self.context.strict && formal_params::have_duplicates(&formal_params.params) {
+            return Err(Error::InvalidParameter(
+                start,
+                "Duplicate parameter in strict context".to_string(),
+            ));
+        }
+        Ok(formal_params)
     }
 
     #[inline]
@@ -2175,15 +2284,13 @@ where
             if self.at_punct(Punct::CloseBrace) {
                 break;
             }
-            body.push(self.parse_statement_list_item()?)
+            body.push(self.parse_statement_list_item(None)?)
         }
         self.expect_punct(Punct::CloseBrace)?;
-        self.context.lexical_names.remove_child();
         self.context.label_set = prev_label;
         self.context.in_iteration = prev_iter;
         self.context.in_switch = prev_switch;
         self.context.in_function_body = prev_in_fn;
-        self.context.lexical_names.remove_child();
         Ok(FuncBody(body))
     }
 
@@ -2207,6 +2314,14 @@ where
             None
         };
         let id = if self.at_keyword(Keyword::Await(())) {
+            if self.context.is_module {
+                return Err(
+                    Error::InvalidUseOfContextualKeyword(
+                        start,
+                        "await is an invalid class name in modules".to_string()
+                    )
+                )
+            }
             let s = self.get_string(&self.look_ahead.span)?;
             let _ = self.next_item()?;
             Some(resast::Ident::from(s))
@@ -2226,7 +2341,7 @@ where
             if let Some(ref i) = id {
                 self.context
                     .lexical_names
-                    .declare(&i.name, lexical_names::DeclKind::Lex, start)?;
+                    .declare(i.name.clone(), lexical_names::DeclKind::Lex, start)?;
             }
         }
         self.context.set_allow_super(true);
@@ -2496,9 +2611,7 @@ where
         let prev_await = self.context.allow_await;
         self.context.allow_yield = false;
         self.context.allow_await = false;
-        self.context
-            .lexical_names
-            .new_child(lexical_names::Scope::FuncTop);
+        self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
             return Err(Error::InvalidParameter(
@@ -2529,9 +2642,7 @@ where
         let prev_yield = self.context.allow_yield;
         let prev_strict = self.context.allow_strict_directive;
         self.context.allow_yield = !self.context.strict;
-        self.context
-            .lexical_names
-            .new_child(lexical_names::Scope::FuncTop);
+        self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
             return Err(Error::InvalidParameter(
@@ -2645,9 +2756,7 @@ where
         let start = self.look_ahead_position;
         let prev_allow = self.context.allow_yield;
         self.context.allow_yield = true;
-        self.context
-            .lexical_names
-            .new_child(lexical_names::Scope::FuncTop);
+        self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
             return Err(Error::InvalidParameter(
@@ -2715,7 +2824,7 @@ where
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow;
-        self.context.lexical_names.remove_child();
+        self.remove_scope();
         Ok(ret)
     }
 
@@ -2843,21 +2952,34 @@ where
                 Ok(Expr::ident_from(self.get_string(&ident.span)?))
             }
         } else if self.look_ahead.token.is_number() || self.look_ahead.token.is_string() {
-            // if self.context.strict && self.look_ahead.token.is_oct_Lit() {
-            //     //FIXME: possible tolerable error
-            // }
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let item = self.next_item()?;
             let lit = match item.token {
                 Token::Number(_) => {
                     let mut span = item.span;
+                    let start = item.location.start;
                     if self.at_big_int_flag() {
                         span.end += 1;
                         // Consume the ident
                         let _n = self.next_item();
                     }
                     let inner = self.get_string(&span)?;
+                    if self.context.strict {
+                        let mut chars = inner.chars();
+                        if let Some('0') = chars.next() {
+                            if let Some(two) = chars.next() {
+                                if two.is_digit(10) {
+                                    return Err(
+                                        Error::OctalLiteral(
+                                            start
+                                        )
+                                    )
+                                }
+
+                            }
+                        }
+                    }
                     Lit::number_from(inner)
                 }
                 Token::String(sl) => {
@@ -3439,15 +3561,13 @@ where
         self.context.allow_await = !is_async;
         self.context.allow_yield = !is_gen;
         let mut found_restricted = false;
-        self.context
-            .lexical_names
-            .new_child(lexical_names::Scope::FuncTop);
+        self.add_scope(lexical_names::Scope::FuncTop);
         let id = if !self.at_punct(Punct::OpenParen) {
             let id_pos = self.look_ahead_position;
             let item = self.look_ahead.clone();
             let id = self.parse_fn_name(is_gen)?;
             self.context.lexical_names.declare(
-                &id.name,
+                id.name.clone(),
                 lexical_names::DeclKind::Func(self.context.is_module),
                 id_pos,
             )?;
@@ -3502,6 +3622,7 @@ where
         self.context.allow_await = prev_await;
         debug!("setting allow_super to {}", prev_super);
         self.context.set_allow_super(prev_super);
+        self.remove_scope();
         let func = Func {
             id,
             params: formal_params.params,
@@ -5710,14 +5831,13 @@ where
                 self.context.past_prolog = true;
             }
         }
-        let ret = match self.parse_statement_list_item() {
+        let ret = match self.parse_statement_list_item(None) {
             Ok(p) => p,
             Err(e) => {
                 self.context.errored = true;
                 return Err(e);
             }
         };
-        trace!(target: "resp:trace", "{:?}", ret);
         Ok(ret)
     }
 }
@@ -5734,4 +5854,14 @@ where
             Some(self.next_part())
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum StmtCtx {
+    Do,
+    For,
+    If,
+    Label,
+    While,
+    With,
 }
