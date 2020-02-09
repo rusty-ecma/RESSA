@@ -543,9 +543,15 @@ fn labeled_function() {
 }
 
 #[test]
-#[should_panic]
-fn dupe_for_of_loop_array() {
-    run_test("for (let [x, x] of []) {}", false).unwrap();
+fn closure_argument_scoping() {
+    run_test("check(() => {
+    let a = 0;
+    let b = 1;
+    });
+check(() => {
+    let a = 0;
+    let b = 1;
+});", false).unwrap();
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {

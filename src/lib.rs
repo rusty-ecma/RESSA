@@ -4072,7 +4072,9 @@ where
                         let prev_strict = self.context.allow_strict_directive;
                         self.context.allow_in = true;
                         self.context.allow_strict_directive = simple;
+                        self.add_scope(lexical_names::Scope::FuncTop);
                         let body = self.parse_function_source_el()?;
+                        self.remove_scope();
                         self.context.allow_await = prev_await;
                         self.context.allow_in = prev_in;
                         self.context.allow_strict_directive = prev_strict;
