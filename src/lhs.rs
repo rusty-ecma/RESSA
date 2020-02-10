@@ -1,5 +1,5 @@
-use resast::prelude::*;
 use crate::{Error, Position};
+use resast::prelude::*;
 type Res = Result<(), Error>;
 
 pub fn check_lhs_expr<'a>(expr: &Expr<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
@@ -47,18 +47,33 @@ fn check_obj_pat<'a>(obj: &[ObjPatPart<'a>], allow_let: bool, pos: Position, str
     Ok(())
 }
 
-fn check_assign_expr<'a>(assign: &AssignExpr<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
+fn check_assign_expr<'a>(
+    assign: &AssignExpr<'a>,
+    allow_let: bool,
+    pos: Position,
+    strict: bool,
+) -> Res {
     match &assign.left {
         AssignLeft::Expr(ref e) => check_lhs_expr(e, allow_let, pos, strict),
         AssignLeft::Pat(ref p) => check_lhs_pat(p, allow_let, pos, strict),
     }
 }
 
-fn check_assign_pat<'a>(assign: &AssignPat<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
+fn check_assign_pat<'a>(
+    assign: &AssignPat<'a>,
+    allow_let: bool,
+    pos: Position,
+    strict: bool,
+) -> Res {
     check_lhs_pat(&*assign.left, allow_let, pos, strict)
 }
 
-fn check_array_expr<'a>(array: &[Option<Expr<'a>>], allow_let: bool, pos: Position, strict: bool) -> Res {
+fn check_array_expr<'a>(
+    array: &[Option<Expr<'a>>],
+    allow_let: bool,
+    pos: Position,
+    strict: bool,
+) -> Res {
     for part in array {
         if let Some(expr) = part {
             check_lhs_expr(expr, allow_let, pos, strict)?;
@@ -67,12 +82,17 @@ fn check_array_expr<'a>(array: &[Option<Expr<'a>>], allow_let: bool, pos: Positi
     Ok(())
 }
 
-fn check_array_pat<'a>(array: &[Option<ArrayPatPart<'a>>], allow_let: bool, pos: Position, strict: bool) -> Res {
+fn check_array_pat<'a>(
+    array: &[Option<ArrayPatPart<'a>>],
+    allow_let: bool,
+    pos: Position,
+    strict: bool,
+) -> Res {
     for part in array {
         if let Some(part) = part {
             match part {
                 ArrayPatPart::Expr(expr) => check_lhs_expr(expr, allow_let, pos, strict)?,
-                ArrayPatPart::Pat(pat) => check_lhs_pat(pat, allow_let, pos, strict)?
+                ArrayPatPart::Pat(pat) => check_lhs_pat(pat, allow_let, pos, strict)?,
             }
         }
     }
@@ -86,7 +106,12 @@ fn check_obj_prop<'a>(prop: &ObjProp<'a>, allow_let: bool, pos: Position, strict
     }
 }
 
-fn check_obj_pat_part<'a>(part: &ObjPatPart<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
+fn check_obj_pat_part<'a>(
+    part: &ObjPatPart<'a>,
+    allow_let: bool,
+    pos: Position,
+    strict: bool,
+) -> Res {
     match part {
         ObjPatPart::Assign(ref a) => check_prop(a, allow_let, pos, strict),
         _ => Err(Error::InvalidLHS(pos)),

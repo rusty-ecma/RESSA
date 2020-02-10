@@ -102,17 +102,18 @@ impl<'a> DuplicateNameDetector<'a> {
                         } else {
                             true
                         }
-                    } else { 
-                        trace!("looking for dupe in {} funcs_as_var: {}, funcs_has {}", idx, scope.funcs_as_var(is_module), self.func.has_at(idx, &i) );
-                        !scope.funcs_as_var(is_module) && self.func.has_at(idx, &i) 
+                    } else {
+                        trace!(
+                            "looking for dupe in {} funcs_as_var: {}, funcs_has {}",
+                            idx,
+                            scope.funcs_as_var(is_module),
+                            self.func.has_at(idx, &i)
+                        );
+                        !scope.funcs_as_var(is_module) && self.func.has_at(idx, &i)
                     };
                     if error {
                         let ret = match self.lex.get_before(idx + 1, &i) {
-                            Some(orig) => Err(Error::LexicalRedecl(
-                                *orig,
-                                pos,
-                                i.to_string(),
-                            )),
+                            Some(orig) => Err(Error::LexicalRedecl(*orig, pos, i.to_string())),
                             None => Err(Error::OperationError(
                                 pos,
                                 format!("lexical map couldn't find {} before {}", i, idx),
@@ -182,31 +183,20 @@ impl<'a> DuplicateNameDetector<'a> {
 
     fn declare_prop(&mut self, prop: &Prop<'a>, kind: DeclKind, pos: Position) -> Res<()> {
         match &prop.value {
-            PropValue::Expr(expr) => {
-                self.declare_expr(expr, kind, pos)
-            }
-            PropValue::Pat(pat) => {
-                self.declare_pat(pat, kind, pos)
-            }
+            PropValue::Expr(expr) => self.declare_expr(expr, kind, pos),
+            PropValue::Pat(pat) => self.declare_pat(pat, kind, pos),
             PropValue::None => match &prop.key {
-                PropKey::Lit(lit) => {
-                    self.declare_literal_ident(lit, kind, pos)
-                }
-                PropKey::Expr(expr) => {
-                    self.declare_expr(expr, kind, pos)
-                }
-                PropKey::Pat(pat) => {
-                    self.declare_pat(pat, kind, pos)
-                }
+                PropKey::Lit(lit) => self.declare_literal_ident(lit, kind, pos),
+                PropKey::Expr(expr) => self.declare_expr(expr, kind, pos),
+                PropKey::Pat(pat) => self.declare_pat(pat, kind, pos),
             },
         }
     }
     fn declare_literal_ident(&mut self, lit: &Lit<'a>, kind: DeclKind, pos: Position) -> Res<()> {
         match lit {
-            Lit::String(s) => {
-                match s {
-                    StringLit::Double(id)
-                    | StringLit::Single(id) => self.declare(id.clone(), kind, pos),
+            Lit::String(s) => match s {
+                StringLit::Double(id) | StringLit::Single(id) => {
+                    self.declare(id.clone(), kind, pos)
                 }
             },
             _ => Err(Error::RestrictedIdent(pos)),
@@ -225,11 +215,7 @@ impl<'a> DuplicateNameDetector<'a> {
             if let Some(poses) = self.var.get(&i) {
                 if let Some(old_pos) = poses.last() {
                     if *old_pos < pos {
-                        return Err(Error::LexicalRedecl(
-                            *old_pos,
-                            pos,
-                            i.to_string(),
-                        ));
+                        return Err(Error::LexicalRedecl(*old_pos, pos, i.to_string()));
                     }
                 }
             }
@@ -284,11 +270,7 @@ fn check<'a>(map: &mut LexMap<'a>, i: Cow<'a, str>, pos: Position) -> Res<()> {
     if map.last_has(&i) {
         if let Some(old_pos) = map.get(&i) {
             if *old_pos < pos {
-                return Err(Error::LexicalRedecl(
-                    *old_pos,
-                    pos,
-                    i.to_string(),
-                ));
+                return Err(Error::LexicalRedecl(*old_pos, pos, i.to_string()));
             }
         }
     }
@@ -298,11 +280,7 @@ fn check<'a>(map: &mut LexMap<'a>, i: Cow<'a, str>, pos: Position) -> Res<()> {
 pub fn add<'a>(map: &mut LexMap<'a>, i: Cow<'a, str>, start: Position) -> Res<()> {
     if let Some(old_pos) = map.insert(i.clone(), start) {
         if old_pos < start {
-            Err(Error::LexicalRedecl(
-                old_pos,
-                start,
-                i.to_string(),
-            ))
+            Err(Error::LexicalRedecl(old_pos, start, i.to_string()))
         } else {
             Ok(())
         }

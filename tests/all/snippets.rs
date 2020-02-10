@@ -508,11 +508,7 @@ fn dupe_in_switch_let_then_var() {
 }
 #[test]
 fn dupe_ident_var_then_var() {
-    run_test(
-        "function q() { { var a; var a } }",
-        false,
-    )
-    .unwrap()
+    run_test("function q() { { var a; var a } }", false).unwrap()
 }
 
 #[test]
@@ -531,10 +527,14 @@ fn dupe_switch_func_then_let() {
 
 #[test]
 fn dupe_func_at_top() {
-    run_test("
+    run_test(
+        "
 function f() { return; }
 function f() { return 0; }
-", false).unwrap();
+",
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -544,21 +544,29 @@ fn labeled_function() {
 
 #[test]
 fn closure_argument_scoping() {
-    run_test("check(() => {
+    run_test(
+        "check(() => {
     let a = 0;
     let b = 1;
     });
 check(() => {
     let a = 0;
     let b = 1;
-});", false).unwrap();
+});",
+        false,
+    )
+    .unwrap();
 }
 #[test]
 fn destructing_with_defaults_complicated() {
-    run_test("
+    run_test(
+        "
 const {a: {a: b = 3} = {a: undefined}} = {};
 var a = 0;
-    ", false).unwrap();
+    ",
+        false,
+    )
+    .unwrap();
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {

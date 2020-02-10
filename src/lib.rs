@@ -465,10 +465,7 @@ where
     /// otherwise we move on to `Parser::parse_statement`
     #[inline]
     fn parse_statement_list_item(&mut self, ctx: Option<StmtCtx>) -> Res<ProgramPart<'b>> {
-        debug!(
-            "{}: parse_statement_list_item",
-            self.look_ahead.span.start
-        );
+        debug!("{}: parse_statement_list_item", self.look_ahead.span.start);
         self.context.is_assignment_target = true;
         self.context.is_binding_element = true;
         let tok = self.look_ahead.token.clone();
@@ -894,7 +891,7 @@ where
                     let f = self.parse_fn_stmt(ctx.is_none())?;
                     let expr = Expr::Func(f);
                     Stmt::Expr(expr)
-                },
+                }
                 Keyword::If(_) => Stmt::If(self.parse_if_stmt()?),
                 Keyword::Return(_) => Stmt::Return(self.parse_return_stmt()?),
                 Keyword::Switch(_) => Stmt::Switch(self.parse_switch_stmt()?),
@@ -1540,7 +1537,6 @@ where
         self.remove_scope();
         ret
     }
-    
 
     #[inline]
     fn parse_for_loop(&mut self, kind: VarKind) -> Res<ForStmt<'b>> {
@@ -2161,11 +2157,16 @@ where
         })
     }
 
-    fn parse_func(&mut self, is_stmt: bool, opt_id: bool, is_hanging: bool, is_async: bool) -> Res<Func<'b>> {
-        debug!("{} parse_func( is_stmt: {}, opt_id: {}, is_hanging: {}, is_async: {}",
-            self.look_ahead.span.start,
-            is_stmt,
-            opt_id, is_hanging, is_async
+    fn parse_func(
+        &mut self,
+        is_stmt: bool,
+        opt_id: bool,
+        is_hanging: bool,
+        is_async: bool,
+    ) -> Res<Func<'b>> {
+        debug!(
+            "{} parse_func( is_stmt: {}, opt_id: {}, is_hanging: {}, is_async: {}",
+            self.look_ahead.span.start, is_stmt, opt_id, is_hanging, is_async
         );
         let is_gen = if let Token::Punct(Punct::Asterisk) = &self.look_ahead.token {
             let _star = self.next_item()?;
@@ -2183,10 +2184,23 @@ where
                 }
                 let id = self.parse_var_ident(false)?;
                 if !is_hanging {
-                    trace!("function not hanging, strict: {}, generator: {}, async: {}", self.context.strict, is_gen, is_async);
-                    trace!("last scope: {:?}\n{:?}", self.context.lexical_names.last_scope(), self.context.lexical_names.states);
+                    trace!(
+                        "function not hanging, strict: {}, generator: {}, async: {}",
+                        self.context.strict,
+                        is_gen,
+                        is_async
+                    );
+                    trace!(
+                        "last scope: {:?}\n{:?}",
+                        self.context.lexical_names.last_scope(),
+                        self.context.lexical_names.states
+                    );
                     let kind = if self.context.strict || is_gen || is_async {
-                        if self.context.lexical_names.current_funcs_as_var(self.context.is_module) {
+                        if self
+                            .context
+                            .lexical_names
+                            .current_funcs_as_var(self.context.is_module)
+                        {
                             lexical_names::DeclKind::Var(self.context.is_module)
                         } else {
                             lexical_names::DeclKind::Lex
@@ -2194,7 +2208,9 @@ where
                     } else {
                         lexical_names::DeclKind::Func(self.context.is_module)
                     };
-                    self.context.lexical_names.declare(id.name.clone(), kind, start)?;
+                    self.context
+                        .lexical_names
+                        .declare(id.name.clone(), kind, start)?;
                 }
                 Some(id)
             }
@@ -2216,7 +2232,7 @@ where
         let prev_strict = self.context.strict;
         let prev_allow_strict = self.context.allow_strict_directive;
         self.context.allow_strict_directive = params.simple;
-        
+
         let body = self.parse_function_source_el()?;
         if !prev_strict && self.context.strict && formal_params::have_duplicates(&params.params) {
             return Err(Error::InvalidParameter(
@@ -2238,9 +2254,9 @@ where
             params: params.params,
             body,
             is_async,
-            generator: is_gen
+            generator: is_gen,
         };
-        
+
         Ok(f)
     }
     fn remove_scope(&mut self) {
@@ -2315,12 +2331,10 @@ where
         };
         let id = if self.at_keyword(Keyword::Await(())) {
             if self.context.is_module {
-                return Err(
-                    Error::InvalidUseOfContextualKeyword(
-                        start,
-                        "await is an invalid class name in modules".to_string()
-                    )
-                )
+                return Err(Error::InvalidUseOfContextualKeyword(
+                    start,
+                    "await is an invalid class name in modules".to_string(),
+                ));
             }
             let s = self.get_string(&self.look_ahead.span)?;
             let _ = self.next_item()?;
@@ -2339,9 +2353,11 @@ where
         }
         if check_id {
             if let Some(ref i) = id {
-                self.context
-                    .lexical_names
-                    .declare(i.name.clone(), lexical_names::DeclKind::Lex, start)?;
+                self.context.lexical_names.declare(
+                    i.name.clone(),
+                    lexical_names::DeclKind::Lex,
+                    start,
+                )?;
             }
         }
         self.context.set_allow_super(true);
@@ -2970,13 +2986,8 @@ where
                         if let Some('0') = chars.next() {
                             if let Some(two) = chars.next() {
                                 if two.is_digit(10) {
-                                    return Err(
-                                        Error::OctalLiteral(
-                                            start
-                                        )
-                                    )
+                                    return Err(Error::OctalLiteral(start));
                                 }
-
                             }
                         }
                     }
