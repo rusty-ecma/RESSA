@@ -553,6 +553,13 @@ check(() => {
     let b = 1;
 });", false).unwrap();
 }
+#[test]
+fn destructing_with_defaults_complicated() {
+    run_test("
+const {a: {a: b = 3} = {a: undefined}} = {};
+var a = 0;
+    ", false).unwrap();
+}
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();

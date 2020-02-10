@@ -73,7 +73,7 @@ impl<'a> DuplicateNameDetector<'a> {
         }
     }
     pub fn last_scope(&self) -> Option<Scope> {
-        self.states.last().map(|s| *s)
+        self.states.last().copied()
     }
     pub fn declare(&mut self, i: Cow<'a, str>, kind: DeclKind, pos: Position) -> Res<()> {
         log::trace!("DuplicateNameDetector::declare {} {:?}", i, kind);
@@ -170,17 +170,46 @@ impl<'a> DuplicateNameDetector<'a> {
             Pat::Obj(ref o) => {
                 for part in o {
                     match part {
-                        ObjPatPart::Assign(ref prop) => match prop.key {
-                            PropKey::Expr(ref ex) => self.declare_expr(ex, kind, pos)?,
-                            PropKey::Pat(ref pat) => self.declare_pat(pat, kind, pos)?,
-                            PropKey::Lit(ref _lit) => unreachable!("literal as identifier"),
-                        },
+                        ObjPatPart::Assign(ref prop) => self.declare_prop(prop, kind, pos)?,
                         ObjPatPart::Rest(ref pat) => self.declare_pat(pat, kind, pos)?,
                     }
                 }
                 Ok(())
             }
             Pat::RestElement(ref r) => self.declare_pat(&*r, kind, pos),
+        }
+    }
+
+    fn declare_prop(&mut self, prop: &Prop<'a>, kind: DeclKind, pos: Position) -> Res<()> {
+        match &prop.value {
+            PropValue::Expr(expr) => {
+                self.declare_expr(expr, kind, pos)
+            }
+            PropValue::Pat(pat) => {
+                self.declare_pat(pat, kind, pos)
+            }
+            PropValue::None => match &prop.key {
+                PropKey::Lit(lit) => {
+                    self.declare_literal_ident(lit, kind, pos)
+                }
+                PropKey::Expr(expr) => {
+                    self.declare_expr(expr, kind, pos)
+                }
+                PropKey::Pat(pat) => {
+                    self.declare_pat(pat, kind, pos)
+                }
+            },
+        }
+    }
+    fn declare_literal_ident(&mut self, lit: &Lit<'a>, kind: DeclKind, pos: Position) -> Res<()> {
+        match lit {
+            Lit::String(s) => {
+                match s {
+                    StringLit::Double(id)
+                    | StringLit::Single(id) => self.declare(id.clone(), kind, pos),
+                }
+            },
+            _ => Err(Error::RestrictedIdent(pos)),
         }
     }
     fn declare_expr(&mut self, expr: &Expr<'a>, kind: DeclKind, pos: Position) -> Res<()> {
