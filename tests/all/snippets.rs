@@ -569,6 +569,12 @@ var a = 0;
     .unwrap();
 }
 
+#[test]
+#[should_panic = "ForOfNotSimple"]
+fn for_of_this_lhs() {
+    run_test("for (this of []) ;", false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;

@@ -1338,7 +1338,6 @@ where
             "{}: parse_for_stmt {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        let start = self.look_ahead_position;
         self.expect_keyword(Keyword::For(()))?;
         let is_await = if self.at_keyword(Keyword::Await(())) {
             let _ = self.next_item()?;
@@ -1373,6 +1372,9 @@ where
                     let stmt = self.parse_for_in_loop(left)?;
                     Ok(Stmt::ForIn(stmt))
                 } else if self.at_contextual_keyword("of") {
+                    if !lhs::is_simple_pat(&decl.id) {
+                        return Err(Error::ForOfNotSimple(init_start));
+                    }
                     let left = LoopLeft::Variable(kind, decl);
                     let stmt = self.parse_for_of_loop(left, is_await)?;
                     Ok(Stmt::ForOf(stmt))
@@ -1435,7 +1437,6 @@ where
             } else {
                 let prev_in = self.context.allow_in;
                 self.context.allow_in = false;
-                let init_start = self.look_ahead_position;
                 let mut decls = self.parse_binding_list(var_kind, true)?;
                 self.context.allow_in = prev_in;
                 if decls.len() == 1 {
@@ -1500,6 +1501,9 @@ where
                     body: Box::new(body),
                 }))
             } else if self.at_contextual_keyword("of") {
+                if !lhs::is_simple_expr(&init) {
+                    return Err(Error::ForOfNotSimple(init_start));
+                }
                 let _ = self.next_item()?;
                 let left = LoopLeft::Expr(init);
                 let right = self.parse_assignment_expr()?;
@@ -1967,17 +1971,11 @@ where
             "{} parse_variable_decl_list in_for: {}",
             self.look_ahead.span.start, in_for
         );
-        // let start = self.look_ahead_position;
         let first = self.parse_variable_decl(in_for)?;
-        // self.context.lexical_names.declare_pat(&first.id,
-        //     lexical_names::DeclKind::Var(self.context.is_module), start)?;
         let mut ret = vec![first];
         while self.at_punct(Punct::Comma) {
             let _ = self.next_item()?;
-            // let start = self.look_ahead_position;
             let next = self.parse_variable_decl(in_for)?;
-            // self.context.lexical_names.declare_pat(&next.id,
-            //     lexical_names::DeclKind::Var(self.context.is_module), start)?;
             ret.push(next);
         }
         Ok(ret)

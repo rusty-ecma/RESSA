@@ -1,7 +1,31 @@
+#![allow(dead_code)]
+// ^^^^^^^^^^^^^^^^^
+// most of this file is prep for a re-write
+
 use crate::{Error, Position};
 use resast::prelude::*;
 type Res = Result<(), Error>;
 
+pub fn is_simple_expr<'a>(expr: &Expr<'a>) -> bool {
+    trace!("is_simple_expr {:?}", expr);
+    match expr {
+        Expr::This => false,
+        _ => true,
+    }
+}
+
+pub fn is_simple_pat<'a>(pat: &Pat<'a>) -> bool {
+    trace!("is_simple_pat {:?}", pat);
+    match pat {
+        Pat::Ident(ref id) => {
+            match &*id.name {
+                "this" => false,
+                _ => true,
+            }
+        }
+        _ => true,
+    }
+}
 pub fn check_lhs_expr<'a>(expr: &Expr<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
     match expr {
         Expr::Ident(ref id) => check_ident(id, allow_let, pos, strict),
