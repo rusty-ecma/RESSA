@@ -546,8 +546,10 @@ where
     /// ```
     #[inline]
     fn parse_import_decl(&mut self) -> Res<ModImport<'b>> {
-        if self.context.in_function_body {
-            return Err(Error::InvalidImportError(self.current_position));
+        if let Some(scope) = self.context.lexical_names.last_scope() {
+            if !scope.is_top() {
+                return Err(Error::InvalidImportError(self.current_position));
+            }
         }
         self.expect_keyword(Keyword::Import(()))?;
         // if the next toke is a string we are at an import
@@ -673,8 +675,10 @@ where
 
     #[inline]
     fn parse_export_decl(&mut self) -> Res<ModExport<'b>> {
-        if self.context.in_function_body {
-            return Err(Error::InvalidExportError(self.current_position));
+        if let Some(scope) = self.context.lexical_names.last_scope() {
+            if !scope.is_top() {
+                return Err(Error::InvalidExportError(self.current_position));
+            }
         }
         if !self.context.is_module {
             return Err(Error::UseOfModuleFeatureOutsideOfModule(

@@ -17,12 +17,10 @@ pub fn is_simple_expr<'a>(expr: &Expr<'a>) -> bool {
 pub fn is_simple_pat<'a>(pat: &Pat<'a>) -> bool {
     trace!("is_simple_pat {:?}", pat);
     match pat {
-        Pat::Ident(ref id) => {
-            match &*id.name {
-                "this" => false,
-                _ => true,
-            }
-        }
+        Pat::Ident(ref id) => match &*id.name {
+            "this" => false,
+            _ => true,
+        },
         _ => true,
     }
 }
