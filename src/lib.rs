@@ -1355,6 +1355,7 @@ where
             // any semi-colon would mean standard C style for loop
             // for (;;) {}
             let stmt = self.parse_for_loop(VarKind::Var)?;
+            self.remove_scope();
             return Ok(Stmt::For(stmt));
         }
         let init_start = self.look_ahead_position;
@@ -1573,7 +1574,6 @@ where
         } else {
             Some(self.parse_expression()?)
         };
-        debug!("{:#?}", test);
         self.expect_punct(Punct::SemiColon)?;
         let update = if self.at_punct(Punct::CloseParen) {
             None
