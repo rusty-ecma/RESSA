@@ -23,6 +23,12 @@ jobs:
       run: cargo test --features moz_central
       env:
         RUST_MIN_STACK: 9999999
+    - name: rust-tarpaulin
+      uses: actions-rs/tarpaulin@v0.1.0
+    - name: Upload to codecov.io
+      uses: codecov/codecov-action@v1.0.2
+      with:
+        token: ${{secrets.CODECOV_TOKEN}}
     - name: Check syntax
       run: cargo fmt --all -- --check
     - name: Cache node_modules
