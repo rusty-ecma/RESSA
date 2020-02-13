@@ -497,7 +497,6 @@ where
                     Ok(ProgramPart::Decl(decl))
                 }
                 Keyword::Function(_) => {
-                    // let func = self.parse_function_decl(true)?;
                     let func = self.parse_fn_stmt(ctx.is_none())?;
                     let decl = Decl::Func(func);
                     Ok(ProgramPart::Decl(decl))
@@ -1291,10 +1290,18 @@ where
             (Box::new(Stmt::Empty), None)
         } else {
             self.expect_punct(Punct::CloseParen)?;
+            let body_start = self.look_ahead_position;
             let c = self.parse_if_clause()?;
+            if Self::is_labeled_func(&c) {
+                return Err(Error::InvalidFuncPosition(body_start, "If body cannot be a labelled function".to_string()));
+            }
             let a = if self.at_keyword(Keyword::Else(())) {
                 let _ = self.next_item()?;
-                Some(Box::new(self.parse_if_clause()?))
+                let e = self.parse_if_clause()?;
+                if Self::is_labeled_func(&e) {
+                    return Err(Error::InvalidFuncPosition(body_start, "Else body cannot be a labelled function".to_string()));
+                }
+                Some(Box::new(e))
             } else {
                 None
             };
@@ -2310,11 +2317,16 @@ where
     fn parse_func_params(&mut self) -> Res<FormalParams<'b>> {
         let start = self.look_ahead_position;
         let formal_params = self.parse_formal_params()?;
-        if self.context.strict && formal_params::have_duplicates(&formal_params.params) {
-            return Err(Error::InvalidParameter(
-                start,
-                "Duplicate parameter in strict context".to_string(),
-            ));
+        if self.context.strict {
+            if formal_params.found_restricted {
+                return Err(Error::StrictModeArgumentsOrEval(start));
+            }
+            if formal_params::have_duplicates(&formal_params.params) {
+                return Err(Error::InvalidParameter(
+                    start,
+                    "Duplicate parameter in strict context".to_string(),
+                ));
+            }
         }
         Ok(formal_params)
     }
