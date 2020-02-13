@@ -1582,7 +1582,7 @@ where
         };
         let start_pos = self.look_ahead_position;
         let body = self.parse_loop_body()?;
-        if Self::is_func_decl(&body) {
+        if Self::is_func_decl(&body) || Self::is_labeled_func(&body) {
             return Err(Error::InvalidFuncPosition(start_pos, "Function declaration cannot be the body of a loop, maybe wrap this in a block statement?".to_string()));
         }
         Ok(ForStmt {
@@ -1849,6 +1849,43 @@ where
             "{}: parse_expression_statement {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
+        let start = self.look_ahead_position;
+        match &self.look_ahead.token {
+            Token::Keyword(Keyword::Let(_)) => {
+                if let Some(peek) = self.scanner.look_ahead() {
+                    if let Ok(peek) = &peek {
+                        if let Token::Punct(Punct::OpenBracket) = &peek.token {
+                            return Err(Error::InvalidStartOfExpressionStmt(
+                                start,
+                                "let [".to_string(),
+                            ));
+                        }
+                    }
+                }
+            }
+            Token::Keyword(Keyword::Function(_)) => {
+                return Err(Error::InvalidStartOfExpressionStmt(
+                    start,
+                    "function".to_string(),
+                ));
+            }
+            Token::Keyword(Keyword::Class(_)) => {
+                return Err(Error::InvalidStartOfExpressionStmt(
+                    start,
+                    "class".to_string(),
+                ));
+            }
+            Token::Punct(Punct::OpenBrace) => {
+                return Err(Error::InvalidStartOfExpressionStmt(start, "{".to_string()));
+            }
+            _ => (),
+        }
+        if self.at_async_function() {
+            return Err(Error::InvalidStartOfExpressionStmt(
+                start,
+                "async function".to_string(),
+            ));
+        }
         let ret = self.parse_expression()?;
 
         self.consume_semicolon()?;

@@ -575,6 +575,17 @@ fn for_of_this_lhs() {
     run_test("for (this of []) ;", false).unwrap();
 }
 
+#[test]
+#[should_panic = "InvalidStartOfExpressionStmt"]
+fn let_open_brace() {
+    run_test(
+        "for (var i in []) let
+[a] = 0;",
+        false,
+    )
+    .unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;

@@ -38,6 +38,7 @@ pub enum Error {
     LexicalRedecl(Position, Position, String),
     InvalidLHS(Position),
     ForOfNotSimple(Position),
+    InvalidStartOfExpressionStmt(Position, String),
     Scanner(ress::error::Error),
     Other(Box<dyn ::std::error::Error>),
 }
@@ -81,6 +82,7 @@ impl Display for Error {
             Error::LexicalRedecl(ref orig, ref redecl, ref id) => write!(f, "identifier {} was previously declared at {} and again at {}", id, orig, redecl),
             Error::InvalidLHS(ref pos) => write!(f, "invalid left hand side at {}", pos),
             Error::ForOfNotSimple(ref pos) => write!(f, "initializer of a for-of loop must be a simple assignment target {}", pos),
+            Error::InvalidStartOfExpressionStmt(ref pos, ref token) => write!(f, "Expression statement cannot start with {} at {}", token, pos),
             Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
             Error::Other(ref e) => write!(f, "{}", e),
         }
