@@ -3367,6 +3367,9 @@ where
                 && !self.at_punct(Punct::Asterisk)
                 && !self.at_punct(Punct::Comma);
             let key = if is_async {
+                if self.at_contextual_keyword("async") {
+                    return Err(Error::UnexpectedToken(ident.location.start, "`async async` is not a valid property name".to_string()))
+                }
                 self.parse_object_property_key()?
             } else {
                 let s = self.get_string(&ident.span)?;
