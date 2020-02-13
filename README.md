@@ -1,4 +1,5 @@
-[![travis](https://img.shields.io/travis/FreeMasen/RESSA.svg)](https://travis-ci.org/FreeMasen/RESSA)
+[![Rust](https://github.com/rusty-ecma/RESSA/workflows/Rust/badge.svg?branch=featureless_test262)](https://github.com/rusty-ecma/RESSA/actions)
+
 [![crates.io](https://img.shields.io/crates/v/ressa.svg)](https://crates.io/crates/ressa)
 [![last commit master](https://img.shields.io/github/last-commit/FreeMasen/RESSA.svg)](https://github.com/FreeMasen/RESSA/commits/master)
 # RESSA
