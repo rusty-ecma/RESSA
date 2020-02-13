@@ -1293,13 +1293,19 @@ where
             let body_start = self.look_ahead_position;
             let c = self.parse_if_clause()?;
             if Self::is_labeled_func(&c) {
-                return Err(Error::InvalidFuncPosition(body_start, "If body cannot be a labelled function".to_string()));
+                return Err(Error::InvalidFuncPosition(
+                    body_start,
+                    "If body cannot be a labelled function".to_string(),
+                ));
             }
             let a = if self.at_keyword(Keyword::Else(())) {
                 let _ = self.next_item()?;
                 let e = self.parse_if_clause()?;
                 if Self::is_labeled_func(&e) {
-                    return Err(Error::InvalidFuncPosition(body_start, "Else body cannot be a labelled function".to_string()));
+                    return Err(Error::InvalidFuncPosition(
+                        body_start,
+                        "Else body cannot be a labelled function".to_string(),
+                    ));
                 }
                 Some(Box::new(e))
             } else {
@@ -3371,7 +3377,10 @@ where
                 && !self.at_punct(Punct::Comma);
             let key = if is_async {
                 if self.at_contextual_keyword("async") {
-                    return Err(Error::UnexpectedToken(ident.location.start, "`async async` is not a valid property name".to_string()))
+                    return Err(Error::UnexpectedToken(
+                        ident.location.start,
+                        "`async async` is not a valid property name".to_string(),
+                    ));
                 }
                 self.parse_object_property_key()?
             } else {
