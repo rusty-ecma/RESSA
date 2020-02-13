@@ -1504,6 +1504,9 @@ where
                         "For in loop left hand side cannot contain an assignment".to_string(),
                     ));
                 }
+                if !lhs::is_simple_expr(&init) {
+                    return Err(Error::ForOfNotSimple(init_start));
+                }
                 let left = LoopLeft::Expr(init);
                 let right = self.parse_expression()?;
                 let body = self.parse_loop_body()?;
