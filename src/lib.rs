@@ -674,7 +674,9 @@ where
 
     #[inline]
     fn parse_export_decl(&mut self) -> Res<ModExport<'b>> {
+        debug!("{} parse_export_decl", self.look_ahead_position);
         if let Some(scope) = self.context.lexical_names.last_scope() {
+            trace!("scope: {:?}", self.context.lexical_names.states);
             if !scope.is_top() {
                 return Err(Error::InvalidExportError(self.current_position));
             }
@@ -1513,6 +1515,7 @@ where
                 if !lhs::is_simple_expr(&init) {
                     return Err(Error::ForOfNotSimple(init_start));
                 }
+                lhs::check_loop_head_expr(&init, init_start)?;
                 let left = LoopLeft::Expr(init);
                 let right = self.parse_expression()?;
                 let body = self.parse_loop_body()?;
@@ -1525,6 +1528,7 @@ where
                 if !lhs::is_simple_expr(&init) {
                     return Err(Error::ForOfNotSimple(init_start));
                 }
+                lhs::check_loop_head_expr(&init, init_start)?;
                 let _ = self.next_item()?;
                 let left = LoopLeft::Expr(init);
                 let right = self.parse_assignment_expr()?;
@@ -2172,11 +2176,16 @@ where
         let param_start = self.look_ahead_position;
         self.add_scope(lexical_names::Scope::FuncTop);
         let formal_params = self.parse_formal_params()?;
-        if self.context.strict && formal_params::have_duplicates(&formal_params.params) {
-            return Err(Error::InvalidParameter(
-                param_start,
-                "Duplicate parameter in strict context".to_string(),
-            ));
+        if self.context.strict {
+            if formal_params::have_duplicates(&formal_params.params) {
+                return Err(Error::InvalidParameter(
+                    param_start,
+                    "Duplicate parameter in strict context".to_string(),
+                ));
+            }
+            if formal_params.found_restricted {
+                return Err(Error::StrictModeArgumentsOrEval(param_start));
+            }
         }
         let strict = formal_params.strict;
         let params = formal_params.params;
@@ -2187,11 +2196,16 @@ where
         if self.context.strict && formal_params.found_restricted {
             return Err(Error::StrictModeArgumentsOrEval(param_start));
         }
-        if !prev_strict && self.context.strict && formal_params::have_duplicates(&params) {
-            return Err(Error::InvalidParameter(
-                start_pos,
-                "Duplicate parameter in function who's body is strict".to_string(),
-            ));
+        if !prev_strict && self.context.strict {
+            if formal_params::have_duplicates(&params) {
+                return Err(Error::InvalidParameter(
+                    start_pos,
+                    "Duplicate parameter in function who's body is strict".to_string(),
+                ));
+            }
+            if formal_params.found_restricted {
+                return Err(Error::StrictModeArgumentsOrEval(param_start));
+            }
         }
         if self.context.strict && strict {
             return self.expected_token_error(&self.look_ahead, &[]);
@@ -2749,6 +2763,7 @@ where
         let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
         self.context.allow_yield = true;
+        self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
             return Err(Error::InvalidParameter(
@@ -2758,6 +2773,7 @@ where
         }
         self.context.allow_yield = false;
         let body = self.parse_method_body(params.simple, params.found_restricted)?;
+        self.remove_scope();
         self.context.allow_yield = prev_yield;
         let func = Func {
             id: None,
@@ -2779,6 +2795,7 @@ where
         let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
         let start_position = self.look_ahead_position;
+        self.add_scope(lexical_names::Scope::FuncTop);
         let formal_params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&formal_params.params) {
             return Err(Error::InvalidParameter(
@@ -2790,6 +2807,7 @@ where
             self.tolerate_error(Error::InvalidGetterParams(start_position))?;
         }
         let body = self.parse_method_body(formal_params.simple, formal_params.found_restricted)?;
+        self.remove_scope();
         self.context.allow_yield = prev_yield;
         Ok(PropValue::Expr(Expr::Func(Func {
             id: None,
@@ -3684,14 +3702,16 @@ where
                 return self.unexpected_token_error(&start, "restricted ident in strict context");
             }
         }
-        if !prev_strict
-            && self.context.strict
-            && formal_params::have_duplicates(&formal_params.params)
-        {
-            return Err(Error::NonStrictFeatureInStrictContext(
-                start_pos,
-                "duplicate function parameter names".to_string(),
-            ));
+        if !prev_strict && self.context.strict {
+            if formal_params::have_duplicates(&formal_params.params) {
+                return Err(Error::NonStrictFeatureInStrictContext(
+                    start_pos,
+                    "duplicate function parameter names".to_string(),
+                ));
+            }
+            if formal_params.found_restricted {
+                return Err(Error::StrictModeArgumentsOrEval(start.location.start));
+            }
         }
         self.context.strict = prev_strict;
         self.context.allow_strict_directive = prev_allow_strict_directive;

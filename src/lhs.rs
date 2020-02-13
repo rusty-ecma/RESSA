@@ -124,7 +124,7 @@ fn check_array_pat<'a>(
 fn check_obj_prop<'a>(prop: &ObjProp<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
     match prop {
         ObjProp::Prop(ref p) => check_prop(p, allow_let, pos, strict),
-        _ => Err(Error::InvalidLHS(pos)),
+        ObjProp::Spread(ref p) => check_lhs_expr(p, allow_let, pos, strict),
     }
 }
 
@@ -146,6 +146,34 @@ fn check_prop<'a>(prop: &Prop<'a>, allow_let: bool, pos: Position, strict: bool)
         PropKey::Pat(ref p) => check_lhs_pat(p, allow_let, pos, strict),
         _ => Err(Error::InvalidLHS(pos)),
     }
+}
+
+pub fn check_loop_head_expr<'a>(left: &Expr<'a>, pos: Position) -> Res {
+    match left {
+        Expr::Array(ref a) => check_binding_array(a, pos),
+        Expr::Obj(ref o) => check_binding_obj(o, pos),
+        _ => Ok(()),
+    }
+}
+fn check_binding_obj<'a>(obj: &ObjExpr, pos: Position) -> Res {
+    for part in obj {
+        if let ObjProp::Prop(prop) = part {
+            if prop.method || prop.kind == PropKind::Method {
+                return Err(Error::InvalidLHS(pos));
+            }
+        }
+    }
+    Ok(())
+}
+pub fn check_binding_array<'a>(a: &ArrayExpr, pos: Position) -> Res {
+    for part in a {
+        if let Some(part) = &part {
+            if let Expr::Sequence(_) = part {
+                return Err(Error::InvalidLHS(pos));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[inline]

@@ -590,6 +590,11 @@ fn let_open_brace() {
 fn async_async_obj_prop() {
     run_test("({async async});", false).unwrap();
 }
+#[test]
+#[should_panic]
+fn export_in_obj_method_body() {
+    run_test("({ get m() { export default null; } });", true).unwrap();
+}
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
