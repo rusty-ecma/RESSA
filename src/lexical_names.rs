@@ -89,11 +89,6 @@ impl<'a> DuplicateNameDetector<'a> {
                 self.add_lex(i, pos)
             }
             DeclKind::Var(is_module) => {
-                //if (scope.lexical.indexOf(name) > -1 && !((scope.flags & SCOPE_SIMPLE_CATCH) && scope.lexical[0] === name) ||
-                // !this.treatFunctionsAsVarInScope(scope) && scope.functions.indexOf(name) > -1) {
-                //     redeclared = true
-                //     break
-                // }
                 for (idx, scope) in self.states.iter().enumerate().rev() {
                     trace!("checking scope {}", idx);
                     let error = if self.lex.has_at(idx, &i) && !scope.is_simple_catch() {
