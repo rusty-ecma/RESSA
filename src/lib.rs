@@ -697,18 +697,44 @@ where
                 }
             }
             let decl = if self.at_keyword(Keyword::Function(())) {
-                let func = Decl::Func(self.parse_function_decl(true)?);
+                let start = self.look_ahead_position;
+                let f = self.parse_function_decl(true)?;
+                if let Some(id) = &f.id {
+                    self.context
+                        .lexical_names
+                        .add_module_export(id.name.clone(), true, start)?;
+                }
+                let func = Decl::Func(f);
                 DefaultExportDecl::Decl(func)
             } else if self.at_keyword(Keyword::Class(())) {
-                let class = Decl::Class(self.parse_class_decl(true, true)?);
+                let start = self.look_ahead_position;
+                let c = self.parse_class_decl(true, true)?;
+                if let Some(id) = &c.id {
+                    self.context
+                        .lexical_names
+                        .add_module_export(id.name.clone(), true, start)?;
+                }
+                let class = Decl::Class(c);
                 DefaultExportDecl::Decl(class)
             } else if self.at_contextual_keyword("async") {
                 if self.at_async_function() {
+                    let start = self.look_ahead_position;
                     let func = self.parse_function_decl(true)?;
+                    if let Some(id) = &func.id {
+                        self.context.lexical_names.add_module_export(
+                            id.name.clone(),
+                            true,
+                            start,
+                        )?;
+                    }
                     let decl = Decl::Func(func);
                     DefaultExportDecl::Decl(decl)
                 } else {
+                    let start = self.look_ahead_position;
                     let expr = self.parse_assignment_expr()?;
+                    self.context
+                        .lexical_names
+                        .add_module_export_expr(&expr, start)?;
                     self.consume_semicolon()?;
                     DefaultExportDecl::Expr(expr)
                 }
@@ -1147,7 +1173,10 @@ where
                     lexical_names::Scope::SimpleCatch,
                 )
             } else {
-                (lexical_names::DeclKind::Lex, lexical_names::Scope::Catch)
+                (
+                    lexical_names::DeclKind::Lex(self.context.is_module),
+                    lexical_names::Scope::Catch,
+                )
             };
             self.add_scope(scope);
             self.context.lexical_names.declare_pat(p, kind, param_pos)?;
@@ -2004,7 +2033,7 @@ where
         let k = if kind == VarKind::Var {
             lexical_names::DeclKind::Var(self.context.is_module)
         } else {
-            lexical_names::DeclKind::Lex
+            lexical_names::DeclKind::Lex(self.context.is_module)
         };
         let start_pos = self.look_ahead_position;
         let first = self.parse_lexical_binding(kind, in_for)?;
@@ -2272,7 +2301,7 @@ where
                         {
                             lexical_names::DeclKind::Var(self.context.is_module)
                         } else {
-                            lexical_names::DeclKind::Lex
+                            lexical_names::DeclKind::Lex(self.context.is_module)
                         }
                     } else {
                         lexical_names::DeclKind::Func(self.context.is_module)
@@ -2429,7 +2458,7 @@ where
             if let Some(ref i) = id {
                 self.context.lexical_names.declare(
                     i.name.clone(),
-                    lexical_names::DeclKind::Lex,
+                    lexical_names::DeclKind::Lex(self.context.is_module),
                     start,
                 )?;
             }

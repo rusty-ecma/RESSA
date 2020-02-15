@@ -1,12 +1,12 @@
 use super::{Error, Position, Res};
 use hash_chain::ChainMap;
 use resast::prelude::*;
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 type LexMap<'a> = ChainMap<Cow<'a, str>, Position>;
 type VarMap<'a> = ChainMap<Cow<'a, str>, Vec<Position>>;
 #[derive(Clone, Copy, Debug)]
 pub enum DeclKind {
-    Lex,
+    Lex(bool),
     Var(bool),
     Func(bool),
     SimpleCatch,
@@ -18,6 +18,10 @@ pub struct DuplicateNameDetector<'a> {
     var: VarMap<'a>,
     func: LexMap<'a>,
     first_lexes: Vec<Option<Cow<'a, str>>>,
+    /// Hashmap of identifiers exported
+    /// from this module and a flag for if they
+    /// have a corresponding declaration
+    module_exports: HashMap<Cow<'a, str>, bool>,
 }
 
 impl<'a> Default for DuplicateNameDetector<'a> {
@@ -28,6 +32,7 @@ impl<'a> Default for DuplicateNameDetector<'a> {
             var: VarMap::default(),
             func: LexMap::default(),
             first_lexes: Vec::new(),
+            module_exports: HashMap::new(),
         }
     }
 }
@@ -78,13 +83,19 @@ impl<'a> DuplicateNameDetector<'a> {
     pub fn declare(&mut self, i: Cow<'a, str>, kind: DeclKind, pos: Position) -> Res<()> {
         log::trace!("DuplicateNameDetector::declare {} {:?}", i, kind);
         match kind {
-            DeclKind::Lex => {
+            DeclKind::Lex(is_module) => {
                 self.check_var(i.clone(), pos)?;
                 self.check_func(i.clone(), pos)?;
                 if let Some(first) = self.first_lexes.last_mut() {
                     if first.is_none() {
                         *first = Some(i.clone());
                     }
+                }
+                if is_module {
+                    self.module_exports
+                        .entry(i.clone())
+                        .and_modify(|e| *e = true)
+                        .or_insert(true);
                 }
                 self.add_lex(i, pos)
             }
@@ -119,6 +130,12 @@ impl<'a> DuplicateNameDetector<'a> {
                     if scope.is_func_top() || scope.is_top() {
                         break;
                     }
+                }
+                if is_module {
+                    self.module_exports
+                        .entry(i.clone())
+                        .and_modify(|e| *e = true)
+                        .or_insert(true);
                 }
                 self.add_var(i.clone(), pos);
                 Ok(())
@@ -248,15 +265,85 @@ impl<'a> DuplicateNameDetector<'a> {
         self.states.push(scope);
         self.first_lexes.push(None);
     }
+
     pub fn remove_child(&mut self) {
         let _ = self.lex.remove_child();
-        let _ = self.var.remove_child();
         let _ = self.func.remove_child();
-        if self.states.len() == 1 {
+        if let Some(old_scope) = self.states.pop() {
+            self.remove_var_child(old_scope);
+        } else {
             panic!("attempted to pop state at bottom of stack")
         }
-        let _ = self.states.pop();
         self.first_lexes.pop();
+    }
+    fn remove_var_child(&mut self, scope: Scope) {
+        if scope.is_func_top() {
+            let _ = self.var.remove_child();
+        } else {
+            if let Some(old) = self.var.remove_child() {
+                for (key, mut value) in old {
+                    if self.var.last_has(&key) {
+                        if let Some(list) = self.var.get_mut(&key) {
+                            list.append(&mut value);
+                        }
+                    } else {
+                        self.var.insert(key, value);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn add_module_export(
+        &mut self,
+        id: Cow<'a, str>,
+        is_resolved: bool,
+        pos: Position,
+    ) -> Res<()> {
+        if self.module_exports.contains_key(&id) {
+            return Err(Error::DuplicateExport(pos, id.to_string()));
+        }
+        self.module_exports.insert(id, is_resolved);
+        Ok(())
+    }
+
+    pub fn add_module_export_expr(&mut self, expr: &Expr<'a>, pos: Position) -> Res<()> {
+        match expr {
+            Expr::Ident(ref id) => self.add_module_export(id.name.clone(), false, pos),
+            Expr::Assign(ref assign) => match &assign.left {
+                AssignLeft::Expr(ref expr) => self.add_module_export_expr_(expr, pos, true),
+                AssignLeft::Pat(ref pat) => self.add_module_export_pat_(pat, pos, true),
+            },
+            _ => Ok(()),
+        }
+    }
+    fn add_module_export_expr_(
+        &mut self,
+        expr: &Expr<'a>,
+        pos: Position,
+        is_resolved: bool,
+    ) -> Res<()> {
+        match expr {
+            Expr::Ident(id) => self.add_module_export(id.name.clone(), is_resolved, pos),
+            _ => Ok(()),
+        }
+    }
+    pub fn add_module_export_pat(&mut self, pat: &Pat<'a>, pos: Position) -> Res<()> {
+        match pat {
+            Pat::Ident(id) => self.add_module_export(id.name.clone(), false, pos),
+            _ => Ok(()),
+        }
+    }
+    fn add_module_export_pat_(
+        &mut self,
+        pat: &Pat<'a>,
+        pos: Position,
+        is_resolved: bool,
+    ) -> Res<()> {
+        match pat {
+            Pat::Ident(id) => self.add_module_export(id.name.clone(), is_resolved, pos),
+            _ => Ok(()),
+        }
     }
 }
 
