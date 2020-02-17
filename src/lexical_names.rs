@@ -1,7 +1,7 @@
 use super::{Error, Position, Res};
 use hash_chain::ChainMap;
 use resast::prelude::*;
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashSet};
 type LexMap<'a> = ChainMap<Cow<'a, str>, Position>;
 type VarMap<'a> = ChainMap<Cow<'a, str>, Vec<Position>>;
 #[derive(Clone, Copy, Debug)]
@@ -21,7 +21,8 @@ pub struct DuplicateNameDetector<'a> {
     /// Hashmap of identifiers exported
     /// from this module and a flag for if they
     /// have a corresponding declaration
-    module_exports: HashMap<Cow<'a, str>, bool>,
+    undefined_module_exports: HashSet<Cow<'a, str>>,
+    exports: HashSet<Cow<'a, str>>,
 }
 
 impl<'a> Default for DuplicateNameDetector<'a> {
@@ -32,7 +33,8 @@ impl<'a> Default for DuplicateNameDetector<'a> {
             var: VarMap::default(),
             func: LexMap::default(),
             first_lexes: Vec::new(),
-            module_exports: HashMap::new(),
+            undefined_module_exports: HashSet::new(),
+            exports: HashSet::new(),
         }
     }
 }
@@ -92,10 +94,7 @@ impl<'a> DuplicateNameDetector<'a> {
                     }
                 }
                 if is_module {
-                    self.module_exports
-                        .entry(i.clone())
-                        .and_modify(|e| *e = true)
-                        .or_insert(true);
+                    self.undefined_module_exports.remove(&i);
                 }
                 self.add_lex(i, pos)
             }
@@ -132,10 +131,7 @@ impl<'a> DuplicateNameDetector<'a> {
                     }
                 }
                 if is_module {
-                    self.module_exports
-                        .entry(i.clone())
-                        .and_modify(|e| *e = true)
-                        .or_insert(true);
+                    self.undefined_module_exports.remove(&i);
                 }
                 self.add_var(i.clone(), pos);
                 Ok(())
@@ -214,7 +210,7 @@ impl<'a> DuplicateNameDetector<'a> {
             _ => Err(Error::RestrictedIdent(pos)),
         }
     }
-    fn declare_expr(&mut self, expr: &Expr<'a>, kind: DeclKind, pos: Position) -> Res<()> {
+    pub fn declare_expr(&mut self, expr: &Expr<'a>, kind: DeclKind, pos: Position) -> Res<()> {
         if let Expr::Ident(ref i) = expr {
             log::trace!("add_expr ident {:?}", i.name);
             self.declare(i.name.clone(), kind, pos)
@@ -279,76 +275,47 @@ impl<'a> DuplicateNameDetector<'a> {
     fn remove_var_child(&mut self, scope: Scope) {
         if scope.is_func_top() {
             let _ = self.var.remove_child();
-        } else {
-            if let Some(old) = self.var.remove_child() {
-                for (key, mut value) in old {
-                    if self.var.last_has(&key) {
-                        if let Some(list) = self.var.get_mut(&key) {
-                            list.append(&mut value);
-                        }
-                    } else {
-                        self.var.insert(key, value);
+        } else if let Some(old) = self.var.remove_child() {
+            for (key, mut value) in old {
+                if self.var.last_has(&key) {
+                    if let Some(list) = self.var.get_mut(&key) {
+                        list.append(&mut value);
                     }
+                } else {
+                    self.var.insert(key, value);
                 }
             }
         }
     }
 
-    pub fn add_module_export(
-        &mut self,
-        id: Cow<'a, str>,
-        is_resolved: bool,
-        pos: Position,
-    ) -> Res<()> {
-        if self.module_exports.contains_key(&id) {
-            return Err(Error::DuplicateExport(pos, id.to_string()));
-        }
-        self.module_exports.insert(id, is_resolved);
+    pub fn add_export_spec(&mut self, spec: &ExportSpecifier<'a>, pos: Position) -> Res<()> {
+        self.add_export_ident(&spec.exported, pos)?;
+        self.undefined_module_export_guard(spec.local.name.clone());
         Ok(())
     }
 
-    pub fn add_module_export_expr(&mut self, expr: &Expr<'a>, pos: Position) -> Res<()> {
-        match expr {
-            Expr::Ident(ref id) => self.add_module_export(id.name.clone(), false, pos),
-            Expr::Assign(ref assign) => match &assign.left {
-                AssignLeft::Expr(ref expr) => self.add_module_export_expr_(expr, pos, true),
-                AssignLeft::Pat(ref pat) => self.add_module_export_pat_(pat, pos, true),
-            },
-            _ => Ok(()),
+    pub fn add_export_ident(&mut self, id: &Ident<'a>, pos: Position) -> Res<()> {
+        if !self.exports.insert(id.name.clone()) {
+            Err(Error::DuplicateExport(pos, id.name.to_string()))
+        } else {
+            Ok(())
         }
     }
-    fn add_module_export_expr_(
+
+    pub fn undefined_module_export_guard(
         &mut self,
-        expr: &Expr<'a>,
-        pos: Position,
-        is_resolved: bool,
-    ) -> Res<()> {
-        match expr {
-            Expr::Ident(id) => self.add_module_export(id.name.clone(), is_resolved, pos),
-            _ => Ok(()),
-        }
-    }
-    pub fn add_module_export_pat(&mut self, pat: &Pat<'a>, pos: Position) -> Res<()> {
-        match pat {
-            Pat::Ident(id) => self.add_module_export(id.name.clone(), false, pos),
-            _ => Ok(()),
-        }
-    }
-    fn add_module_export_pat_(
-        &mut self,
-        pat: &Pat<'a>,
-        pos: Position,
-        is_resolved: bool,
-    ) -> Res<()> {
-        match pat {
-            Pat::Ident(id) => self.add_module_export(id.name.clone(), is_resolved, pos),
-            _ => Ok(()),
+        id: Cow<'a, str>,
+    ) {
+        trace!("add_module_export: {}", id);
+        if !self.var.has_at(0, &id) && !self.lex.has_at(0, &id) {
+            self.undefined_module_exports.insert(id);
         }
     }
 }
 
 /// check the last tier in the chain map for an identifier
 fn check<'a>(map: &mut LexMap<'a>, i: Cow<'a, str>, pos: Position) -> Res<()> {
+    trace!("checking for {}", i);
     if map.last_has(&i) {
         if let Some(old_pos) = map.get(&i) {
             if *old_pos < pos {

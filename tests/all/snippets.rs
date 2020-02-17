@@ -596,6 +596,64 @@ fn export_in_obj_method_body() {
     run_test("({ get m() { export default null; } });", true).unwrap();
 }
 
+#[test]
+fn export_default_class() {
+    run_test(
+        "
+export default class Name { }",
+        true,
+    )
+    .unwrap();
+}
+#[test]
+#[should_panic = "DuplicateExport"]
+fn duplicate_export() {
+    run_test("export default class Name {}
+export function Name() {}", true).unwrap();
+}
+#[test]
+#[should_panic = "DuplicateExport"]
+fn duplicate_export_prev_decl() {
+    run_test("let x = 0;
+export { x, x }", true).unwrap();
+}
+
+#[test]
+#[should_panic = "LexicalRedecl"]
+fn arrow_fn_dupe_param_lex() {
+    run_test("(x, y) => { let x = 0; }", false).unwrap();
+}
+
+#[test]
+#[should_panic]
+fn async_arrow_rest_trailing_comma() {
+    run_test("(async (...a,) => { });", false).unwrap()
+}
+
+#[test]
+#[should_panic]
+fn async_function_dupe_param_lex() {
+    run_test("async function f(a) { let a; }", false).unwrap();
+}
+
+#[test]
+fn export_as_as_as() {
+    run_test("
+var as = null;
+export {
+    as as as
+};", true).unwrap();
+}
+
+#[test]
+fn dupe_var_strict() {
+    run_test("'use strict';
+function f(a) {
+    var a;
+}", false).unwrap();
+}
+
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
