@@ -302,10 +302,7 @@ impl<'a> DuplicateNameDetector<'a> {
         }
     }
 
-    pub fn undefined_module_export_guard(
-        &mut self,
-        id: Cow<'a, str>,
-    ) {
+    pub fn undefined_module_export_guard(&mut self, id: Cow<'a, str>) {
         trace!("add_module_export: {}", id);
         if !self.var.has_at(0, &id) && !self.lex.has_at(0, &id) {
             self.undefined_module_exports.insert(id);

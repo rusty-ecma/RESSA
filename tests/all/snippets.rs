@@ -608,14 +608,22 @@ export default class Name { }",
 #[test]
 #[should_panic = "DuplicateExport"]
 fn duplicate_export() {
-    run_test("export default class Name {}
-export function Name() {}", true).unwrap();
+    run_test(
+        "export default class Name {}
+export function Name() {}",
+        true,
+    )
+    .unwrap();
 }
 #[test]
 #[should_panic = "DuplicateExport"]
 fn duplicate_export_prev_decl() {
-    run_test("let x = 0;
-export { x, x }", true).unwrap();
+    run_test(
+        "let x = 0;
+export { x, x }",
+        true,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -638,21 +646,28 @@ fn async_function_dupe_param_lex() {
 
 #[test]
 fn export_as_as_as() {
-    run_test("
+    run_test(
+        "
 var as = null;
 export {
     as as as
-};", true).unwrap();
+};",
+        true,
+    )
+    .unwrap();
 }
 
 #[test]
 fn dupe_var_strict() {
-    run_test("'use strict';
+    run_test(
+        "'use strict';
 function f(a) {
     var a;
-}", false).unwrap();
+}",
+        false,
+    )
+    .unwrap();
 }
-
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();

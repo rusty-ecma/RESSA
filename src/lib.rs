@@ -843,7 +843,7 @@ where
             Ok(ModExport::Named(decl))
         }
     }
-    
+
     #[inline]
     fn parse_export_specifier(&mut self) -> Res<ExportSpecifier<'b>> {
         let local = self.parse_ident_name()?;
@@ -3903,7 +3903,11 @@ where
         } else {
             self.parse_pattern_with_default(&mut params)?
         };
-        self.context.lexical_names.declare_pat(&param, DeclKind::Var(self.context.is_module), start)?;
+        self.context.lexical_names.declare_pat(
+            &param,
+            DeclKind::Var(self.context.is_module),
+            start,
+        )?;
         let param = FuncArg::Pat(param);
         let simple = simple && Self::is_simple(&param);
         Ok((simple, found_restricted, param))
@@ -4180,7 +4184,9 @@ where
                 let prev_await = self.context.allow_await;
                 self.context.allow_await = !is_async;
                 self.add_scope(lexical_names::Scope::FuncTop);
-                if let Some(params) = self.reinterpret_as_cover_formals_list(current.clone(), start_pos)? {
+                if let Some(params) =
+                    self.reinterpret_as_cover_formals_list(current.clone(), start_pos)?
+                {
                     let mut simple = true;
                     for arg in &params {
                         if self.context.strict && Self::check_arg_strict_mode(arg) {
@@ -4378,10 +4384,18 @@ where
         let mut params2 = Vec::with_capacity(param_len);
         for param in params {
             match &param {
-                FuncArg::Pat(pat) => self.context.lexical_names.declare_pat(pat, DeclKind::Lex(self.context.is_module), pos)?,
-                FuncArg::Expr(expr) => self.context.lexical_names.declare_expr(expr, DeclKind::Lex(self.context.is_module), pos)?,
+                FuncArg::Pat(pat) => self.context.lexical_names.declare_pat(
+                    pat,
+                    DeclKind::Lex(self.context.is_module),
+                    pos,
+                )?,
+                FuncArg::Expr(expr) => self.context.lexical_names.declare_expr(
+                    expr,
+                    DeclKind::Lex(self.context.is_module),
+                    pos,
+                )?,
             }
-            
+
             if Self::is_assignment(&param) {
                 match &param {
                     FuncArg::Pat(ref p) => {
@@ -4398,15 +4412,17 @@ where
                                                 "strict reserved word as an identifier".to_string(),
                                             ));
                                         }
-                                        params2.push(FuncArg::Pat(Pat::Ident(resast::Ident::from(
-                                            "yield",
-                                        ))));
+                                        params2.push(FuncArg::Pat(Pat::Ident(
+                                            resast::Ident::from("yield"),
+                                        )));
                                         continue;
                                     }
-                                },
-                                Expr::Await(_) => {
-                                    return Err(Error::UnexpectedToken(pos, "await is invalid in a default expression for a function arg".to_string()))
-                                },
+                                }
+                                Expr::Await(_) => return Err(Error::UnexpectedToken(
+                                    pos,
+                                    "await is invalid in a default expression for a function arg"
+                                        .to_string(),
+                                )),
                                 _ => (),
                             }
                         }
@@ -4424,17 +4440,18 @@ where
                                                 "strict reserved word as an identifier".to_string(),
                                             ));
                                         }
-                                        params2.push(FuncArg::Expr(Expr::Ident(resast::Ident::from(
-                                            "yield",
-                                        ))));
+                                        params2.push(FuncArg::Expr(Expr::Ident(
+                                            resast::Ident::from("yield"),
+                                        )));
                                         continue;
                                     }
-                                },
-                                Expr::Await(_) => {
-                                    return Err(Error::UnexpectedToken(pos, "await is invalid in a default expression for a function arg".to_string()))
                                 }
+                                Expr::Await(_) => return Err(Error::UnexpectedToken(
+                                    pos,
+                                    "await is invalid in a default expression for a function arg"
+                                        .to_string(),
+                                )),
                                 _ => (),
-
                             }
                         }
                     }
@@ -5302,7 +5319,11 @@ where
                 self.expect_comma_sep()?;
                 if self.at_punct(Punct::CloseParen) {
                     if spread {
-                        return Err(Error::UnexpectedToken(comma_position, "trailing comma in function args after a rest parameter is illegal".to_string()))
+                        return Err(Error::UnexpectedToken(
+                            comma_position,
+                            "trailing comma in function args after a rest parameter is illegal"
+                                .to_string(),
+                        ));
                     }
                     break;
                 }
