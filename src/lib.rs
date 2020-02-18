@@ -2996,6 +2996,7 @@ where
                             "BigInt cannot be uses as an object Lit key",
                         );
                     }
+                    self.octal_literal_guard(&item.span)?;
                     Lit::number_from(self.get_string(&item.span)?)
                 }
                 _ => return Err(self.reinterpret_error("number or string", "Lit")),
@@ -3041,6 +3042,25 @@ where
                 ],
             )
         }
+    }
+
+    fn octal_literal_guard(&mut self, span: &Span) -> Res<()> {
+        if self.context.strict {
+            let mut chars = self.get_string(span)?.chars();
+            if let Some(first) = chars.next() {
+                if first == '0' {
+                    if let Some(second) = chars.next() {
+                        if second.is_digit(10) {
+                            return self.unexpected_token_error(
+                                &self.look_ahead,
+                                "numbers cannot have a leading zero in strict mode",
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     #[inline]
@@ -3090,23 +3110,13 @@ where
             let lit = match item.token {
                 Token::Number(_) => {
                     let mut span = item.span;
-                    let start = item.location.start;
                     if self.at_big_int_flag() {
                         span.end += 1;
                         // Consume the ident
                         let _n = self.next_item();
                     }
+                    self.octal_literal_guard(&span)?;
                     let inner = self.get_string(&span)?;
-                    if self.context.strict {
-                        let mut chars = inner.chars();
-                        if let Some('0') = chars.next() {
-                            if let Some(two) = chars.next() {
-                                if two.is_digit(10) {
-                                    return Err(Error::OctalLiteral(start));
-                                }
-                            }
-                        }
-                    }
                     Lit::number_from(inner)
                 }
                 Token::String(sl) => {
@@ -3657,6 +3667,7 @@ where
             if !is_tagged && cooked.contains_octal_escape {
                 return Err(Error::OctalLiteral(item.location.start));
             }
+
             if !is_tagged && cooked.contains_invalid_unicode_escape {
                 return Err(Error::InvalidEscape(
                     item.location.start,
