@@ -669,6 +669,18 @@ function f(a) {
     .unwrap();
 }
 
+#[test]
+#[should_panic]
+fn strict_mode_string_oct_lit() {
+    run_test("'use strict';'\\08'", false).unwrap();
+}
+
+#[test]
+#[should_panic]
+fn strict_mode_after_oct_escape() {
+    run_test(r#"'\07'; 'use strict';"#, false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;

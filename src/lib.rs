@@ -140,6 +140,10 @@ struct Context<'a> {
     past_prolog: bool,
     /// If we encounter an error, the iterator should stop
     errored: bool,
+    /// If we find a directive with an octal escape
+    /// we need to error if a 'use strict' directive
+    /// is then found
+    found_directive_octal_escape: bool,
 }
 
 impl Default for Config {
@@ -172,6 +176,7 @@ impl<'a> Default for Context<'a> {
             has_line_term: false,
             past_prolog: false,
             errored: false,
+            found_directive_octal_escape: false,
         }
     }
 }
@@ -438,13 +443,26 @@ where
         let expr = self.parse_expression()?;
         if let Expr::Lit(lit) = expr {
             if let Lit::String(s) = lit {
-                self.context.strict = self.context.strict || s.inner_matches("use strict");
+                if let Token::String(quoted) = &orig.token {
+                    let (contents, oct) = match &quoted {
+                        ress::prelude::StringLit::Double(inner)
+                        | ress::prelude::StringLit::Single(inner) => {
+                            (inner.content, inner.contains_octal_escape)
+                        }
+                    };
+                    self.context.strict = self.context.strict || contents == "use strict";
+                    self.context.found_directive_octal_escape =
+                        self.context.found_directive_octal_escape || oct;
+                }
                 debug!(
                     "updated context.strict to {}, allowed?: {}",
                     self.context.strict, self.context.allow_strict_directive
                 );
                 if !self.context.allow_strict_directive && self.context.strict {
                     return self.unexpected_token_error(&orig, "use strict in an invalid location");
+                }
+                if self.context.strict && self.context.found_directive_octal_escape {
+                    return Err(Error::OctalLiteral(orig.location.start));
                 }
                 self.consume_semicolon()?;
                 Ok(ProgramPart::Dir(Dir {
@@ -862,10 +880,12 @@ where
         match &item.token {
             Token::String(ref sl) => Ok(match sl {
                 ress::prelude::StringLit::Double(ref s) => {
-                    resast::prelude::Lit::double_string_from(s)
+                    self.octal_literal_guard_string(s.contains_octal_escape, item.location.start)?;
+                    resast::prelude::Lit::double_string_from(s.content)
                 }
                 ress::prelude::StringLit::Single(ref s) => {
-                    resast::prelude::Lit::single_string_from(s)
+                    self.octal_literal_guard_string(s.contains_octal_escape, item.location.start)?;
+                    resast::prelude::Lit::single_string_from(s.content)
                 }
             }),
             _ => self.expected_token_error(&item, &["[string]"]),
@@ -2229,6 +2249,7 @@ where
         let params = formal_params.params;
         let prev_strict = self.context.strict;
         let prev_allow_strict = self.context.allow_strict_directive;
+        let prev_oct = self.context.found_directive_octal_escape;
         self.context.allow_strict_directive = formal_params.simple;
         let body = self.parse_function_source_el()?;
         if self.context.strict && formal_params.found_restricted {
@@ -2249,6 +2270,7 @@ where
             return self.expected_token_error(&self.look_ahead, &[]);
         }
         self.context.strict = prev_strict;
+        self.context.found_directive_octal_escape = prev_oct;
         self.context.allow_strict_directive = prev_allow_strict;
         self.context.allow_await = prev_await;
         self.context.allow_yield = prev_yield;
@@ -2337,6 +2359,7 @@ where
         self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_func_params()?;
         let prev_strict = self.context.strict;
+        let prev_oct = self.context.found_directive_octal_escape;
         let prev_allow_strict = self.context.allow_strict_directive;
         self.context.allow_strict_directive = params.simple;
 
@@ -2351,6 +2374,7 @@ where
             return self.expected_token_error(&self.look_ahead, &[]);
         }
         self.context.strict = prev_strict;
+        self.context.found_directive_octal_escape = prev_oct;
         self.context.allow_strict_directive = prev_allow_strict;
         self.context.allow_await = prev_await;
         self.context.allow_yield = prev_yield;
@@ -2429,6 +2453,7 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         let prev_strict = self.context.strict;
+        let prev_oct = self.context.found_directive_octal_escape;
         self.context.strict = true;
         self.expect_keyword(Keyword::Class(()))?;
         let start = self.look_ahead_position;
@@ -2476,6 +2501,7 @@ where
         let body = self.parse_class_body()?;
 
         self.context.strict = prev_strict;
+        self.context.found_directive_octal_escape = prev_oct;
         Ok(Class {
             id,
             super_class,
@@ -2865,6 +2891,7 @@ where
         self.context.is_assignment_target = false;
         self.context.is_binding_element = false;
         let prev_strict = self.context.strict;
+        let prev_oct = self.context.found_directive_octal_escape;
         let prev_allow_strict = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
         let start = self.look_ahead.clone();
@@ -2875,6 +2902,7 @@ where
             self.unexpected_token_error(&start, "restricted ident")?;
         }
         self.context.strict = prev_strict;
+        self.context.found_directive_octal_escape = prev_oct;
         self.context.allow_strict_directive = prev_allow_strict;
         Ok(body)
     }
@@ -2942,6 +2970,7 @@ where
         self.context.is_assignment_target = false;
         self.context.is_binding_element = false;
         let prev_strict = self.context.strict;
+        let prev_oct = self.context.found_directive_octal_escape;
         let prev_allow = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
         let start_pos = self.look_ahead_position;
@@ -2955,6 +2984,7 @@ where
             ))?;
         }
         self.context.strict = prev_strict;
+        self.context.found_directive_octal_escape = prev_oct;
         self.context.allow_strict_directive = prev_allow;
         self.remove_scope();
         Ok(ret)
@@ -2981,13 +3011,22 @@ where
                 _ => false,
             }
         {
-            // if item.token.is_oct_Lit() {
-            //     //FIXME: possible tolerable error
-            // }
             let id = match &item.token {
                 Token::String(ref sl) => match sl {
-                    ress::prelude::StringLit::Single(s) => Lit::single_string_from(s),
-                    ress::prelude::StringLit::Double(s) => Lit::double_string_from(s),
+                    ress::prelude::StringLit::Single(s) => {
+                        self.octal_literal_guard_string(
+                            s.contains_octal_escape,
+                            item.location.start,
+                        )?;
+                        Lit::single_string_from(s.content)
+                    }
+                    ress::prelude::StringLit::Double(s) => {
+                        self.octal_literal_guard_string(
+                            s.contains_octal_escape,
+                            item.location.start,
+                        )?;
+                        Lit::double_string_from(s.content)
+                    }
                 },
                 Token::Number(_) => {
                     if self.at_big_int_flag() {
@@ -3042,6 +3081,13 @@ where
                 ],
             )
         }
+    }
+
+    fn octal_literal_guard_string(&self, has_octal: bool, pos: Position) -> Res<()> {
+        if self.context.strict && has_octal {
+            return Err(Error::OctalLiteral(pos));
+        }
+        Ok(())
     }
 
     fn octal_literal_guard(&mut self, span: &Span) -> Res<()> {
@@ -3122,10 +3168,18 @@ where
                 Token::String(sl) => {
                     let inner = match sl {
                         ress::prelude::StringLit::Single(ref s) => {
-                            resast::prelude::StringLit::single_from(s)
+                            self.octal_literal_guard_string(
+                                s.contains_octal_escape,
+                                item.location.start,
+                            )?;
+                            resast::prelude::StringLit::single_from(s.content)
                         }
                         ress::prelude::StringLit::Double(ref d) => {
-                            resast::prelude::StringLit::double_from(d)
+                            self.octal_literal_guard_string(
+                                d.contains_octal_escape,
+                                item.location.start,
+                            )?;
+                            resast::prelude::StringLit::double_from(d.content)
                         }
                     };
                     Lit::String(inner)
@@ -3668,7 +3722,9 @@ where
                 return Err(Error::OctalLiteral(item.location.start));
             }
 
-            if !is_tagged && cooked.contains_invalid_unicode_escape {
+            if !is_tagged
+                && (cooked.contains_invalid_unicode_escape || cooked.contains_invalid_hex_escape)
+            {
                 return Err(Error::InvalidEscape(
                     item.location.start,
                     "Invalid unicode escape in template literal".to_string(),
@@ -3741,6 +3797,7 @@ where
         }
         found_restricted = found_restricted || formal_params.found_restricted;
         let prev_strict = self.context.strict;
+        let prev_oct = self.context.found_directive_octal_escape;
         let prev_allow_strict_directive = self.context.allow_strict_directive;
         self.context.allow_strict_directive = formal_params.simple;
         let start = self.look_ahead.clone();
@@ -3763,6 +3820,7 @@ where
             }
         }
         self.context.strict = prev_strict;
+        self.context.found_directive_octal_escape = prev_oct;
         self.context.allow_strict_directive = prev_allow_strict_directive;
         self.context.allow_yield = prev_yield;
         self.context.allow_await = prev_await;
