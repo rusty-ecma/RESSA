@@ -318,7 +318,10 @@ impl<'a> DuplicateNameDetector<'a> {
     }
 
     pub fn get_undefined_exports(&self) -> Vec<String> {
-        self.undefined_module_exports.iter().map(|n| n.to_string()).collect()
+        self.undefined_module_exports
+            .iter()
+            .map(|n| n.to_string())
+            .collect()
     }
 }
 

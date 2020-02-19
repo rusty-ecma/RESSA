@@ -681,6 +681,17 @@ fn strict_mode_after_oct_escape() {
     run_test(r#"'\07'; 'use strict';"#, false).unwrap();
 }
 
+#[test]
+fn obj_init_arg() {
+    run_test("({a = 2}) => a", false).unwrap();
+}
+
+#[test]
+#[should_panic]
+fn obj_init_prop_init() {
+    run_test("({a = 2})", false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;

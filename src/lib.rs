@@ -77,13 +77,22 @@ use formal_params::FormalParams;
 use lexical_names::DeclKind;
 use resast::prelude::*;
 use resast::ClassBody;
-use std::{collections::HashSet, mem::replace};
+use std::{
+    collections::{HashMap, HashSet},
+    mem::replace,
+};
 
 /// The current configuration options.
 /// This will most likely increase over time
 struct Config {
     /// whether or not to tolerate a subset of errors
     tolerant: bool,
+}
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum LabelKind {
+    Iteration,
+    Other,
+    Unknown,
 }
 
 /// The current parsing context.
@@ -127,7 +136,7 @@ struct Context<'a> {
     /// to labels only, not all identifiers. Errors
     /// at that level would need to be handled by
     /// the calling scope
-    label_set: HashSet<&'a str>,
+    label_set: HashMap<&'a str, LabelKind>,
     /// If the current scope has a `'use strict';` directive
     /// in the prelude
     strict: bool,
@@ -170,7 +179,7 @@ impl<'a> Default for Context<'a> {
             in_function_body: false,
             in_iteration: false,
             in_switch: false,
-            label_set: HashSet::new(),
+            label_set: HashMap::new(),
             strict: false,
             lexical_names: lexical_names::DuplicateNameDetector::default(),
             has_line_term: false,
@@ -483,7 +492,7 @@ where
     /// statement or declaration (import/export/function/const/let/class)
     /// otherwise we move on to `Parser::parse_statement`
     #[inline]
-    fn parse_statement_list_item(&mut self, ctx: Option<StmtCtx>) -> Res<ProgramPart<'b>> {
+    fn parse_statement_list_item(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<ProgramPart<'b>> {
         debug!("{}: parse_statement_list_item", self.look_ahead.span.start);
         self.context.is_assignment_target = true;
         self.context.is_binding_element = true;
@@ -665,6 +674,9 @@ where
             };
             (imported, local)
         };
+        self.context
+            .lexical_names
+            .declare(local.name.clone(), DeclKind::Lex(true), start)?;
         if local.name == "arguments" || local.name == "eval" {
             return Err(Error::StrictModeArgumentsOrEval(start));
         }
@@ -681,13 +693,21 @@ where
             return self.expected_token_error(&self.look_ahead, &["as"]);
         }
         let _ = self.next_item()?;
+        let start = self.look_ahead_position;
         let ident = self.parse_ident_name()?;
+        self.context
+            .lexical_names
+            .declare(ident.name.clone(), DeclKind::Lex(true), start)?;
         Ok(ImportSpecifier::Namespace(ident))
     }
 
     #[inline]
     fn parse_import_default_specifier(&mut self) -> Res<ImportSpecifier<'b>> {
+        let start = self.look_ahead_position;
         let ident = self.parse_ident_name()?;
+        self.context
+            .lexical_names
+            .declare(ident.name.clone(), DeclKind::Lex(true), start)?;
         Ok(ImportSpecifier::Default(ident))
     }
 
@@ -717,6 +737,10 @@ where
                     );
                 }
             }
+            self.context.lexical_names.add_export_ident(
+                &resast::prelude::Ident::from("default"),
+                self.look_ahead_position,
+            )?;
             let decl = if self.at_keyword(Keyword::Function(())) {
                 return self.parse_export_decl_func(true);
             } else if self.at_keyword(Keyword::Class(())) {
@@ -802,12 +826,17 @@ where
             let mut specifiers = Vec::new();
             let mut found_default = false;
             while !self.at_punct(Punct::CloseBrace) {
-                if self.at_keyword(Keyword::Default(())) {
-                    found_default = true;
-                }
+                let is_default = self.at_keyword(Keyword::Default(()));
+                found_default = found_default || is_default;
                 let start = self.look_ahead_position;
                 let spec = self.parse_export_specifier()?;
-                self.context.lexical_names.add_export_spec(&spec, start)?;
+                if is_default {
+                    self.context
+                        .lexical_names
+                        .add_export_ident(&resast::prelude::Ident::from("default"), start)?;
+                } else {
+                    self.context.lexical_names.add_export_spec(&spec, start)?;
+                }
                 specifiers.push(spec);
                 if !self.at_punct(Punct::CloseBrace) {
                     self.expect_punct(Punct::Comma)?;
@@ -819,7 +848,9 @@ where
                 let source = self.parse_module_specifier()?;
                 self.consume_semicolon()?;
                 for spec in &specifiers {
-                    self.context.lexical_names.removed_undefined_export(&spec.local);
+                    self.context
+                        .lexical_names
+                        .removed_undefined_export(&spec.local);
                 }
                 let decl = NamedExportDecl::Specifier(specifiers, Some(source));
                 Ok(ModExport::Named(decl))
@@ -896,7 +927,7 @@ where
     }
 
     #[inline]
-    fn parse_statement(&mut self, ctx: Option<StmtCtx>) -> Res<Stmt<'b>> {
+    fn parse_statement(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_statement {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -935,6 +966,12 @@ where
                     let f = self.parse_function_decl(true)?;
                     Stmt::Expr(Expr::Func(f))
                 } else {
+                    if let Some(StmtCtx::Label(name)) = ctx {
+                        self.context
+                            .label_set
+                            .entry(&name)
+                            .and_modify(|k| *k = LabelKind::Other);
+                    }
                     self.parse_labelled_statement()?
                 }
             }
@@ -948,8 +985,24 @@ where
                     Stmt::Continue(self.parse_continue_stmt(k)?)
                 }
                 Keyword::Debugger(k) => self.parse_debugger_stmt(k)?,
-                Keyword::Do(_) => Stmt::DoWhile(self.parse_do_while_stmt()?),
-                Keyword::For(_) => self.parse_for_stmt()?,
+                Keyword::Do(_) => {
+                    if let Some(StmtCtx::Label(name)) = ctx {
+                        self.context
+                            .label_set
+                            .entry(&name)
+                            .and_modify(|k| *k = LabelKind::Iteration);
+                    }
+                    Stmt::DoWhile(self.parse_do_while_stmt()?)
+                }
+                Keyword::For(_) => {
+                    if let Some(StmtCtx::Label(name)) = ctx {
+                        self.context
+                            .label_set
+                            .entry(&name)
+                            .and_modify(|k| *k = LabelKind::Iteration);
+                    }
+                    self.parse_for_stmt()?
+                }
                 Keyword::Function(_) => {
                     let f = self.parse_fn_stmt(ctx.is_none())?;
                     let expr = Expr::Func(f);
@@ -961,7 +1014,15 @@ where
                 Keyword::Throw(_) => Stmt::Throw(self.parse_throw_stmt()?),
                 Keyword::Try(_) => Stmt::Try(self.parse_try_stmt()?),
                 Keyword::Var(_) => self.parse_var_stmt()?,
-                Keyword::While(_) => Stmt::While(self.parse_while_stmt()?),
+                Keyword::While(_) => {
+                    if let Some(StmtCtx::Label(name)) = ctx {
+                        self.context
+                            .label_set
+                            .entry(&name)
+                            .and_modify(|k| *k = LabelKind::Iteration);
+                    }
+                    Stmt::While(self.parse_while_stmt()?)
+                }
                 Keyword::With(_) => Stmt::With(self.parse_with_stmt()?),
                 Keyword::Yield(_) if !self.context.strict => self.parse_labelled_statement()?,
                 _ => Stmt::Expr(self.parse_expression_statement()?),
@@ -1828,9 +1889,17 @@ where
             self.look_ahead.span.start
         );
         self.expect_keyword(k)?;
+        let start = self.look_ahead_position;
         let ret = if self.look_ahead.token.is_ident() && !self.context.has_line_term {
             let id = self.parse_var_ident(false)?;
-            if !self.context.label_set.contains(&*id.name) {
+            if let Some(label_kind) = self.context.label_set.get(&*id.name) {
+                if k == Keyword::Continue(()) && label_kind != &LabelKind::Iteration {
+                    return Err(Error::ContinueOfNotIterationLabel(
+                        start,
+                        id.name.to_string(),
+                    ));
+                }
+            } else {
                 return Err(Error::UnknownOptionalLabel(
                     self.current_position,
                     k,
@@ -1883,7 +1952,13 @@ where
                 } else {
                     return Err(self.reinterpret_error("expression", "ident"));
                 };
-                if !self.context.label_set.insert(self.get_string(&start)?) {
+                let label_str = self.get_string(&start)?;
+                if self
+                    .context
+                    .label_set
+                    .insert(label_str, LabelKind::Unknown)
+                    .is_some()
+                {
                     return Err(self.redecl_error(&id.name));
                 }
                 let body = if self.at_keyword(Keyword::Class(())) {
@@ -1911,7 +1986,7 @@ where
                     let expr = Expr::Func(f);
                     Stmt::Expr(expr)
                 } else {
-                    self.parse_statement(Some(StmtCtx::Label))?
+                    self.parse_statement(Some(StmtCtx::Label(label_str)))?
                 };
                 self.context.label_set.remove(&self.get_string(&start)?);
                 return Ok(Stmt::Labeled(LabeledStmt {
@@ -2431,7 +2506,7 @@ where
         let prev_iter = self.context.in_iteration;
         let prev_switch = self.context.in_switch;
         let prev_in_fn = self.context.in_function_body;
-        self.context.label_set = HashSet::new();
+        self.context.label_set = HashMap::new();
         self.context.in_iteration = false;
         self.context.in_switch = false;
         self.context.in_function_body = true;
@@ -3378,6 +3453,14 @@ where
                         return Ok(Expr::ArrowParamPlaceHolder(args, false));
                     } else {
                         return Ok(Expr::ArrowParamPlaceHolder(vec![FuncArg::Expr(ex)], false));
+                    }
+                }
+                if let Expr::Obj(_) = &ex {
+                    if let Some(item) = &self.context.first_covert_initialized_name_error {
+                        return Err(Error::UnexpectedToken(
+                            item.location.start,
+                            item.token.to_string(),
+                        ));
                     }
                 }
                 Ok(ex)
@@ -6094,11 +6177,11 @@ where
                         let names = self.context.lexical_names.get_undefined_exports();
                         self.context.errored = true;
                         self.found_eof = true;
-                        return Err(Error::UndefinedExports(names))
+                        return Err(Error::UndefinedExports(names));
                     }
                 }
                 p
-            },
+            }
             Err(e) => {
                 self.context.errored = true;
                 return Err(e);
@@ -6123,11 +6206,11 @@ where
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum StmtCtx {
+enum StmtCtx<'a> {
     Do,
     For,
     If,
-    Label,
+    Label(&'a str),
     While,
     With,
 }
