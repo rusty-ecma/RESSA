@@ -1571,10 +1571,18 @@ where
                 };
                 let left = LoopLeft::Expr(Expr::ident_from(k));
                 let right = self.parse_expression()?;
+                let body_start = self.look_ahead_position;
+                let body = self.parse_loop_body()?;
+                if Self::is_labeled_func(&body) {
+                    return Err(Error::InvalidFuncPosition(
+                        body_start,
+                        "Loop body cannot be a function or labeled function".to_string(),
+                    ));
+                }
                 Ok(Stmt::ForIn(ForInStmt {
                     left,
                     right,
-                    body: Box::new(self.parse_loop_body()?),
+                    body: Box::new(body),
                 }))
             } else {
                 let prev_in = self.context.allow_in;
@@ -1640,7 +1648,14 @@ where
                 lhs::check_loop_head_expr(&init, init_start)?;
                 let left = LoopLeft::Expr(init);
                 let right = self.parse_expression()?;
+                let body_start = self.look_ahead_position;
                 let body = self.parse_loop_body()?;
+                if Self::is_labeled_func(&body) {
+                    return Err(Error::InvalidFuncPosition(
+                        body_start,
+                        "Loop body cannot be a function or labeled function".to_string(),
+                    ));
+                }
                 Ok(Stmt::ForIn(ForInStmt {
                     left,
                     right,
@@ -2381,12 +2396,15 @@ where
         } else {
             false
         };
+        let mut id_is_restricted = false;
+        let id_start = self.look_ahead_position;
         let id = if is_stmt {
             if opt_id && !self.look_ahead.token.is_ident() {
                 None
             } else {
+                id_is_restricted = self.look_ahead.token.is_restricted();
                 let start = self.look_ahead_position;
-                if self.context.strict && self.look_ahead.token.is_restricted() {
+                if self.context.strict && id_is_restricted {
                     return Err(Error::RestrictedIdent(start));
                 }
                 let id = self.parse_var_ident(false)?;
@@ -2436,20 +2454,29 @@ where
         let param_start = self.look_ahead_position;
         self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_func_params()?;
+        debug!(
+            "any params restricted? {}, {}",
+            params.found_restricted, params.strict
+        );
         let prev_strict = self.context.strict;
         let prev_oct = self.context.found_directive_octal_escape;
         let prev_allow_strict = self.context.allow_strict_directive;
         self.context.allow_strict_directive = params.simple;
 
         let body = self.parse_function_source_el()?;
-        if !prev_strict && self.context.strict && formal_params::have_duplicates(&params.params) {
-            return Err(Error::InvalidParameter(
-                param_start,
-                "Duplicate parameter in function who's body is strict".to_string(),
-            ));
-        }
-        if self.context.strict && params.strict {
-            return self.expected_token_error(&self.look_ahead, &[]);
+        if !prev_strict && self.context.strict {
+            if formal_params::have_duplicates(&params.params) {
+                return Err(Error::InvalidParameter(
+                    param_start,
+                    "Duplicate parameter in function who's body is strict".to_string(),
+                ));
+            }
+            if params.found_restricted {
+                return Err(Error::StrictModeArgumentsOrEval(param_start));
+            }
+            if id_is_restricted {
+                return Err(Error::StrictModeArgumentsOrEval(id_start));
+            }
         }
         self.context.strict = prev_strict;
         self.context.found_directive_octal_escape = prev_oct;
@@ -3889,10 +3916,7 @@ where
         let start = self.look_ahead.clone();
         let body = self.parse_function_source_el()?;
         if self.context.strict && found_restricted {
-            //TODO: Double check this
-            if !self.config.tolerant {
-                return self.unexpected_token_error(&start, "restricted ident in strict context");
-            }
+            return self.unexpected_token_error(&start, "restricted ident in strict context");
         }
         if !prev_strict && self.context.strict {
             if formal_params::have_duplicates(&formal_params.params) {
@@ -4164,6 +4188,7 @@ where
             let ident = self.parse_var_ident(is_var)?;
             let restricted = ident.name == "eval" || ident.name == "arguments";
             params.push(self.look_ahead.clone());
+            debug!("found restricted ident? {} {}", restricted, &ident.name);
             Ok((restricted, Pat::Ident(ident)))
         }
     }
@@ -5455,6 +5480,8 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         self.expect_punct(Punct::OpenParen)?;
+        let prev_await = self.context.allow_await;
+        self.context.allow_await = false;
         let mut ret = Vec::new();
         if !self.at_punct(Punct::CloseParen) {
             loop {
@@ -5485,6 +5512,7 @@ where
             }
         }
         self.expect_punct(Punct::CloseParen)?;
+        self.context.allow_await = prev_await;
         Ok(ret)
     }
     /// Parse an argument of an async function
