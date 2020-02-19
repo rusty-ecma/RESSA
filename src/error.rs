@@ -40,6 +40,7 @@ pub enum Error {
     ForOfNotSimple(Position),
     InvalidStartOfExpressionStmt(Position, String),
     DuplicateExport(Position, String),
+    UndefinedExports(Vec<String>),
     Scanner(ress::error::Error),
     Other(Box<dyn ::std::error::Error>),
 }
@@ -85,6 +86,7 @@ impl Display for Error {
             Error::ForOfNotSimple(ref pos) => write!(f, "initializer of a for-of loop must be a simple assignment target {}", pos),
             Error::InvalidStartOfExpressionStmt(ref pos, ref token) => write!(f, "Expression statement cannot start with {} at {}", token, pos),
             Error::DuplicateExport(ref pos, ref token) => write!(f, "Found duplicate export with name {} at {}", token, pos),
+            Error::UndefinedExports(ref names) => write!(f, "Undefined exports in module: {}", names.join(", ")),
             Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
             Error::Other(ref e) => write!(f, "{}", e),
         }

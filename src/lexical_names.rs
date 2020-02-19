@@ -294,6 +294,10 @@ impl<'a> DuplicateNameDetector<'a> {
         Ok(())
     }
 
+    pub fn removed_undefined_export(&mut self, id: &Ident<'a>) {
+        self.undefined_module_exports.remove(&id.name);
+    }
+
     pub fn add_export_ident(&mut self, id: &Ident<'a>, pos: Position) -> Res<()> {
         if !self.exports.insert(id.name.clone()) {
             Err(Error::DuplicateExport(pos, id.name.to_string()))
@@ -307,6 +311,14 @@ impl<'a> DuplicateNameDetector<'a> {
         if !self.var.has_at(0, &id) && !self.lex.has_at(0, &id) {
             self.undefined_module_exports.insert(id);
         }
+    }
+
+    pub fn has_undefined_exports(&self) -> bool {
+        !self.undefined_module_exports.is_empty()
+    }
+
+    pub fn get_undefined_exports(&self) -> Vec<String> {
+        self.undefined_module_exports.iter().map(|n| n.to_string()).collect()
     }
 }
 

@@ -818,6 +818,9 @@ where
                 let _ = self.next_item()?;
                 let source = self.parse_module_specifier()?;
                 self.consume_semicolon()?;
+                for spec in &specifiers {
+                    self.context.lexical_names.removed_undefined_export(&spec.local);
+                }
                 let decl = NamedExportDecl::Specifier(specifiers, Some(source));
                 Ok(ModExport::Named(decl))
             } else if found_default {
@@ -6085,7 +6088,17 @@ where
             }
         }
         let ret = match self.parse_statement_list_item(None) {
-            Ok(p) => p,
+            Ok(p) => {
+                if self.context.is_module && self.look_ahead.is_eof() {
+                    if self.context.lexical_names.has_undefined_exports() {
+                        let names = self.context.lexical_names.get_undefined_exports();
+                        self.context.errored = true;
+                        self.found_eof = true;
+                        return Err(Error::UndefinedExports(names))
+                    }
+                }
+                p
+            },
             Err(e) => {
                 self.context.errored = true;
                 return Err(e);
