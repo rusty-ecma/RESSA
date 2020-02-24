@@ -698,6 +698,12 @@ fn strict_fn_body_arguments_as_arg() {
     run_test("function a(arguments) { 'use strict'; }", false).unwrap();
 }
 
+#[test]
+#[should_panic]
+fn dupe_ident_in_loop_left() {
+    run_test("for (const [a, a] of []);", false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;

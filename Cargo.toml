@@ -31,6 +31,7 @@ serialization = ["resast/serialization"]
 esprima = ["resast/esprima"]
 moz_central = ["walkdir"]
 test_262 = ["indicatif", "rayon", "pulldown-cmark"]
+test_262_parser = ["indicatif", "rayon", "pulldown-cmark"]
 
 [dev-dependencies]
 term-painter = "0.2.4"

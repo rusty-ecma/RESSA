@@ -4,6 +4,7 @@
 
 use crate::{Error, Position};
 use resast::prelude::*;
+use std::{collections::HashSet, borrow::Cow};
 type Res = Result<(), Error>;
 
 pub fn is_simple_expr<'a>(expr: &Expr<'a>) -> bool {
@@ -148,32 +149,104 @@ fn check_prop<'a>(prop: &Prop<'a>, allow_let: bool, pos: Position, strict: bool)
     }
 }
 
-pub fn check_loop_head_expr<'a>(left: &Expr<'a>, pos: Position) -> Res {
+pub fn check_loop_left<'a>(left: &LoopLeft<'a>, pos: Position) -> Res {
+    let mut set = HashSet::new();
     match left {
-        Expr::Array(ref a) => check_binding_array(a, pos),
-        Expr::Obj(ref o) => check_binding_obj(o, pos),
+        LoopLeft::Expr(expr) => check_loop_left_expr(expr, pos, &mut set),
+        LoopLeft::Pat(pat) => check_loop_left_pat(pat, pos, &mut set),
+        LoopLeft::Variable(kind, decls) => {
+            if let VarKind::Var = kind {
+                Ok(())
+            } else {
+                check_loop_left_pat(&decls.id, pos, &mut set)
+            }
+        }, 
+    }
+}
+
+pub fn check_loop_head_expr<'a>(left: &Expr<'a>, pos: Position) -> Res {
+    debug!("check_loop_head_expr");
+    let mut set = HashSet::new();
+    match left {
+        Expr::Array(ref a) => check_binding_array(a, pos, &mut set),
+        Expr::Obj(ref o) => check_binding_obj(o, pos, &mut set),
+        Expr::Assign(ref a) => check_loop_left_expr(&*a.right, pos, &mut set),
         _ => Ok(()),
     }
 }
-fn check_binding_obj<'a>(obj: &ObjExpr, pos: Position) -> Res {
+
+fn check_binding_obj<'a>(obj: &[ObjProp<'a>], pos: Position, set: &mut HashSet<Cow<'a, str>>) -> Res {
+    debug!("check_binding_obj");
     for part in obj {
         if let ObjProp::Prop(prop) = part {
             if prop.method || prop.kind == PropKind::Method {
                 return Err(Error::InvalidLHS(pos));
             }
+            check_loop_left_prop_key(&prop.key, pos, set)?;
         }
     }
     Ok(())
 }
-pub fn check_binding_array<'a>(a: &ArrayExpr, pos: Position) -> Res {
+
+pub fn check_binding_array<'a>(a: &[Option<Expr<'a>>], pos: Position, set: &mut HashSet<Cow<'a, str>>) -> Res {
+    debug!("check_binding_array");
     for part in a {
         if let Some(part) = &part {
             if let Expr::Sequence(_) = part {
                 return Err(Error::InvalidLHS(pos));
             }
+            check_loop_left_expr(part, pos, set)?;
         }
     }
     Ok(())
+}
+
+fn check_loop_left_prop_key<'a>(prop: &PropKey<'a>, pos: Position, set: &mut HashSet<Cow<'a, str>>) -> Res {
+    debug!("check_loop_left_prop_key");
+    match prop {
+        PropKey::Expr(expr) => check_loop_left_expr(expr, pos, set),
+        PropKey::Pat(pat) => check_loop_left_pat(pat, pos, set),
+        _ => Err(Error::InvalidLHS(pos)),
+    }
+}
+
+fn check_loop_left_expr<'a>(expr: &Expr<'a>, pos: Position, set: &mut HashSet<Cow<'a, str>>) -> Res {
+    debug!("check_loop_left_expr");
+    match expr {
+        Expr::Ident(ident) => {
+            if !set.insert(ident.name.clone()) {
+                Err(Error::InvalidLHS(pos))
+            } else {
+                Ok(())
+            }
+        },
+        _ => Ok(())
+    }
+}
+
+fn check_loop_left_pat<'a>(pat: &Pat<'a>, pos: Position, set: &mut HashSet<Cow<'a, str>>) -> Res {
+    debug!("check_loop_left_pat");
+    match pat {
+        Pat::Ident(ident) => {
+            if !set.insert(ident.name.clone()) {
+                Err(Error::InvalidLHS(pos))
+            } else {
+                Ok(())
+            }
+        },
+        Pat::Array(a) => {
+            for p in a {
+                if let Some(p) = p {
+                    match p {
+                        ArrayPatPart::Expr(expr) => check_loop_left_expr(expr, pos, set)?,
+                        ArrayPatPart::Pat(pat) => check_loop_left_pat(pat, pos, set)?,
+                    }
+                }
+            }
+            Ok(())
+        }
+        _ => Ok(())
+    }
 }
 
 #[inline]

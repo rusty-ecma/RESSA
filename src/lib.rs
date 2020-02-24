@@ -1518,6 +1518,7 @@ where
                         return Err(Error::ForOfNotSimple(init_start));
                     }
                     let left = LoopLeft::Variable(kind, decl);
+                    lhs::check_loop_left(&left, init_start)?;
                     let stmt = self.parse_for_of_loop(left, is_await)?;
                     Ok(Stmt::ForOf(stmt))
                 } else {
@@ -1588,6 +1589,7 @@ where
                 let prev_in = self.context.allow_in;
                 self.context.allow_in = false;
                 let mut decls = self.parse_binding_list(var_kind, true)?;
+                debug!("{:?}", decls);
                 self.context.allow_in = prev_in;
                 if decls.len() == 1 {
                     let decl = if let Some(d) = decls.pop() {
@@ -1597,6 +1599,7 @@ where
                     };
                     if decl.init.is_none() && self.at_keyword(Keyword::In(())) {
                         let left = LoopLeft::Variable(var_kind, decl);
+                        lhs::check_loop_left(&left, init_start)?;
                         let _in = self.next_item()?;
                         let right = self.parse_expression()?;
                         let body_start = self.look_ahead_position;
@@ -1615,6 +1618,7 @@ where
                         }
                     } else if decl.init.is_none() && self.at_contextual_keyword("of") {
                         let left = LoopLeft::Variable(var_kind, decl);
+                        lhs::check_loop_left(&left, init_start)?;
                         Ok(Stmt::ForOf(self.parse_for_of_loop(left, is_await)?))
                     } else {
                         let init = LoopInit::Variable(var_kind, vec![decl]);

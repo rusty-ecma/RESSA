@@ -20,7 +20,7 @@ jobs:
     - name: unzip moz-central
       run: unzip -qq moz-central.zip -d moz-central
     - name: Run tests
-      run: cargo test --features moz_central
+      run: cargo test --features="moz_central,test_262"
       env:
         RUST_MIN_STACK: 9999999
     - name: rust-tarpaulin
