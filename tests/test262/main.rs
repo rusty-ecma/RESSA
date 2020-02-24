@@ -760,7 +760,6 @@ var \\u0079ield = 123;";
     }
 }
 
-
 #[cfg(feature = "test_262_parser")]
 mod parser {
 

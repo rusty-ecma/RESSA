@@ -20,3 +20,5 @@ To run these tests simple execute the following command.
 ```sh
 cargo test --features moz_central -- moz_central
 ```
+
+The 3rd set of tests are required for the Test262 Test Suite. 
