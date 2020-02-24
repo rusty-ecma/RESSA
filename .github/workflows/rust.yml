@@ -22,7 +22,7 @@ jobs:
     - name: curl Test262
       run: git clone https://github.com/tc39/test262 ./test262_full && mv ./test262_full/test ./test262
     - name: Run tests
-      run: cargo test --features="moz_central,test_262"
+      run: cargo test --features=moz_central,test_262
       env:
         RUST_MIN_STACK: 9999999
     - name: rust-tarpaulin
@@ -30,7 +30,7 @@ jobs:
       env: 
         RUST_MIN_STACK: 9999999
       with: 
-        args: --features="moz_central, test_262"
+        args: --features=moz_central,test_262
     - name: Upload to codecov.io
       uses: codecov/codecov-action@v1.0.2
       with:
