@@ -802,7 +802,7 @@ mod parser {
         );
         return false;
     }
-    
+
     fn report_cat_errors(name: &str, cat: &[String]) -> usize {
         if cat.is_empty() {
             return 0;
@@ -814,12 +814,12 @@ mod parser {
         eprintln!("\n----------\n");
         cat.len()
     }
-    
+
     fn run_category(paths: &[PathBuf], should_fail: bool) -> Vec<String> {
         let mut ret = Vec::new();
         for path in paths.iter() {
-            let js =
-                std::fs::read_to_string(&path).expect(&format!("failed to read {}", path.display()));
+            let js = std::fs::read_to_string(&path)
+                .expect(&format!("failed to read {}", path.display()));
             let is_mod = format!("{}", path.display()).contains("module");
             let mut p = match Parser::builder().js(&js).module(is_mod).build() {
                 Ok(p) => p,
@@ -845,8 +845,10 @@ mod parser {
         }
         ret
     }
-    
-    fn categorize_paths(paths: &[PathBuf]) -> (Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>) {
+
+    fn categorize_paths(
+        paths: &[PathBuf],
+    ) -> (Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>) {
         paths
             .into_iter()
             .fold((vec![], vec![], vec![], vec![]), |mut acc, path| {
