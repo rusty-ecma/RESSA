@@ -14,5 +14,7 @@ benchmark.md
 moz-central
 *.out
 *.log
+*.ron
 /test262
 /failures
+!tests/test262/hilight.js

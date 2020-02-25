@@ -1,5 +1,4 @@
 #![cfg(test)]
-use flate2::read::GzDecoder;
 use ressa::{Builder, Error};
 use std::path::Path;
 use walkdir::WalkDir;
@@ -12,7 +11,7 @@ static ESPARSE: &str = "node_modules/.bin/esparse";
 fn moz_central() {
     let moz_central_path = Path::new("./moz-central");
     if !moz_central_path.exists() {
-        get_moz_central_test_files(&moz_central_path);
+        panic!("Unable to run this test without the files in ./moz-central see CONTRIBUTING.md for more information");
     }
     let failures = walk(&moz_central_path);
     let fail_count = failures
@@ -36,7 +35,7 @@ fn moz_central() {
 fn walk(path: &Path) -> Vec<(String, bool)> {
     let mut ret = Vec::new();
     for file_path in WalkDir::new(path).into_iter() {
-        let file_path = file_path.unwrap();
+        let file_path = file_path.expect(&format!("Error for file {}", path.display()));
         if file_path.path().is_file() {
             let test = if let Some(ext) = file_path.path().extension() {
                 ext == "js"
@@ -89,13 +88,18 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                             Some(msg2)
                         } else {
                             let name = file_path.file_name();
-                            let mut out_path = Path::new("failures").join(name);
+                            let failures_path = Path::new("failures");
+                            if !failures_path.exists() {
+                                std::fs::create_dir_all(&failures_path)
+                                    .expect("Failed to create out path for failures");
+                            }
+                            let mut out_path = failures_path.join(name);
                             out_path.set_extension("json");
                             ::std::fs::write(
                                 &out_path,
                                 String::from_utf8_lossy(&op.stdout).to_string(),
                             )
-                            .unwrap();
+                            .expect(&format!("failed to wirte {}", out_path.display()));
                             None
                         }
                     }
@@ -123,6 +127,9 @@ fn run(file: &Path) -> Result<(), Error> {
         contents = format!("//{}", contents);
     }
     if let Some(first) = contents.lines().next() {
+        if first.contains("SyntaxError") {
+            return Ok(());
+        }
         if first.contains("error:InternalError")
         /*--> in last line*/
         {
@@ -136,18 +143,4 @@ fn run(file: &Path) -> Result<(), Error> {
         let _part = part?;
     }
     Ok(())
-}
-
-fn get_moz_central_test_files(path: &Path) {
-    let mut response = reqwest::get(
-        "https://hg.mozilla.org/mozilla-central/archive/tip.tar.gz/js/src/jit-test/tests/",
-    )
-    .expect("Failed to get zip of moz-central");
-    let mut buf = Vec::new();
-    response
-        .copy_to(&mut buf)
-        .expect("failed to copy to BzDecoder");
-    let gz = GzDecoder::new(buf.as_slice());
-    let mut t = tar::Archive::new(gz);
-    t.unpack(path).expect("Failed to unpack gz");
 }
