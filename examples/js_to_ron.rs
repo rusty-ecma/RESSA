@@ -2,6 +2,7 @@ extern crate ressa;
 use ressa::*;
 
 fn main() {
+    let _ = env_logger::try_init();
     let mut args = ::std::env::args();
     let _ = args.next().unwrap();
     let path = args.next().expect("One argument required");
@@ -11,8 +12,7 @@ fn main() {
     } else {
         false
     };
-    let mut b = Builder::new();
-    let mut p = b.module(module).js(&js).build().unwrap();
+    let mut p = Parser::builder().module(module).js(&js).build().unwrap();
     let ast = p.parse().unwrap();
     println!("{:#?}", ast);
 }

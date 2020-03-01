@@ -3,7 +3,7 @@ use super::{get_js_file, EverythingVersion, Lib};
 use env_logger;
 
 use crate::es_tokens;
-use ressa::{Builder, Parser};
+use ressa::Parser;
 #[test]
 fn es5() {
     let _ = env_logger::try_init();
@@ -22,17 +22,13 @@ fn es5() {
             if item != part {
                 let pos = p.next_position();
                 panic!(
-                    "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
+                    "Error, part {} doesn't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
                     i, item, part, pos.start.line, pos.start.column
                 )
             }
         }
         i += 1;
     }
-    // for (i, (item, part)) in p.zip(es_tokens::ES5.iter()).enumerate() {
-
-    //     // assert_eq!((i, &item), (i, part));
-    // }
 }
 
 #[test]
@@ -52,11 +48,11 @@ fn es2015_script() {
             };
             if item != part {
                 let pos = p.next_position();
-                ::std::fs::write("left.out", format!("{:#?}", item));
-                ::std::fs::write("right.out", format!("{:#?}", part));
+                let _ = ::std::fs::write("left.out", format!("{:#?}", item));
+                let _ = ::std::fs::write("right.out", format!("{:#?}", part));
                 panic!(
-                    "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
-                    i, item, part, pos.start.line, pos.start.column
+                    "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
+                    i, path, pos.start.line, pos.start.column, item, part,
                 )
             }
         }
@@ -70,8 +66,7 @@ fn es2015_module() {
     let _ = env_logger::try_init();
     let path = Lib::Everything(EverythingVersion::Es2015Module).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
-    let mut b = Builder::new();
-    let mut p = b
+    let mut p = Parser::builder()
         .module(true)
         .js(&js)
         .build()
@@ -86,11 +81,11 @@ fn es2015_module() {
             };
             if item != part {
                 let pos = p.next_position();
-                ::std::fs::write("parsed.out", format!("{:#?}", item));
-                ::std::fs::write("expected.out", format!("{:#?}", part));
+                let _ = ::std::fs::write("parsed.out", format!("{:#?}", item));
+                let _ = ::std::fs::write("expected.out", format!("{:#?}", part));
                 panic!(
-                    "Error, part {} does't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
-                    i, item, part, pos.start.line, pos.start.column
+                    "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
+                    i, path, pos.start.line, pos.start.column, item, part,
                 )
             }
         }
@@ -109,8 +104,7 @@ fn es2015_module() {
         "export default (0, 1);",
     ];
     for export in js_list {
-        let mut b = Builder::new();
-        let p = b
+        let p = Parser::builder()
             .module(true)
             .js(export)
             .build()

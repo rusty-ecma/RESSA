@@ -180,7 +180,11 @@ fn es2015(c: &mut Criterion) {
 fn es_module(c: &mut Criterion) {
     c.bench_function("es_module", |b| {
         b.iter(|| {
-            let p = Parser::new(&EVMOD).expect("Unable to crate new parser for es2015-module.js");
+            let p = Parser::builder()
+                .js(&EVMOD)
+                .module(true)
+                .build()
+                .expect("Unable to crate new parser for es2015-module.js");
             for i in p {
                 black_box(i.unwrap());
             }

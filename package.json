@@ -1,13 +1,15 @@
 {
   "devDependencies": {
+    "acorn": "^6.4.0",
     "angular": "^1.5.6",
     "dexie": "^2.0.4",
     "esprima": "^4.0.1",
+    "everything.js": "^1.0.3",
     "jquery": "^3.3.1",
     "moment": "^2.22.2",
     "react": "^16.4.2",
     "react-dom": "^16.4.2",
-    "vue": "^2.5.17",
-    "everything.js": "^1.0.3"
-  }
+    "vue": "^2.5.17"
+  },
+  "dependencies": {}
 }

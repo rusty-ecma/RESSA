@@ -1,0 +1,51 @@
+name: Rust
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Setup Node.js for use with actions
+      uses: actions/setup-node@v1.1.0
+    - name: install js test libs from npm
+      run: npm install
+    - name: Build
+      run: cargo build
+    - name: curl moz_central
+      run: curl https://hg.mozilla.org/mozilla-central/archive/tip.zip/js/src/jit-test/tests/ --output moz-central.zip
+    - name: unzip moz-central
+      run: unzip -qq moz-central.zip -d moz-central
+    - name: clone Test262
+      run: git clone https://github.com/tc39/test262 ./test262_full && mv ./test262_full/test ./test262
+    - name: Run tests
+      run: cargo test --features=moz_central,test_262
+      env:
+        RUST_MIN_STACK: 9999999
+    - name: rust-tarpaulin
+      uses: actions-rs/tarpaulin@v0.1.0
+      env: 
+        RUST_MIN_STACK: 9999999
+      with: 
+        args: --features=moz_central,test_262
+    - name: Upload to codecov.io
+      uses: codecov/codecov-action@v1.0.2
+      with:
+        token: ${{secrets.CODECOV_TOKEN}}
+    - name: Check syntax
+      run: cargo fmt --all -- --check
+    - name: Cache node_modules
+      uses: actions/cache@v1.0.3
+      with:
+        path: ./node_modules
+        key: ${{ runner.os }}.node_modules
+    - name: before cargo cache
+      run: rm -rf ~/.cargo/registry
+    - name: Cache cargo directory
+      uses: actions/cache@v1.0.3
+      with:
+        key: ${{ runner.os }}.cargo
+        path: ~/.cargo

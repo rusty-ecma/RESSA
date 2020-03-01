@@ -1,6 +1,6 @@
 [package]
 name = "ressa"
-version = "0.5.2"
+version = "0.7.0"
 authors = ["Robert Masen <r@robertmasen.pizza>"]
 repository = "https://github.com/FreeMasen/RESSA"
 description = "An ECMAscript parser"
@@ -11,31 +11,49 @@ categories = ["parsing", "text-processing", "web-programming"]
 edition = "2018"
 
 [dependencies]
-ress = "0.7.1"
-resast = "0.3.0"
+ress = "0.9.0"
+resast = "0.4.0"
 log = "0.4"
 backtrace = "0"
-reqwest = { version = "0.9", optional = true}
-flate2 = { version = "1", optional = true}
-tar = { version = "0.4", optional = true}
-rayon = { version = "1", optional = true}
+walkdir = { version = "2", optional = true }
+indicatif = { version = "0.12", optional = true, features = ["with_rayon"] }
+rayon = { version = "1.2", optional = true }
+pulldown-cmark = { version = "0.6", optional = true }
+res-regex = "0.1.0"
+hash-chain = "0.2.4"
 
 [features]
 default = []
 major_libs = []
 debug_look_ahead = []
-moz_central = ["reqwest", "flate2", "tar", "rayon"]
+error_backtrace = []
+serialization = ["resast/serialization"]
+esprima = ["resast/esprima"]
+moz_central = ["walkdir"]
+test_262 = ["indicatif", "rayon", "pulldown-cmark"]
+test_262_parser = ["indicatif", "rayon", "pulldown-cmark"]
 
 [dev-dependencies]
 term-painter = "0.2.4"
 docopt = "1"
 walkdir = "2"
-serde_derive = "1"
-serde = "1"
+serde = { version = "1", features = ["derive"] }
 lazy_static = "1"
-criterion = "0.2"
+criterion = "0.3"
 env_logger = "0.6"
+term = "0.6"
+serde_json = "1"
+serde_yaml = "0"
 
 [[bench]]
 name = "major_libs"
 harness = false
+
+[[example]]
+name = "js-to-json"
+path = "examples/js_to_json.rs"
+required-features = ["serialization"]
+[[example]]
+name = "js-to-json-esprima"
+path = "examples/js_to_json-esprima.rs"
+required-features = ["esprima"]

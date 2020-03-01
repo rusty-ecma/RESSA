@@ -7,43 +7,34 @@
 
 This project is part of a series of crates designed to enable developers to create JavaScript development tools using the Rust programming language. [Rusty ECMA Details](#rusty-ecma-details)
 
-The two major pieces that users will interact with are the `Parser` struct and the enums defined by `resast`
+The two major pieces that users will interact with are the `Parser` struct and the enums defined by [`resast`](https://github.com/FreeMasen/resast)
 
 ## `Parser`
 
 The parser struct will be the main way to convert text into an `AST`.
 Conveniently `Parser` implements `Iterator` over `Result<ProgramPart, Error>`,
-this means that you can evaluate your JS in pieces from top to bottom. These pieces will be discussed in more detail in the [node section](#node).
+this means that you can evaluate your JS in pieces from top to bottom. 
 
 ### Iterator Example
 ```rust
-use ressa::Parser;
-use resast::ref_tree::prelude::*;
+use resast::prelude::*;
+use ressa::*;
 
 fn main() {
     let js = "function helloWorld() { alert('Hello world'); }";
     let p = Parser::new(&js).unwrap();
-
-    let f = ProgramPart::Decl(
-        Decl::Function(
-            Function {
-                id: Some("helloWorld"),
-                params: vec![],
-                body: vec![
-                    ProgramPart::Stmt(
-                        Stmt::Expr(
-                            Expr::Call(CallExpr {
-                                callee: Box::new(Expr::Ident("alert")),
-                                arguments: vec![Expr::Literal(Literal::String("'Hello world'"))],
-                            })
-                        )
-                    )
-                ],
-                generator: false,
-                is_async: false,
-            }
-        )
-    );
+    let f = ProgramPart::decl(Decl::Func(Func {
+        id: Some(Ident::from("helloWorld")),
+        params: vec![],
+        body: FuncBody(vec![ProgramPart::Stmt(Stmt::Expr(Expr::Call(CallExpr {
+            callee: Box::new(Expr::ident_from("alert")),
+            arguments: vec![Expr::Lit(Lit::String(StringLit::Single(Cow::Owned(
+                "Hello world".to_string(),
+            ))))],
+        })))]),
+        generator: false,
+        is_async: false,
+    }));
     for part in p {
         assert_eq!(part.unwrap(), f);
     }
@@ -67,8 +58,8 @@ function Thing() {
     let mut parser = Parser::new(js).expect("Failed to create parser");
     let program = parser.parse().expect("Unable to parse text");
     match program {
-        Program::Script(parts) => println!("found a script"),
-        Program::Mod(parts) => println!("found an es6 module"),
+        Program::Script(_parts) => println!("found a script"),
+        Program::Mod(_parts) => println!("found an es6 module"),
     }
 }
 ```

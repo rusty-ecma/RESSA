@@ -53,11 +53,30 @@ fn dexie() {
 fn run_test(name: &str, normal: String, min: String) {
     let _ = env_logger::try_init();
     println!("parsing: {} chars", min.len());
-    let mut p = Parser::new(&normal).expect(&format!("Unable to create {} parser", name));
-    let result = p.parse().expect(&format!("Unable to parse {}", name));
-    println!("{:#?}", result);
-    let mut p = Parser::new(&min).expect(&format!("Unable to create react.min {}", name));
-    let _result = p.parse().expect(&format!("Unable to parse {}.min", name));
+    let mut p = Parser::builder()
+        .js(&normal)
+        .module(name.contains("module"))
+        .build()
+        .expect(&format!("Unable to create {} parser", name));
+    let r = p.parse();
+    handle_result(r, name);
+    let mut p = Parser::builder()
+        .js(&normal)
+        .module(name.contains("module"))
+        .build()
+        .expect(&format!("Unable to create {}.min", name));
+    let r = p.parse();
+    handle_result(r, &format!("{}.min", name));
+}
+
+fn handle_result<'a>(
+    result: Result<resast::Program<'a>, ressa::Error>,
+    name: &str,
+) -> resast::Program<'a> {
+    match result {
+        Ok(result) => result,
+        Err(e) => panic!("Unable to parse {0}\n{1}\n{1:?}", name, e),
+    }
 }
 
 fn get_js(l: Lib) -> Result<(String, String), ::std::io::Error> {
