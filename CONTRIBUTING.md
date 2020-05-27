@@ -17,8 +17,18 @@ curl https://hg.mozilla.org/mozilla-central/archive/tip.zip/js/src/jit-test/test
 unzip -q moz-central.zip -d moz-central
 ```
 
+<<<<<<< HEAD
 To run these tests simply execute the following command.
 
 ```sh
 cargo test --features moz_central -- moz_central
 ```
+=======
+To run these tests simple execute the following command.
+
+```sh
+cargo test --features moz_central -- moz_central
+```
+
+The 3rd set of tests are required for the Test262 Test Suite. 
+>>>>>>> next
