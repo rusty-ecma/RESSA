@@ -10,25 +10,33 @@ two people working on the same issue
 
 ## Testing
 
-There are a few sets of JavaScript files that are required to run the tests in this repository. The first set can be easily acquired by running `npm install` in the root of this project. An additional test is also available behind a feature flag `moz_central` that requires the JIT Test files from the FireFox repository, the expectation is that these will exist in the folder `moz-central` in the root of this project. To get these files you can either manually download and unzip them by following [this link](https://hg.mozilla.org/mozilla-central/archive/tip.zip/js/src/jit-test/tests/) or you can execute the following command.
+There are a few sets of JavaScript files that are required to run the tests in this repository.
+
+### NPM files
+
+This set can be easily acquired by running `npm install` in the root of this project. 
+
+### Spider Monkey Files
+
+An additional test is also available behind a feature flag `moz_central` that requires the JIT Test files from the FireFox repository, the expectation is that these will exist in the folder `moz-central` in the root of this project. To get these files you can either manually download and unzip them by following [this link](https://hg.mozilla.org/mozilla-central/archive/tip.zip/js/src/jit-test/tests/) or you can execute the following command.
 
 ```sh
 curl https://hg.mozilla.org/mozilla-central/archive/tip.zip/js/src/jit-test/tests/ --output moz-central.zip
 unzip -q moz-central.zip -d moz-central
 ```
 
-<<<<<<< HEAD
 To run these tests simply execute the following command.
 
 ```sh
 cargo test --features moz_central -- moz_central
 ```
-=======
-To run these tests simple execute the following command.
+
+### Test262
+
+Another test that is feature gated due to the time it takes to run parses all 30,000+ files in the [Test262](https://github.com/tc39/test262) test suite. The expectation is that the test folder from that repository is in the root of the project with the name test262.
 
 ```sh
-cargo test --features moz_central -- moz_central
+curl -L https://github.com/tc39/test262/zipball/master -o test262.zip
+unzip -q test262.zip -d test262_full
+mv ./test262_full/test ./test262
 ```
-
-The 3rd set of tests are required for the Test262 Test Suite. 
->>>>>>> next
