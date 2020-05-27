@@ -33,6 +33,7 @@ jobs:
         args: --features=moz_central,test_262
     - name: Upload to codecov.io
       uses: codecov/codecov-action@v1.0.2
+      if: ${{github.repository}} == 'rusty-ecma/RESSA'
       with:
         token: ${{secrets.CODECOV_TOKEN}}
     - name: Check syntax
