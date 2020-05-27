@@ -18,3 +18,5 @@ moz-central
 /test262
 /failures
 !tests/test262/hilight.js
+test262_full
+*.zip
