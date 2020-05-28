@@ -12,16 +12,16 @@ edition = "2018"
 
 [dependencies]
 # ress = "0.9.0"
-ress = { git = "https://github.com/rusty-ecma/ress" }
-resast = "0.4.0"
+ress = { git = "https://github.com/rusty-ecma/ress", rev = "6fc0fe9" }
+resast = "0.4"
 log = "0.4"
 backtrace = "0"
 walkdir = { version = "2", optional = true }
 indicatif = { version = "0.12", optional = true, features = ["with_rayon"] }
-rayon = { version = "1.2", optional = true }
-pulldown-cmark = { version = "0.6", optional = true }
-res-regex = "0.1.0"
-hash-chain = "0.2.4"
+rayon = { version = "1", optional = true }
+pulldown-cmark = { version = "0.7", optional = true }
+res-regex = "0.1"
+hash-chain = "0.3"
 
 [features]
 default = []

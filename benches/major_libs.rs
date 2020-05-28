@@ -1,5 +1,5 @@
 #![cfg(test)]
-#![feature(test)]
+// #![feature(test)]
 //! This benchmarking suite is extremely naive
 //! I use it internally to determine if I have
 //! been able to make large impact performance
@@ -16,7 +16,7 @@
 //! [esprima](https://github.com/jquery/esprima)
 extern crate ress;
 extern crate ressa;
-extern crate test;
+// extern crate test;
 #[macro_use]
 extern crate lazy_static;
 
@@ -45,150 +45,69 @@ lazy_static! {
 }
 
 fn angular1(c: &mut Criterion) {
-    c.bench_function("angular1", |b| {
-        b.iter(|| {
-            let p = Parser::new(&NG).expect("Unable to crate new parser for angular.js");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &NG, "angular1");
 }
 
 fn angular1_min(c: &mut Criterion) {
-    c.bench_function("angular1_min", |b| {
-        b.iter(|| {
-            let p = Parser::new(&NG_MIN).expect("Unable to crate new parser for angular.min.js");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &NG_MIN, "angular1_min");
 }
 
 fn jquery(c: &mut Criterion) {
-    c.bench_function("jquery", |b| {
-        b.iter(|| {
-            let p = Parser::new(&JQ).expect("Unable to crate new parser for jquery");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &JQ, "jquery");
 }
 
 fn jquery_min(c: &mut Criterion) {
-    c.bench_function("jquery_min", |b| {
-        b.iter(|| {
-            let p = Parser::new(&JQ_MIN).expect("Unable to crate new parser for jquery.min");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &JQ_MIN, "jquery_min");
 }
 
 fn react(c: &mut Criterion) {
-    c.bench_function("react", |b| {
-        b.iter(|| {
-            let p = Parser::new(&REACT).expect("Unable to crate new parser for react.js");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &REACT, "react");
 }
 
 fn react_min(c: &mut Criterion) {
-    c.bench_function("react_min", |b| {
-        b.iter(|| {
-            let p = Parser::new(&REACT_MIN).expect("Unable to crate new parser for react.min.js");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &REACT_MIN, "react_min");
 }
 
 fn react_dom(c: &mut Criterion) {
-    c.bench_function("react_dom", |b| {
-        b.iter(|| {
-            let p = Parser::new(&REACT_DOM).expect("Unable to crate new parser for react-dom.js");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &REACT_DOM, "react_dom");
 }
 
 fn react_dom_min(c: &mut Criterion) {
-    c.bench_function("react_dom_min", |b| {
-        b.iter(|| {
-            let p = Parser::new(&REACT_DOM_MIN)
-                .expect("Unable to crate new parser for react-dom.min.js");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &REACT_DOM_MIN, "react_dom_min");
 }
 
 fn vue(c: &mut Criterion) {
-    c.bench_function("vue", |b| {
-        b.iter(|| {
-            let p = Parser::new(&VUE).expect("Unable to crate new parser for vue.js");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &VUE, "vue");
 }
 
 fn vue_min(c: &mut Criterion) {
-    c.bench_function("vue_min", |b| {
-        b.iter(|| {
-            let p = Parser::new(&VUE_MIN).expect("Unable to crate new parser for vue.min.js");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &VUE_MIN, "vue_min");
 }
 
 fn es5(c: &mut Criterion) {
-    c.bench_function("es5", |b| {
-        b.iter(|| {
-            let p = Parser::new(&EV5).expect("Unable to crate new parser for es5.js");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &EV5, "es5");
 }
 
 fn es2015(c: &mut Criterion) {
-    c.bench_function("es2015", |b| {
-        b.iter(|| {
-            let p = Parser::new(&EV2015).expect("Unable to crate new parser for es2015-script.js");
-            for i in p {
-                black_box(i.unwrap());
-            }
-        });
-    });
+    bench(c, &EV2015, "es2015");
 }
 
 fn es_module(c: &mut Criterion) {
-    c.bench_function("es_module", |b| {
+    bench(c, &EVMOD, "es_module");
+}
+
+fn bench(c: &mut Criterion, js: &str, name: &'static str) {
+    c.bench_function(name, |b| {
         b.iter(|| {
             let p = Parser::builder()
-                .js(&EVMOD)
+                .js(&js)
                 .module(true)
                 .build()
                 .expect("Unable to crate new parser for es2015-module.js");
             for i in p {
                 black_box(i.unwrap());
             }
-        });
+        })
     });
 }
 
@@ -213,11 +132,11 @@ enum Lib {
 impl Lib {
     pub fn path(&self) -> String {
         match self {
-            &Lib::Jquery => "node_modules/jquery/dist/jquery.js".into(),
-            &Lib::Angular => "node_modules/angular/angular.js".into(),
-            &Lib::React => "node_modules/react/umd/react.development.js".into(),
-            &Lib::ReactDom => "node_modules/react-dom/umd/react-dom.development.js".into(),
-            &Lib::Vue => "node_modules/vue/dist/vue.js".into(),
+            Lib::Jquery => "node_modules/jquery/dist/jquery.js".into(),
+            Lib::Angular => "node_modules/angular/angular.js".into(),
+            Lib::React => "node_modules/react/umd/react.development.js".into(),
+            Lib::ReactDom => "node_modules/react-dom/umd/react-dom.development.js".into(),
+            Lib::Vue => "node_modules/vue/dist/vue.js".into(),
             Lib::Es5 => "node_modules/everything.js/es5.js".into(),
             Lib::Es2015S => "node_modules/everything.js/es2015-script.js".into(),
             Lib::Es2015M => "node_modules/everything.js/es2015-module.js".into(),
@@ -226,11 +145,11 @@ impl Lib {
 
     pub fn min_path(&self) -> String {
         match self {
-            &Lib::Jquery => "node_modules/jquery/dist/jquery.min.js".into(),
-            &Lib::Angular => "node_modules/angular/angular.min.js".into(),
-            &Lib::React => "node_modules/react/umd/react.production.min.js".into(),
-            &Lib::ReactDom => "node_modules/react-dom/umd/react-dom.production.min.js".into(),
-            &Lib::Vue => "node_modules/vue/dist/vue.min.js".into(),
+            Lib::Jquery => "node_modules/jquery/dist/jquery.min.js".into(),
+            Lib::Angular => "node_modules/angular/angular.min.js".into(),
+            Lib::React => "node_modules/react/umd/react.production.min.js".into(),
+            Lib::ReactDom => "node_modules/react-dom/umd/react-dom.production.min.js".into(),
+            Lib::Vue => "node_modules/vue/dist/vue.min.js".into(),
             _ => unreachable!(),
         }
     }
