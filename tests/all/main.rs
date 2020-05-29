@@ -92,7 +92,7 @@ pub fn npm_install() -> Result<(), Error> {
 
 fn format_error(js: &str, e: &ressa::Error) -> Option<String> {
     let start = e.position()?;
-    let column = js.lines().skip(start.line.saturating_sub(1)).next()?.map(|l| l.len());
+    let column = js.lines().nth(start.line.saturating_sub(1))?.len();
     let end = ress::Position {
         line: start.line,
         column,
