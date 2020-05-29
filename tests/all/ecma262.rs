@@ -9,25 +9,29 @@ fn es5() {
     let _ = env_logger::try_init();
     info!("ES5");
     let path = Lib::Everything(EverythingVersion::Es5).path();
-    let js = get_js_file(&path).expect(&format!("Faield to get {:?}", path));
+    println!("path: {:?}", path);
+    let js = get_js_file(&path)
+        .unwrap_or_else( |e| panic!("Faield to get {:?}\n{}", path, e));
     let mut p = Parser::new(&js).expect("Failed to create parser");
     let mut tokens = es_tokens::ES5.iter();
     let mut i = 0;
+    let mut last_position = p.next_position();
     while let Some(ref item) = p.next() {
         if let Some(part) = tokens.next() {
             let item = match item {
                 Ok(i) => i,
-                Err(e) => panic!("Error parsing {:?}\n{}", path, e),
+                Err(e) => panic!("Error parsing {:?}\n{}", path, super::format_error(&js, e).unwrap_or_else(String::new)),
             };
             if item != part {
-                let pos = p.next_position();
                 panic!(
-                    "Error, part {} doesn't match \n{:?}\n{:?}\nnext start: line: {}, column: {}",
-                    i, item, part, pos.start.line, pos.start.column
+                    "Error, part {} doesn't match \n{:?}\n{:?}\nnext start: line: {}, column: {}\n{}",
+                    i, item, part, last_position.start.line, last_position.start.column,
+                    super::hilight_position(&js, &last_position).unwrap_or_else(String::new)
                 )
             }
         }
         i += 1;
+        last_position = p.next_position();
     }
 }
 

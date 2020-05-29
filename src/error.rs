@@ -99,6 +99,51 @@ impl Error {
     pub fn unable_to_reinterpret(pos: Position, from: &str, to: &str) -> Self {
         Error::UnableToReinterpret(pos, from.to_owned(), to.to_owned())
     }
+
+    pub fn position(&self) -> Option<Position> {
+        use self::Error::*;
+        match self {
+            RestrictedIdent(p) => Some(*p),
+            UnexpectedToken(p, _) => Some(*p),
+            UnableToReinterpret(p, _, _) => Some(*p),
+            Redecl(p, _) => Some(*p),
+            OperationError(p, _) => Some(*p),
+            InvalidGetterParams(p) => Some(*p),
+            InvalidSetterParams(p) => Some(*p),
+            NonStrictFeatureInStrictContext(p, _) => Some(*p),
+            InvalidImportError(p) => Some(*p),
+            InvalidExportError(p) => Some(*p),
+            InvalidYield(p) => Some(*p),
+            InvalidUseOfContextualKeyword(p, _) => Some(*p),
+            TryWithNoCatchOrFinally(p) => Some(*p),
+            InvalidCatchArg(p) => Some(*p),
+            ThrowWithNoArg(p) => Some(*p),
+            UnknownOptionalLabel(p, _, _) => Some(*p),
+            InvalidOptionalLabel(p) => Some(*p),
+            UseOfModuleFeatureOutsideOfModule(p, _) => Some(*p),
+            NewLineAfterFatArrow(p) => Some(*p),
+            StrictModeArgumentsOrEval(p) => Some(*p),
+            InvalidSuper(p) => Some(*p),
+            InvalidFuncPosition(p, _) => Some(*p),
+            InvalidClassPosition(p, _) => Some(*p),
+            ForOfInAssign(p ,_) => Some(*p),
+            ContinueOutsideOfIteration(p) => Some(*p),
+            InvalidParameter(p, _) => Some(*p),
+            OctalLiteral(p) => Some(*p),
+            HtmlCommentInModule(p) => Some(*p),
+            InvalidRegEx(p, _) => Some(*p),
+            InvalidTrailingComma(p) => Some(*p),
+            InvalidEscape(p, _) => Some(*p),
+            LexicalRedecl(p, _, _) => Some(*p),
+            InvalidLHS(p) => Some(*p),
+            ForOfNotSimple(p) => Some(*p),
+            InvalidStartOfExpressionStmt(p, _) => Some(*p),
+            DuplicateExport(p, _) => Some(*p),
+            ContinueOfNotIterationLabel(p, _) => Some(*p),
+            Scanner(e) => Some(Position { line: e.line, column: e.column }),
+            _ => None
+        }
+    }
 }
 
 impl From<::std::io::Error> for Error {
