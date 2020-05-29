@@ -426,7 +426,6 @@ where
         })
     }
     /// Parse all of the directives into a single prologue
-    #[inline]
     fn parse_directive_prologues(&mut self) -> Res<Vec<ProgramPart<'b>>> {
         debug!(
             "{}: parse_directive_prologues {:?}",
@@ -442,7 +441,6 @@ where
         Ok(ret)
     }
     /// Parse a single directive
-    #[inline]
     fn parse_directive(&mut self) -> Res<ProgramPart<'b>> {
         debug!(
             "{}: parse_directive {:?}",
@@ -491,7 +489,6 @@ where
     /// we check to see if we are at at token that is a known
     /// statement or declaration (import/export/function/const/let/class)
     /// otherwise we move on to `Parser::parse_statement`
-    #[inline]
     fn parse_statement_list_item(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<ProgramPart<'b>> {
         debug!("{}: parse_statement_list_item", self.look_ahead.span.start);
         self.context.is_assignment_target = true;
@@ -571,7 +568,6 @@ where
     /// import Thing, * as Stuff from 'place';
     /// import 'place';
     /// ```
-    #[inline]
     fn parse_import_decl(&mut self) -> Res<ModImport<'b>> {
         if let Some(scope) = self.context.lexical_names.last_scope() {
             if !scope.is_top() {
@@ -638,7 +634,6 @@ where
     /// ```js
     /// import {Thing} from 'place';
     /// ```
-    #[inline]
     fn parse_named_imports(&mut self) -> Res<Vec<ImportSpecifier<'b>>> {
         self.expect_punct(Punct::OpenBrace)?;
         let mut ret = Vec::new();
@@ -652,7 +647,6 @@ where
         Ok(ret)
     }
 
-    #[inline]
     fn parse_import_specifier(&mut self) -> Res<ImportSpecifier<'b>> {
         let start = self.look_ahead_position;
         let (imported, local) = if self.look_ahead.token.is_ident() {
@@ -686,7 +680,6 @@ where
         }))
     }
 
-    #[inline]
     fn parse_import_namespace_specifier(&mut self) -> Res<ImportSpecifier<'b>> {
         self.expect_punct(Punct::Asterisk)?;
         if !self.at_contextual_keyword("as") {
@@ -701,7 +694,6 @@ where
         Ok(ImportSpecifier::Namespace(ident))
     }
 
-    #[inline]
     fn parse_import_default_specifier(&mut self) -> Res<ImportSpecifier<'b>> {
         let start = self.look_ahead_position;
         let ident = self.parse_ident_name()?;
@@ -711,7 +703,6 @@ where
         Ok(ImportSpecifier::Default(ident))
     }
 
-    #[inline]
     fn parse_export_decl(&mut self) -> Res<ModExport<'b>> {
         debug!("{} parse_export_decl", self.look_ahead_position);
         if let Some(scope) = self.context.lexical_names.last_scope() {
@@ -896,7 +887,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_export_specifier(&mut self) -> Res<ExportSpecifier<'b>> {
         let local = self.parse_ident_name()?;
         let exported = if self.at_contextual_keyword("as") {
@@ -908,7 +898,6 @@ where
         Ok(ExportSpecifier { local, exported })
     }
 
-    #[inline]
     fn parse_module_specifier(&mut self) -> Res<Lit<'b>> {
         let item = self.next_item()?;
         match &item.token {
@@ -926,7 +915,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_statement(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_statement {:?}",
@@ -1032,7 +1020,6 @@ where
         Ok(stmt)
     }
 
-    #[inline]
     fn parse_with_stmt(&mut self) -> Res<WithStmt<'b>> {
         debug!(
             "{}: parse_with_stmt {:?}",
@@ -1073,7 +1060,6 @@ where
         })
     }
 
-    #[inline]
     fn parse_while_stmt(&mut self) -> Res<WhileStmt<'b>> {
         debug!(
             "{}: parse_while_stmt {:?}",
@@ -1108,7 +1094,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_var_stmt(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_var_stmt {:?}",
@@ -1122,7 +1107,6 @@ where
         Ok(stmt)
     }
 
-    #[inline]
     fn parse_var_decl_list(&mut self, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
         debug!(
             "{} parse_var_decl_list {:?}",
@@ -1150,7 +1134,6 @@ where
         Ok(ret)
     }
 
-    #[inline]
     fn parse_var_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
         let (_, patt) = self.parse_pattern(Some(VarKind::Var), &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&patt) {
@@ -1179,7 +1162,6 @@ where
         Ok(VarDecl { id: patt, init })
     }
 
-    #[inline]
     fn parse_try_stmt(&mut self) -> Res<TryStmt<'b>> {
         debug!(
             "{}: parse_try_stmt {:?}",
@@ -1223,7 +1205,6 @@ where
         })
     }
 
-    #[inline]
     fn parse_catch_clause(&mut self) -> Res<CatchClause<'b>> {
         debug!(
             "{}: parse_catch_clause {:?}",
@@ -1281,7 +1262,6 @@ where
         Ok(CatchClause { param, body })
     }
 
-    #[inline]
     fn parse_finally_clause(&mut self) -> Res<BlockStmt<'b>> {
         debug!(
             "{}: parse_finally_clause {:?}",
@@ -1291,7 +1271,6 @@ where
         self.parse_block(true)
     }
 
-    #[inline]
     fn parse_throw_stmt(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_throw_stmt {:?}",
@@ -1306,7 +1285,6 @@ where
         Ok(arg)
     }
 
-    #[inline]
     fn parse_switch_stmt(&mut self) -> Res<SwitchStmt<'b>> {
         debug!(
             "{}: parse_switch_stmt {:?}",
@@ -1344,7 +1322,6 @@ where
         })
     }
 
-    #[inline]
     fn parse_switch_case(&mut self) -> Res<SwitchCase<'b>> {
         debug!(
             "{}: parse_switch_case {:?}",
@@ -1371,7 +1348,6 @@ where
         Ok(SwitchCase { test, consequent })
     }
 
-    #[inline]
     fn parse_return_stmt(&mut self) -> Res<Option<Expr<'b>>> {
         debug!(
             "{}: parse_return_stmt {:?}",
@@ -1397,7 +1373,6 @@ where
         Ok(ret)
     }
 
-    #[inline]
     fn parse_if_stmt(&mut self) -> Res<IfStmt<'b>> {
         debug!(
             "{}: parse_if_stmt {:?}",
@@ -1444,7 +1419,6 @@ where
         })
     }
 
-    #[inline]
     fn parse_if_clause(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_if_clause {:?}",
@@ -1456,7 +1430,6 @@ where
         self.parse_statement(Some(StmtCtx::If))
     }
 
-    #[inline]
     fn parse_fn_stmt(&mut self, decl_pos: bool) -> Res<Func<'b>> {
         debug!(
             "{}: parse_fn_stmt {:?} {}",
@@ -1473,7 +1446,6 @@ where
         Ok(decl)
     }
 
-    #[inline]
     fn parse_for_stmt(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_for_stmt {:?}",
@@ -1708,7 +1680,6 @@ where
         ret
     }
 
-    #[inline]
     fn parse_for_loop(&mut self, kind: VarKind) -> Res<ForStmt<'b>> {
         debug!(
             "{}: parse_for_loop {:?}",
@@ -1723,7 +1694,6 @@ where
         self.parse_for_loop_cont(init)
     }
 
-    #[inline]
     fn parse_for_loop_cont(&mut self, init: Option<LoopInit<'b>>) -> Res<ForStmt<'b>> {
         debug!(
             "{}: parse_for_loop_cont {:?}",
@@ -1754,7 +1724,6 @@ where
         })
     }
 
-    #[inline]
     fn parse_for_in_loop(&mut self, left: LoopLeft<'b>) -> Res<ForInStmt<'b>> {
         debug!(
             "{}: parse_for_in_loop {:?}",
@@ -1804,7 +1773,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_for_of_loop(&mut self, left: LoopLeft<'b>, is_await: bool) -> Res<ForOfStmt<'b>> {
         debug!(
             "{}: parse_for_of_loop {:?}",
@@ -1836,7 +1804,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_loop_body(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_loop_body {:?}",
@@ -1852,7 +1819,6 @@ where
         Ok(ret)
     }
 
-    #[inline]
     fn parse_do_while_stmt(&mut self) -> Res<DoWhileStmt<'b>> {
         debug!(
             "{}: parse_do_while_stmt {:?}",
@@ -1880,7 +1846,6 @@ where
         })
     }
 
-    #[inline]
     fn parse_break_stmt(&mut self, _s: &'b str) -> Res<Option<resast::Ident<'b>>> {
         debug!(
             "{}: parse_break_stmt {:?}",
@@ -1889,7 +1854,6 @@ where
         self.parse_optionally_labeled_statement(Keyword::Break(()))
     }
 
-    #[inline]
     fn parse_continue_stmt(&mut self, _s: &'b str) -> Res<Option<resast::Ident<'b>>> {
         debug!(
             "{}: parse_continue_stmt {:?}",
@@ -1898,7 +1862,6 @@ where
         self.parse_optionally_labeled_statement(Keyword::Continue(()))
     }
 
-    #[inline]
     fn parse_optionally_labeled_statement(
         &mut self,
         k: Keyword<()>,
@@ -1940,7 +1903,6 @@ where
         Ok(ret)
     }
 
-    #[inline]
     fn parse_debugger_stmt(&mut self, _s: &'b str) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_debugger_stmt {:?}",
@@ -1951,7 +1913,6 @@ where
         Ok(Stmt::Debugger)
     }
 
-    #[inline]
     fn parse_labelled_statement(&mut self) -> Res<Stmt<'b>> {
         debug!("parse_labelled_statement, {:?}", self.look_ahead.token);
         let start = self.look_ahead.span;
@@ -2018,7 +1979,6 @@ where
         Ok(Stmt::Expr(ret))
     }
 
-    #[inline]
     fn parse_expression_statement(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_expression_statement {:?}",
@@ -2067,7 +2027,6 @@ where
         Ok(ret)
     }
 
-    #[inline]
     fn parse_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_expression {:?}",
@@ -2093,7 +2052,6 @@ where
         Ok(ret)
     }
 
-    #[inline]
     fn parse_block(&mut self, new_scope: bool) -> Res<BlockStmt<'b>> {
         debug!(
             "{}: parse_block {:?}",
@@ -2129,7 +2087,6 @@ where
         Ok(BlockStmt(ret))
     }
 
-    #[inline]
     fn parse_lexical_decl(&mut self, in_for: bool) -> Res<Decl<'b>> {
         debug!(
             "{}: parse_lexical_decl {:?}",
@@ -2150,7 +2107,6 @@ where
         Ok(Decl::Var(kind, decl))
     }
 
-    #[inline]
     fn parse_binding_list(&mut self, kind: VarKind, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
         debug!(
             "{}: parse_binding_list {:?}",
@@ -2181,7 +2137,6 @@ where
         Ok(ret)
     }
 
-    #[inline]
     fn parse_variable_decl_list(&mut self, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
         debug!(
             "{} parse_variable_decl_list in_for: {}",
@@ -2197,7 +2152,6 @@ where
         Ok(ret)
     }
 
-    #[inline]
     fn parse_variable_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
         debug!(
             "{} parse_variable_decl in_for: {}",
@@ -2223,7 +2177,6 @@ where
         Ok(VarDecl { id, init })
     }
 
-    #[inline]
     fn is_pat_ident(pat: &Pat) -> bool {
         match pat {
             Pat::Ident(_) => true,
@@ -2231,7 +2184,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_lexical_binding(&mut self, kind: VarKind, in_for: bool) -> Res<VarDecl<'b>> {
         debug!(
             "{}: parse_lexical_binding {:?}",
@@ -2269,7 +2221,6 @@ where
         Ok(VarDecl { id, init })
     }
 
-    #[inline]
     fn is_restricted(id: &Pat) -> bool {
         match id {
             Pat::Ident(ref ident) => ident.name == "eval" || ident.name == "arguments",
@@ -2277,7 +2228,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_function_decl(&mut self, opt_ident: bool) -> Res<Func<'b>> {
         debug!(
             "{}: parse_function_decl {:?}",
@@ -2525,7 +2475,6 @@ where
         Ok(formal_params)
     }
 
-    #[inline]
     fn parse_function_source_el(&mut self) -> Res<FuncBody<'b>> {
         debug!(
             "{}: parse_function_source_el {:?}",
@@ -2555,7 +2504,6 @@ where
         Ok(FuncBody(body))
     }
 
-    #[inline]
     fn parse_class_decl(&mut self, opt_ident: bool, check_id: bool) -> Res<Class<'b>> {
         debug!(
             "{}: parse_class_decl {:?}",
@@ -2618,7 +2566,6 @@ where
         })
     }
 
-    #[inline]
     fn parse_class_body(&mut self) -> Res<ClassBody<'b>> {
         debug!(
             "{}: parse_class_body {:?}",
@@ -2640,7 +2587,6 @@ where
         Ok(ClassBody(ret))
     }
 
-    #[inline]
     fn parse_class_el(&mut self, has_ctor: bool) -> Res<(bool, Prop<'b>)> {
         debug!(
             "{}: parse_class_el {:?}",
@@ -2805,7 +2751,6 @@ where
         ))
     }
 
-    #[inline]
     /// Compares `key` with `other` to see if they
     /// match, this takes into account all of the
     /// different shapes that `key` could be, including
@@ -2830,7 +2775,6 @@ where
         }
     }
 
-    #[inline]
     fn is_generator(val: &PropValue) -> bool {
         match val {
             PropValue::Expr(ref e) => match e {
@@ -2842,7 +2786,6 @@ where
         }
     }
 
-    #[inline]
     fn is_static(key: &PropKey) -> bool {
         match key {
             PropKey::Lit(ref l) => match l {
@@ -2863,7 +2806,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_async_property_method(&mut self) -> Res<PropValue<'b>> {
         debug!(
             "{}: parse_property_method_async_fn",
@@ -2895,7 +2837,6 @@ where
         Ok(PropValue::Expr(Expr::Func(func)))
     }
 
-    #[inline]
     fn parse_property_method(&mut self) -> Res<PropValue<'b>> {
         debug!(
             "{}: parse_property_method {:?}",
@@ -2927,7 +2868,6 @@ where
         Ok(PropValue::Expr(Expr::Func(func)))
     }
 
-    #[inline]
     fn parse_generator_method(&mut self) -> Res<PropValue<'b>> {
         debug!(
             "{}: pares_generator_method {:?}",
@@ -2958,7 +2898,6 @@ where
         Ok(PropValue::Expr(Expr::Func(func)))
     }
 
-    #[inline]
     fn parse_getter_method(&mut self) -> Res<PropValue<'b>> {
         debug!(
             "{}: parse_getter_method {:?}",
@@ -2991,7 +2930,6 @@ where
         })))
     }
 
-    #[inline]
     fn parse_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<FuncBody<'b>> {
         debug!(
             "{}: parse_method_body {:?}",
@@ -3016,7 +2954,6 @@ where
         Ok(body)
     }
 
-    #[inline]
     fn parse_setter_method(&mut self) -> Res<PropValue<'b>> {
         debug!(
             "{}: parse_setter_method {:?}",
@@ -3052,7 +2989,6 @@ where
         Ok(PropValue::Expr(Expr::Func(func)))
     }
 
-    #[inline]
     fn is_rest(arg: &FuncArg) -> bool {
         match arg {
             FuncArg::Expr(ref e) => match e {
@@ -3066,7 +3002,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_property_method_body(
         &mut self,
         simple: bool,
@@ -3107,7 +3042,6 @@ where
             || tok.matches_punct(Punct::OpenBracket)
     }
 
-    #[inline]
     fn parse_object_property_key(&mut self) -> Res<PropKey<'b>> {
         debug!(
             "{}: parse_object_property_key {:?}",
@@ -3218,7 +3152,6 @@ where
         Ok(())
     }
 
-    #[inline]
     fn is_valid_property_key_lit(expr: &Expr) -> bool {
         match expr {
             Expr::Lit(ref l) => match l {
@@ -3229,7 +3162,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_primary_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_primary_expression {:?}",
@@ -3392,7 +3324,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_group_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_group_expr {:?}",
@@ -3517,7 +3448,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_array_init(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_array_init {:?}",
@@ -3549,7 +3479,6 @@ where
         self.expect_punct(Punct::CloseBracket)?;
         Ok(Expr::Array(elements))
     }
-    #[inline]
     fn parse_obj_init(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_obj_init {:?}",
@@ -3590,7 +3519,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_obj_prop(&mut self) -> Res<(bool, ObjProp<'b>)> {
         debug!(
             "{}: parse_obj_prop {:?}",
@@ -3763,7 +3691,6 @@ where
         Ok((is_proto, prop))
     }
 
-    #[inline]
     fn is_proto_(key: &PropKey) -> bool {
         trace!("is_proto {:?}", key);
         match key {
@@ -3781,7 +3708,6 @@ where
         }
     }
 
-    #[inline]
     fn at_possible_ident(&self) -> bool {
         self.look_ahead.token.is_ident()
             || self.look_ahead.token.is_keyword()
@@ -3793,7 +3719,6 @@ where
             }
     }
 
-    #[inline]
     fn parse_template_lit(&mut self, is_tagged: bool) -> Res<TemplateLit<'b>> {
         debug!(
             "{}: parse_template_Lit {:?}",
@@ -3820,7 +3745,6 @@ where
         })
     }
 
-    #[inline]
     fn parse_template_element(&mut self, is_tagged: bool) -> Res<TemplateElement<'b>> {
         debug!(
             "{}: parse_template_element {:?}",
@@ -3853,7 +3777,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_function_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_function_expr {:?}",
@@ -3951,7 +3874,6 @@ where
         Ok(Expr::Func(func))
     }
 
-    #[inline]
     fn parse_fn_name(&mut self, is_gen: bool) -> Res<resast::Ident<'b>> {
         debug!(
             "{}: parse_fn_name {:?}",
@@ -3964,7 +3886,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_ident_name(&mut self) -> Res<resast::Ident<'b>> {
         debug!(
             "{}: parse_ident_name {:?}",
@@ -3980,7 +3901,6 @@ where
         Ok(resast::Ident::from(ret))
     }
 
-    #[inline]
     fn parse_var_ident(&mut self, is_var: bool) -> Res<resast::Ident<'b>> {
         debug!(
             "{}: parse_var_ident {:?}",
@@ -4038,7 +3958,6 @@ where
         Ok(i)
     }
 
-    #[inline]
     fn parse_formal_params(&mut self) -> Res<FormalParams<'b>> {
         debug!(
             "{}: parse_formal_params {:?}",
@@ -4073,7 +3992,6 @@ where
         })
     }
 
-    #[inline]
     fn parse_formal_param(&mut self, simple: bool) -> Res<(bool, bool, FuncArg<'b>)> {
         debug!(
             "{}: parse_formal_param {:?}",
@@ -4096,7 +4014,6 @@ where
         Ok((simple, found_restricted, param))
     }
 
-    #[inline]
     fn parse_rest_element(
         &mut self,
         params: &mut Vec<Item<Token<&'b str>>>,
@@ -4117,7 +4034,6 @@ where
         Ok((restricted, ret))
     }
 
-    #[inline]
     fn parse_binding_rest_el(
         &mut self,
         params: &mut Vec<Item<Token<&'b str>>>,
@@ -4131,7 +4047,6 @@ where
         Ok((b, Pat::RestElement(Box::new(pat))))
     }
 
-    #[inline]
     fn parse_pattern_with_default(
         &mut self,
         params: &mut Vec<Item<Token<&'b str>>>,
@@ -4160,7 +4075,6 @@ where
         Ok((is_restricted, ret))
     }
 
-    #[inline]
     fn parse_pattern(
         &mut self,
         kind: Option<VarKind>,
@@ -4197,7 +4111,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_array_pattern(
         &mut self,
         params: &mut Vec<Item<Token<&'b str>>>,
@@ -4231,7 +4144,6 @@ where
         Ok((false, Pat::Array(elements)))
     }
 
-    #[inline]
     fn parse_object_pattern(&mut self) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_object_pattern {:?}",
@@ -4254,7 +4166,6 @@ where
         Ok((false, Pat::Obj(body)))
     }
 
-    #[inline]
     fn parse_rest_prop(&mut self) -> Res<ObjPatPart<'b>> {
         debug!(
             "{}: parse_rest_prop {:?}",
@@ -4273,7 +4184,6 @@ where
         Ok(part)
     }
 
-    #[inline]
     fn parse_property_pattern(&mut self) -> Res<ObjPatPart<'b>> {
         debug!(
             "{}: parse_property_pattern {:?}",
@@ -4322,7 +4232,6 @@ where
         }))
     }
 
-    #[inline]
     fn parse_assignment_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_assignment_expr {:?}",
@@ -4506,7 +4415,6 @@ where
         }
     }
 
-    #[inline]
     fn is_async(expr: &Expr) -> bool {
         match expr {
             Expr::Func(ref f) => f.is_async,
@@ -4535,7 +4443,6 @@ where
         }
     }
 
-    #[inline]
     fn is_arrow_param_placeholder(expr: &Expr) -> bool {
         match expr {
             Expr::ArrowParamPlaceHolder(_, _) => true,
@@ -4697,7 +4604,6 @@ where
         Ok(Some(params2))
     }
 
-    #[inline]
     fn is_await(arg: &FuncArg) -> bool {
         match arg {
             FuncArg::Expr(ref e) => match e {
@@ -4711,7 +4617,6 @@ where
         }
     }
 
-    #[inline]
     fn is_assignment(arg: &FuncArg) -> bool {
         match arg {
             FuncArg::Pat(ref p) => match p {
@@ -4724,7 +4629,6 @@ where
             },
         }
     }
-    #[inline]
     pub fn is_simple(arg: &FuncArg) -> bool {
         match arg {
             FuncArg::Pat(ref p) => match p {
@@ -4738,7 +4642,6 @@ where
         }
     }
 
-    #[inline]
     fn is_invalid_await(arg: &FuncArg) -> bool {
         match arg {
             FuncArg::Expr(Expr::Assign(AssignExpr { right, .. }))
@@ -4820,7 +4723,6 @@ where
         }
     }
 
-    #[inline]
     fn is_reinterpret_target(ex: &Expr) -> bool {
         match ex {
             Expr::Ident(_) => true,
@@ -4835,7 +4737,6 @@ where
         }
     }
 
-    #[inline]
     fn reinterpret_prop(&self, p: Prop<'b>) -> Res<Prop<'b>> {
         let Prop {
             key,
@@ -4876,7 +4777,6 @@ where
         })
     }
 
-    #[inline]
     fn parse_yield_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_yield_expr {:?}",
@@ -4904,7 +4804,6 @@ where
         Ok(Expr::Yield(y))
     }
 
-    #[inline]
     fn parse_conditional_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_conditional_expr {:?}",
@@ -4939,7 +4838,6 @@ where
         Ok(expr)
     }
 
-    #[inline]
     fn parse_binary_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_binary_expression {:?}",
@@ -5049,7 +4947,6 @@ where
         Ok(current)
     }
 
-    #[inline]
     fn parse_exponentiation_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_exponentiation_expression",
@@ -5083,7 +4980,6 @@ where
         Ok(expr)
     }
 
-    #[inline]
     fn parse_unary_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_unary_expression {:?} allow_await: {}",
@@ -5188,7 +5084,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_await_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_await_expr {:?}",
@@ -5202,7 +5097,6 @@ where
         Ok(Expr::Await(Box::new(arg)))
     }
 
-    #[inline]
     fn parse_update_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_update_expr {:?}",
@@ -5281,7 +5175,6 @@ where
         }
     }
 
-    #[inline]
     fn is_func_decl(stmt: &Stmt) -> bool {
         if let Stmt::Expr(Expr::Func(_)) = stmt {
             true
@@ -5290,7 +5183,6 @@ where
         }
     }
 
-    #[inline]
     fn is_labeled_func(stmt: &Stmt) -> bool {
         match stmt {
             Stmt::Labeled(stmt) => {
@@ -5300,7 +5192,6 @@ where
         }
     }
 
-    #[inline]
     fn is_ident(expr: &Expr) -> bool {
         match expr {
             Expr::Ident(_) => true,
@@ -5308,7 +5199,6 @@ where
         }
     }
 
-    #[inline]
     fn parse_left_hand_side_expr(&mut self) -> Res<Expr<'b>> {
         if !self.context.allow_in {
             return Err(Error::InvalidUseOfContextualKeyword(
@@ -5368,7 +5258,6 @@ where
         Ok(expr)
     }
 
-    #[inline]
     /// Will parse a pending super expression.
     ///
     /// > note: This will handle any invalid super expression
@@ -5391,7 +5280,6 @@ where
         Ok(Expr::Super)
     }
 
-    #[inline]
     fn parse_left_hand_side_expr_allow_call(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_left_hand_side_expr_allow_call",
@@ -5477,7 +5365,6 @@ where
         Ok(expr)
     }
     /// Parse the arguments of an async function
-    #[inline]
     fn parse_async_args(&mut self) -> Res<Vec<Expr<'b>>> {
         debug!(
             "{}: parse_async_args {:?}",
@@ -5521,7 +5408,6 @@ where
     }
     /// Parse an argument of an async function
     /// note: not sure this is needed
-    #[inline]
     fn parse_async_arg(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_async_arg {:?}",
@@ -5534,7 +5420,6 @@ where
     /// Expect a comma separator,
     /// if parsing with tolerance we can tolerate
     /// a non-existent comma
-    #[inline]
     fn expect_comma_sep(&mut self) -> Res<()> {
         debug!(
             "{}: expect_comma_sep {:?}",
@@ -5544,7 +5429,6 @@ where
     }
 
     /// Parse an expression preceded by the `...` operator
-    #[inline]
     fn parse_spread_element(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_spread_element {:?}",
@@ -5557,7 +5441,6 @@ where
         Ok(Expr::Spread(Box::new(arg)))
     }
     /// Parse function arguments, expecting to open with `(` and close with `)`
-    #[inline]
     fn parse_args(&mut self) -> Res<Vec<Expr<'b>>> {
         debug!(
             "{}: parse_args {:?}",
@@ -5591,7 +5474,6 @@ where
     /// This will parse one of two expressions `new Thing()`
     /// or `new.target`. The later is only valid in a function
     /// body
-    #[inline]
     fn parse_new_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_new_expr {:?}",
@@ -5683,7 +5565,6 @@ where
     }
     /// Set the state back to the previous state
     /// isolating the previous state
-    #[inline]
     fn set_isolate_cover_grammar_state(
         &mut self,
         prev_bind: bool,
@@ -5701,7 +5582,6 @@ where
     }
     /// Get the context state in order to isolate this state from the
     /// following operation
-    #[inline]
     fn isolate_cover_grammar(&mut self) -> (bool, bool, Option<Item<Token<&'b str>>>) {
         debug!(
             "{}: isolate_cover_grammar {:?}",
@@ -5820,7 +5700,6 @@ where
     /// Get the next token and validate that it matches
     /// the punct provided, discarding the result
     /// if it does
-    #[inline]
     fn expect_punct(&mut self, p: Punct) -> Res<()> {
         let next = self.next_item()?;
         if !next.token.matches_punct(p) {
@@ -5828,7 +5707,6 @@ where
         }
         Ok(())
     }
-    #[inline]
     fn expect_fat_arrow(&mut self) -> Res<()> {
         if self.look_ahead.token.matches_punct(Punct::EqualGreaterThan) {
             if self.context.has_line_term {
@@ -5844,7 +5722,6 @@ where
     /// move on to the next item and validate it matches
     /// the keyword provided, discarding the result
     /// if it does
-    #[inline]
     fn expect_keyword(&mut self, k: Keyword<()>) -> Res<()> {
         let next = self.next_item()?;
         if !next.token.matches_keyword(k) {
@@ -5852,7 +5729,6 @@ where
         }
         Ok(())
     }
-    #[inline]
     fn at_return_arg(&self) -> bool {
         if self.context.has_line_term {
             return self.look_ahead.is_string() || self.look_ahead.is_template();
@@ -5861,7 +5737,6 @@ where
             && !self.at_punct(Punct::CloseBrace)
             && !self.look_ahead.is_eof()
     }
-    #[inline]
     fn at_import_call(&mut self) -> Res<bool> {
         debug!(
             "{}: at_import_call {:?}",
@@ -5882,7 +5757,6 @@ where
             Ok(false)
         }
     }
-    #[inline]
     fn at_qualified_prop_key(&self) -> bool {
         match &self.look_ahead.token {
             Token::Ident(_)
@@ -5910,7 +5784,6 @@ where
     /// (not including any comments)
     /// must be an identifier, `let`, `yield`
     /// `{`, or `[`
-    #[inline]
     fn at_lexical_decl(&mut self) -> bool {
         if let Token::Keyword(Keyword::Let(ref s)) = self.look_ahead.token {
             if s.contains("\\u") {
@@ -5933,18 +5806,15 @@ where
         ret
     }
     /// Test for if the next token is a specific punct
-    #[inline]
     fn at_punct(&self, p: Punct) -> bool {
         self.look_ahead.token.matches_punct(p)
     }
     /// Test for if the next token is a specific keyword
-    #[inline]
     fn at_keyword(&self, k: Keyword<()>) -> bool {
         self.look_ahead.token.matches_keyword(k)
     }
     /// This test is for all the operators that might be part
     /// of an assignment statement
-    #[inline]
     fn at_assign(&self) -> bool {
         self.look_ahead.token.matches_punct(Punct::Equal)
             || self.look_ahead.token.matches_punct(Punct::AsteriskEqual)
@@ -5978,7 +5848,6 @@ where
     /// The keyword `async` is conditional, that means to decided
     /// if we are actually at an async function we need to check the
     /// next token would need to be on the same line
-    #[inline]
     fn at_async_function(&mut self) -> bool {
         debug!(
             "{}: at_async_function {:?}",
@@ -6003,7 +5872,6 @@ where
     /// check the next token, if it is a semi-colon it will
     /// consume it otherwise we need to either be at a line terminator
     /// EoF or a close brace
-    #[inline]
     fn consume_semicolon(&mut self) -> Res<()> {
         trace!("consume_semicolon {}", self.context.has_line_term);
         if self.at_punct(Punct::SemiColon) {
@@ -6018,11 +5886,9 @@ where
     }
     /// Tests if a token matches an &str that might represent
     /// a contextual keyword like `async`
-    #[inline]
     fn at_contextual_keyword(&self, s: &str) -> bool {
         self.is_contextual_keyword(s, &self.look_ahead.span)
     }
-    #[inline]
     fn is_contextual_keyword(&self, keyword: &str, span: &Span) -> bool {
         if let Some(current) = self.scanner.str_for(span) {
             debug!("at_contextual_keyword {:?} {:?}", keyword, current);
@@ -6034,13 +5900,11 @@ where
     /// Sort of keywords `eval` and `arguments` have
     /// a special meaning and will cause problems
     /// if used in the wrong scope
-    #[inline]
     fn is_restricted_word(word: &resast::Ident) -> bool {
         &word.name == "eval" || &word.name == "arguments"
     }
     /// Check if this &str is in the list of reserved
     /// words in the context of 'use strict'
-    #[inline]
     fn is_strict_reserved(word: &resast::Ident) -> bool {
         word.name == "implements"
             || word.name == "interface"
@@ -6055,7 +5919,6 @@ where
     /// Tests if the parser is currently at the
     /// start of an expression. This consists of a
     /// subset of punctuation, keywords or a regex Lit
-    #[inline]
     fn is_start_of_expr(&self) -> bool {
         let mut ret = true;
         let token = &self.look_ahead.token;
@@ -6089,8 +5952,6 @@ where
         ret
     }
 
-    #[inline]
-    #[inline]
     fn at_big_int_flag(&self) -> bool {
         let Span { start, end } = self.look_ahead.span;
         &self.original[start..end] == "n"
