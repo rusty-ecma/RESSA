@@ -11,10 +11,10 @@ categories = ["parsing", "text-processing", "web-programming"]
 edition = "2018"
 
 [dependencies]
+backtrace = "0"
 ress = "0.9.1"
 resast = "0.4"
 log = "0.4"
-backtrace = "0"
 walkdir = { version = "2", optional = true }
 indicatif = { version = "0.12", optional = true, features = ["with_rayon"] }
 rayon = { version = "1", optional = true }
