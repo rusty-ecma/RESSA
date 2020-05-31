@@ -126,7 +126,7 @@ impl Error {
             InvalidSuper(p) => Some(*p),
             InvalidFuncPosition(p, _) => Some(*p),
             InvalidClassPosition(p, _) => Some(*p),
-            ForOfInAssign(p ,_) => Some(*p),
+            ForOfInAssign(p, _) => Some(*p),
             ContinueOutsideOfIteration(p) => Some(*p),
             InvalidParameter(p, _) => Some(*p),
             OctalLiteral(p) => Some(*p),
@@ -140,8 +140,11 @@ impl Error {
             InvalidStartOfExpressionStmt(p, _) => Some(*p),
             DuplicateExport(p, _) => Some(*p),
             ContinueOfNotIterationLabel(p, _) => Some(*p),
-            Scanner(e) => Some(Position { line: e.line, column: e.column }),
-            _ => None
+            Scanner(e) => Some(Position {
+                line: e.line,
+                column: e.column,
+            }),
+            _ => None,
         }
     }
 }

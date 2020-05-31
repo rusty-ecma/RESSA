@@ -10,8 +10,7 @@ fn es5() {
     info!("ES5");
     let path = Lib::Everything(EverythingVersion::Es5).path();
     println!("path: {:?}", path);
-    let js = get_js_file(&path)
-        .unwrap_or_else( |e| panic!("Faield to get {:?}\n{}", path, e));
+    let js = get_js_file(&path).unwrap_or_else(|e| panic!("Faield to get {:?}\n{}", path, e));
     let mut p = Parser::new(&js).expect("Failed to create parser");
     let mut tokens = es_tokens::ES5.iter();
     let mut i = 0;
@@ -20,7 +19,11 @@ fn es5() {
         if let Some(part) = tokens.next() {
             let item = match item {
                 Ok(i) => i,
-                Err(e) => panic!("Error parsing {:?}\n{}", path, super::format_error(&js, e).unwrap_or_else(String::new)),
+                Err(e) => panic!(
+                    "Error parsing {:?}\n{}",
+                    path,
+                    super::format_error(&js, e).unwrap_or_else(String::new)
+                ),
             };
             if item != part {
                 panic!(
