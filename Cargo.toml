@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 # ress = "0.9.0"
-ress = { git = "https://github.com/rusty-ecma/ress", rev = "6fc0fe9" }
+ress = { git = "https://github.com/rusty-ecma/ress", rev = "d22b063" }
 resast = "0.4"
 log = "0.4"
 backtrace = "0"
