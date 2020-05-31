@@ -106,7 +106,9 @@ fn bench(c: &mut Criterion, js: &str, name: &'static str, module: bool) {
                 .expect("Unable to crate new parser for es2015-module.js");
             for i in p {
                 match i {
-                    Ok(p) => {black_box(p);},
+                    Ok(p) => {
+                        black_box(p);
+                    }
                     Err(e) => {
                         if let Some(text) = format_error(js, &e) {
                             panic!("{}:\n{}", e, text);
@@ -121,25 +123,29 @@ fn bench(c: &mut Criterion, js: &str, name: &'static str, module: bool) {
 }
 
 fn format_error(js: &str, e: &ressa::Error) -> Option<String> {
-    
     let pos = e.position()?;
     let line_count = js.lines().count();
     if line_count < 5 {
         return Some(js.to_string());
     }
     let skip = pos.line.saturating_sub(2);
-    Some(js.lines().enumerate().skip(skip)
-        .take(5)
-        .map(|(i,l)| {
-            if i+1 == pos.line {
-                let whitespace = " ".repeat(pos.column);
-                let tail_ct = l.len() - pos.column;
-                let arrows = "^".repeat(tail_ct);
-                format!("{}\n{}{}\n", l, whitespace, arrows)
-            } else {
-                format!("{}\n", l)
-            }
-        }).collect())
+    Some(
+        js.lines()
+            .enumerate()
+            .skip(skip)
+            .take(5)
+            .map(|(i, l)| {
+                if i + 1 == pos.line {
+                    let whitespace = " ".repeat(pos.column);
+                    let tail_ct = l.len() - pos.column;
+                    let arrows = "^".repeat(tail_ct);
+                    format!("{}\n{}{}\n", l, whitespace, arrows)
+                } else {
+                    format!("{}\n", l)
+                }
+            })
+            .collect(),
+    )
 }
 
 fn npm_install() -> Result<(), ::std::io::Error> {
