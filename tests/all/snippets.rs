@@ -716,6 +716,13 @@ fn assign_multiple_props_nested() {
     .unwrap();
 }
 
+#[test]
+#[ignore]
+fn invalid_group_regression() {
+    // TODO: named regex groups
+    run_test(r#"var re = /(?<x>a)|b/"#, false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
