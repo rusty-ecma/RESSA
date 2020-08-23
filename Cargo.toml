@@ -1,6 +1,6 @@
 [package]
 name = "ressa"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Robert Masen <r@robertmasen.pizza>"]
 repository = "https://github.com/FreeMasen/RESSA"
 description = "An ECMAscript parser"
@@ -11,8 +11,7 @@ categories = ["parsing", "text-processing", "web-programming"]
 edition = "2018"
 
 [dependencies]
-# ress = "0.9.0"
-ress = { git = "https://github.com/rusty-ecma/ress", rev = "6fc0fe9" }
+ress = "0.9.1"
 resast = "0.4"
 log = "0.4"
 backtrace = "0"
