@@ -196,7 +196,7 @@ impl<'a> Test262Runner<'a> {
             .iter()
             .any(|f| f == &Flag::Module || f == &Flag::NoStrict)
         {
-            self.run_script(&format!("'use strict'\n{}", self.js))?;
+            self.run_script(&format!("'use strict';\n{}", self.js))?;
         }
         Ok(())
     }

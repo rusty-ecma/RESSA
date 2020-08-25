@@ -1,0 +1,18 @@
+[package]
+name = "in-and-out-logger"
+version = "0.1.0"
+authors = ["rfm <r@robertmasen.pizza>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+syn = { version = "1", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"
+
+[dev-dependencies]
+log = "0.4"
+
+[lib]
+proc-macro = true

@@ -705,10 +705,47 @@ fn dupe_ident_in_loop_left() {
 }
 
 #[test]
-#[ignore]
 fn invalid_group_regression() {
-    // TODO: named regex groups
     run_test(r#"var re = /(?<x>a)|b/"#, false).unwrap();
+}
+
+#[test]
+fn array_for_each() {
+    let js = r#"'use strict'
+[
+        
+      ].forEach((s) => {
+        try {
+          validateNativeFunctionSource(s);
+        } catch (unused) {
+          $ERROR(`${JSON.stringify(s)} should pass`);
+        }
+      });
+      
+      [
+        'native code',
+        'function() {}',
+        'function(){ "native code" }',
+        'function(){ [] native code }',
+        'function()) { [native code] }',
+        'function(() { [native code] }',
+        'function []] () { [native code] }',
+        'function [[] () { [native code] }',
+        'function ["]] () { [native code] }',
+        'function [\']] () { [native code] }',
+        'function() { [native code] /* }',
+        '// function() { [native code] }',
+      ].forEach((s) => {
+        let fail = false;
+        try {
+          validateNativeFunctionSource(s);
+          fail = true;
+        } catch (unused) {}
+        if (fail) {
+          $ERROR(`${JSON.stringify(s)} should fail`);
+        }
+      });"#;
+      run_test(js, false).unwrap();
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {

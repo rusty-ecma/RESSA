@@ -121,11 +121,6 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
 }
 
 fn run(file: &Path) -> Result<(), Error> {
-    // Named regex groups
-    if file.ends_with("bug1640487.js")
-    || file.ends_with("bug1640592.js") {
-        return Ok(())
-    }
     let mut contents = ::std::fs::read_to_string(file)?;
     if contents.starts_with("|") {
         // bad comment
