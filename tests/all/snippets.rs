@@ -745,14 +745,18 @@ fn array_for_each() {
           $ERROR(`${JSON.stringify(s)} should fail`);
         }
       });"#;
-      run_test(js, false).unwrap();
+    run_test(js, false).unwrap();
 }
 
 #[test]
 fn async_generator() {
-    run_test("export default async function * AG() {}
+    run_test(
+        "export default async function * AG() {}
     AG.foo = '';
-    ", true).unwrap();
+    ",
+        true,
+    )
+    .unwrap();
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {

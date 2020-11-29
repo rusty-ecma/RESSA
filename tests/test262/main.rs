@@ -200,7 +200,6 @@ impl<'a> Test262Runner<'a> {
         }
         Ok(())
     }
-    
 
     pub fn run(&self) -> Result<(), E262> {
         if !self.desc.flags.iter().any(|f| f == &Flag::OnlyStrict) {

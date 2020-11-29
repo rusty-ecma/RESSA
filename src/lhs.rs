@@ -9,19 +9,13 @@ type Res = Result<(), Error>;
 
 pub fn is_simple_expr<'a>(expr: &Expr<'a>) -> bool {
     trace!("is_simple_expr {:?}", expr);
-    match expr {
-        Expr::This => false,
-        _ => true,
-    }
+    !matches!(expr, Expr::This)
 }
 
 pub fn is_simple_pat<'a>(pat: &Pat<'a>) -> bool {
     trace!("is_simple_pat {:?}", pat);
     match pat {
-        Pat::Ident(ref id) => match &*id.name {
-            "this" => false,
-            _ => true,
-        },
+        Pat::Ident(ref id) => !matches!(&*id.name, "this"),
         _ => true,
     }
 }

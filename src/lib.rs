@@ -2278,10 +2278,7 @@ where
     #[inline]
     #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_pat_ident(pat: &Pat) -> bool {
-        match pat {
-            Pat::Ident(_) => true,
-            _ => false,
-        }
+        matches!(pat, Pat::Ident(_))
     }
 
     #[inline]
@@ -3127,14 +3124,8 @@ where
     #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn is_rest(arg: &FuncArg) -> bool {
         match arg {
-            FuncArg::Expr(ref e) => match e {
-                Expr::Spread(_) => true,
-                _ => false,
-            },
-            FuncArg::Pat(ref p) => match p {
-                Pat::RestElement(_) => true,
-                _ => false,
-            },
+            FuncArg::Expr(ref e) => matches!(e, Expr::Spread(_)),
+            FuncArg::Pat(ref p) => matches!(p, Pat::RestElement(_)),
         }
     }
 
@@ -3415,7 +3406,10 @@ where
                 Token::RegEx(r) => {
                     let flags = if let Some(f) = r.flags { f } else { "" };
                     let re = resast::prelude::RegEx::from(&r.body, flags);
-                    crate::regex::validate_regex(regex.location.start, self.get_string(&regex.span)?)?;
+                    crate::regex::validate_regex(
+                        regex.location.start,
+                        self.get_string(&regex.span)?,
+                    )?;
                     re
                 }
                 _ => unreachable!(),
@@ -4194,10 +4188,7 @@ where
 
     #[inline]
     #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
-    fn parse_rest_element(
-        &mut self,
-        params: &mut Vec<RessItem<'b>>,
-    ) -> Res<(bool, Pat<'b>)> {
+    fn parse_rest_element(&mut self, params: &mut Vec<RessItem<'b>>) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_rest_element {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -4216,10 +4207,7 @@ where
 
     #[inline]
     #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
-    fn parse_binding_rest_el(
-        &mut self,
-        params: &mut Vec<RessItem<'b>>,
-    ) -> Res<(bool, Pat<'b>)> {
+    fn parse_binding_rest_el(&mut self, params: &mut Vec<RessItem<'b>>) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_binding_rest_el {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -5548,7 +5536,7 @@ where
             self.set_inherit_cover_grammar_state(prev_bind, prev_assign, prev_first);
             ret
         };
-        
+
         loop {
             if self.at_punct(Punct::Period) {
                 self.context.is_binding_element = false;
@@ -5892,7 +5880,11 @@ where
     /// and return the last token
     #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn next_item(&mut self) -> Res<RessItem<'b>> {
-        trace!("next_item {}, next: {:?}", self.context.has_line_term, self.look_ahead);
+        trace!(
+            "next_item {}, next: {:?}",
+            self.context.has_line_term,
+            self.look_ahead
+        );
         let mut comment_line_term = false;
         loop {
             self.context.has_line_term = comment_line_term || self.scanner.has_pending_new_line();
