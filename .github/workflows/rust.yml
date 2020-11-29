@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Setup Node.js for use with actions
-      uses: actions/setup-node@v1.4.0
+      uses: actions/setup-node@v1.4.4
     - name: install js test libs from npm
       run: npm install
     - name: Build
