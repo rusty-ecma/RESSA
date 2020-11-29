@@ -43,6 +43,7 @@ pub enum Error {
     UndefinedExports(Vec<String>),
     ContinueOfNotIterationLabel(Position, String),
     Scanner(ress::error::Error),
+    InvalidRegex(Position, String),
     Other(Box<dyn ::std::error::Error>),
 }
 
@@ -90,6 +91,7 @@ impl Display for Error {
             Error::UndefinedExports(ref names) => write!(f, "Undefined exports in module: {}", names.join(", ")),
             Error::ContinueOfNotIterationLabel(ref pos, ref token) => write!(f, "Label `{}` is does not label a loop, continue is invalid at {}", token, pos),
             Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
+            Error::InvalidRegex(ref pos, ref msg) => write!(f, "Invalid regex at {}: {}", pos, msg),
             Error::Other(ref e) => write!(f, "{}", e),
         }
     }
@@ -98,6 +100,9 @@ impl Display for Error {
 impl Error {
     pub fn unable_to_reinterpret(pos: Position, from: &str, to: &str) -> Self {
         Error::UnableToReinterpret(pos, from.to_owned(), to.to_owned())
+    }
+    pub fn invalid_regex(pos: Position, err: res_regex::Error) -> Self {
+        Self::InvalidRegex(pos, err.msg)
     }
 }
 

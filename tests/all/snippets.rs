@@ -711,7 +711,7 @@ fn invalid_group_regression() {
 
 #[test]
 fn array_for_each() {
-    let js = r#"'use strict'
+    let js = r#"'use strict';
 [
         
       ].forEach((s) => {
@@ -746,6 +746,13 @@ fn array_for_each() {
         }
       });"#;
       run_test(js, false).unwrap();
+}
+
+#[test]
+fn async_generator() {
+    run_test("export default async function * AG() {}
+    AG.foo = '';
+    ", true).unwrap();
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {

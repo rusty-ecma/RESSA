@@ -175,7 +175,7 @@ impl WorkHandler {
 }
 
 impl<'a> CommentHandler<'a> for WorkHandler {
-    fn handle_comment(&mut self, comment: Item<Token<&str>>) {
+    fn handle_comment(&mut self, comment: Item<&str>) {
         match comment.token {
             Token::Comment(c) => {
                 if c.is_multi_line() {

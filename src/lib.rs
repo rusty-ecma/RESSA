@@ -59,7 +59,6 @@ extern crate ress;
 #[macro_use]
 extern crate log;
 extern crate backtrace;
-use in_and_out_logger::log_in_and_out;
 
 use ress::prelude::*;
 pub use ress::Span;
@@ -82,6 +81,7 @@ use std::{
     collections::{HashMap, HashSet},
     mem::replace,
 };
+type RessItem<'a> = Item<&'a str>;
 
 /// The current configuration options.
 /// This will most likely increase over time
@@ -122,7 +122,7 @@ struct Context<'a> {
     allow_super_call: bool,
     /// If we have found any possible naming errors
     /// which are not yet resolved
-    first_covert_initialized_name_error: Option<Item<Token<&'a str>>>,
+    first_covert_initialized_name_error: Option<RessItem<'a>>,
     /// If the current expressions is an assignment target
     is_assignment_target: bool,
     /// If the current expression is a binding element
@@ -286,17 +286,17 @@ pub struct Parser<'a, CH> {
     /// `ress` crate for more details)
     scanner: Scanner<'a>,
     /// The next item,
-    look_ahead: Item<Token<&'a str>>,
+    look_ahead: RessItem<'a>,
     /// Since we are looking ahead, we need
     /// to make sure we don't miss the eof
     /// by using this flag
     found_eof: bool,
     /// a possible container for tokens, currently
     /// it is unused
-    _tokens: Vec<Item<Token<&'a str>>>,
+    _tokens: Vec<RessItem<'a>>,
     /// a possible container for comments, currently
     /// it is unused
-    _comments: Vec<Item<Token<&'a str>>>,
+    _comments: Vec<RessItem<'a>>,
     /// The current position we are parsing
     current_position: Position,
     look_ahead_position: Position,
@@ -454,7 +454,6 @@ where
         );
         let orig = self.look_ahead.clone();
         let expr = self.parse_expression()?;
-        debug!("parsed dir expression: {:?}", expr);
         if let Expr::Lit(lit) = expr {
             if let Lit::String(s) = lit {
                 if let Token::String(quoted) = &orig.token {
@@ -478,6 +477,7 @@ where
                 if self.context.strict && self.context.found_directive_octal_escape {
                     return Err(Error::OctalLiteral(orig.location.start));
                 }
+                debug!("Consuming Semi");
                 self.consume_semicolon()?;
                 Ok(ProgramPart::Dir(Dir {
                     dir: s.clone_inner(),
@@ -488,6 +488,7 @@ where
             }
         } else {
             let stmt = ProgramPart::Stmt(Stmt::Expr(expr));
+            debug!("Consuming Semi");
             self.consume_semicolon()?;
             Ok(stmt)
         }
@@ -2346,9 +2347,7 @@ where
             false
         };
         self.expect_keyword(Keyword::Function(()))?;
-        let is_gen = if is_async {
-            false
-        } else {
+        let is_gen = {
             let is_gen = self.at_punct(Punct::Asterisk);
             if is_gen {
                 let _ = self.next_item()?;
@@ -3339,6 +3338,7 @@ where
                 Ok(Expr::ident_from(self.get_string(&ident.span)?))
             }
         } else if self.look_ahead.token.is_number() || self.look_ahead.token.is_string() {
+            debug!("found number or string");
             self.context.is_assignment_target = false;
             self.context.is_binding_element = false;
             let item = self.next_item()?;
@@ -3355,6 +3355,7 @@ where
                     Lit::number_from(inner)
                 }
                 Token::String(sl) => {
+                    debug!("found string!");
                     let inner = match sl {
                         ress::prelude::StringLit::Single(ref s) => {
                             self.octal_literal_guard_string(
@@ -3414,7 +3415,7 @@ where
                 Token::RegEx(r) => {
                     let flags = if let Some(f) = r.flags { f } else { "" };
                     let re = resast::prelude::RegEx::from(&r.body, flags);
-                    crate::regex::validate_regex(self.get_string(&regex.span)?)?;
+                    crate::regex::validate_regex(regex.location.start, self.get_string(&regex.span)?)?;
                     re
                 }
                 _ => unreachable!(),
@@ -4175,7 +4176,7 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         let start = self.look_ahead_position;
-        let mut params: Vec<Item<Token<&'b str>>> = Vec::new();
+        let mut params: Vec<RessItem<'b>> = Vec::new();
         let (found_restricted, param) = if self.at_punct(Punct::Ellipsis) {
             self.parse_rest_element(&mut params)?
         } else {
@@ -4195,7 +4196,7 @@ where
     #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_rest_element(
         &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
+        params: &mut Vec<RessItem<'b>>,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_rest_element {:?}",
@@ -4217,7 +4218,7 @@ where
     #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_binding_rest_el(
         &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
+        params: &mut Vec<RessItem<'b>>,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_binding_rest_el {:?}",
@@ -4232,7 +4233,7 @@ where
     #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_pattern_with_default(
         &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
+        params: &mut Vec<RessItem<'b>>,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_pattern_with_default {:?}",
@@ -4263,7 +4264,7 @@ where
     fn parse_pattern(
         &mut self,
         kind: Option<VarKind>,
-        params: &mut Vec<Item<Token<&'b str>>>,
+        params: &mut Vec<RessItem<'b>>,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_pattern {:?}",
@@ -4300,7 +4301,7 @@ where
     #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
     fn parse_array_pattern(
         &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
+        params: &mut Vec<RessItem<'b>>,
         _kind: VarKind,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
@@ -5608,6 +5609,7 @@ where
             }
         }
         self.context.allow_in = prev_in;
+        debug!("Returning expr: {:?}", expr);
         Ok(expr)
     }
     /// Parse the arguments of an async function
@@ -5828,7 +5830,7 @@ where
         &mut self,
         prev_bind: bool,
         prev_assign: bool,
-        prev_first: Option<Item<Token<&'b str>>>,
+        prev_first: Option<RessItem<'b>>,
     ) -> Res<()> {
         if let Some(ref _e) = prev_first {
             //FIXME this needs to do something
@@ -5842,7 +5844,7 @@ where
     /// Get the context state in order to isolate this state from the
     /// following operation
     #[inline]
-    fn isolate_cover_grammar(&mut self) -> (bool, bool, Option<Item<Token<&'b str>>>) {
+    fn isolate_cover_grammar(&mut self) -> (bool, bool, Option<RessItem<'b>>) {
         debug!(
             "{}: isolate_cover_grammar {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -5854,7 +5856,7 @@ where
         ret
     }
     /// Get the context state for cover grammar operations
-    fn get_cover_grammar_state(&self) -> (bool, bool, Option<Item<Token<&'b str>>>) {
+    fn get_cover_grammar_state(&self) -> (bool, bool, Option<RessItem<'b>>) {
         (
             self.context.is_binding_element,
             self.context.is_assignment_target,
@@ -5867,7 +5869,7 @@ where
         &mut self,
         is_binding_element: bool,
         is_assignment: bool,
-        first_covert_initialized_name_error: Option<Item<Token<&'b str>>>,
+        first_covert_initialized_name_error: Option<RessItem<'b>>,
     ) {
         self.context.is_binding_element = self.context.is_binding_element && is_binding_element;
         self.context.is_assignment_target = self.context.is_assignment_target && is_assignment;
@@ -5877,7 +5879,7 @@ where
     }
     /// Capture the context state for a binding_element, assignment and
     /// first_covert_initialized_name
-    fn inherit_cover_grammar(&mut self) -> (bool, bool, Option<Item<Token<&'b str>>>) {
+    fn inherit_cover_grammar(&mut self) -> (bool, bool, Option<RessItem<'b>>) {
         trace!("inherit_cover_grammar");
         let ret = self.get_cover_grammar_state();
         self.context.is_binding_element = true;
@@ -5889,11 +5891,11 @@ where
     /// swap the last look ahead with this new token
     /// and return the last token
     #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
-    fn next_item(&mut self) -> Res<Item<Token<&'b str>>> {
+    fn next_item(&mut self) -> Res<RessItem<'b>> {
         trace!("next_item {}, next: {:?}", self.context.has_line_term, self.look_ahead);
         let mut comment_line_term = false;
         loop {
-            self.context.has_line_term = comment_line_term || self.scanner.pending_new_line;
+            self.context.has_line_term = comment_line_term || self.scanner.has_pending_new_line();
             if let Some(look_ahead) = self.scanner.next() {
                 let look_ahead = look_ahead?;
                 if cfg!(feature = "debug_look_ahead") {
@@ -6126,7 +6128,7 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         if self.at_contextual_keyword("async") {
-            !self.scanner.pending_new_line
+            !self.scanner.has_pending_new_line()
                 && if let Some(peek) = self.scanner.look_ahead() {
                     if let Ok(peek) = peek {
                         peek.token.matches_keyword(Keyword::Function(()))
@@ -6242,7 +6244,7 @@ where
             .ok_or_else(|| self.op_error("Unable to get &str from scanner"))
     }
 
-    fn expected_token_error<T>(&self, item: &Item<Token<&'b str>>, expectation: &[&str]) -> Res<T> {
+    fn expected_token_error<T>(&self, item: &Item<&'b str>, expectation: &[&str]) -> Res<T> {
         if cfg!(feature = "error_backtrace") {
             let bt = backtrace::Backtrace::new();
             error!("{:?}", bt);
@@ -6265,7 +6267,7 @@ where
             format!("Expected {}; found {:?}", expectation, item.token),
         ))
     }
-    fn unexpected_token_error<T>(&self, item: &Item<Token<&'b str>>, msg: &str) -> Res<T> {
+    fn unexpected_token_error<T>(&self, item: &RessItem<'b>, msg: &str) -> Res<T> {
         if cfg!(feature = "error_backtrace") {
             let bt = backtrace::Backtrace::new();
             error!("{:?}", bt);
