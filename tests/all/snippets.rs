@@ -704,6 +704,18 @@ fn dupe_ident_in_loop_left() {
     run_test("for (const [a, a] of []);", false).unwrap();
 }
 
+#[test]
+fn assign_multiple_props_nested() {
+    run_test(
+        "var a = {
+        b: c += 1,
+        d: e += 1,
+      };",
+        false,
+    )
+    .unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
