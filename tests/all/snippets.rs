@@ -749,7 +749,7 @@ fn array_for_each() {
 }
 
 #[test]
-fn async_generator() {
+fn export_async_generator() {
     run_test(
         "export default async function * AG() {}
     AG.foo = '';
@@ -757,6 +757,16 @@ fn async_generator() {
         true,
     )
     .unwrap();
+}
+
+#[test]
+fn async_generator_method() {
+    run_test(
+        "let o = { 
+            async *f() {}
+        };",
+        false,
+    ).unwrap();
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {

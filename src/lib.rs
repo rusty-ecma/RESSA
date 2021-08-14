@@ -2933,6 +2933,12 @@ where
             self.look_ahead.span.start
         );
         let start = self.look_ahead_position;
+        let generator = if self.at_punct(Punct::Asterisk) {
+            let _ = self.next_item();
+            true
+        } else {
+            false
+        };
         let prev_yield = self.context.allow_yield;
         let prev_await = self.context.allow_await;
         self.context.allow_yield = false;
@@ -2952,7 +2958,7 @@ where
             id: None,
             params: params.params,
             is_async: true,
-            generator: false,
+            generator,
             body,
         };
         Ok(PropValue::Expr(Expr::Func(func)))
@@ -2960,7 +2966,7 @@ where
 
     #[inline]
     #[cfg_attr(feature = "log_in_and_out", log_in_and_out)]
-    fn parse_property_method(&mut self) -> Res<PropValue<'b>> {
+    fn parse_property_method(&mut self, is_gen: bool, is_async: bool) -> Res<PropValue<'b>> {
         debug!(
             "{}: parse_property_method {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -2968,7 +2974,7 @@ where
         let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
         let prev_strict = self.context.allow_strict_directive;
-        self.context.allow_yield = !self.context.strict;
+        self.context.allow_yield = !self.context.strict && !is_gen;
         self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
@@ -2984,8 +2990,8 @@ where
         let func = Func {
             id: None,
             params: params.params,
-            is_async: false,
-            generator: false,
+            is_async,
+            generator: is_gen,
             body,
         };
         Ok(PropValue::Expr(Expr::Func(func)))
@@ -3680,17 +3686,61 @@ where
         let mut is_proto = false;
         let mut at_get = false;
         let mut at_set = false;
+        // let prev_super = self.context.allow_super;
+        // let computed = self.at_punct(Punct::OpenBracket);
+        // let key = self.parse_object_property_key()?;
+        // let (at_get, at_set, at_async) = Self::check_key_for_keywords(&key);
+        // if at_get {
+        //     let computed = self.at_punct(Punct::OpenBracket);
+        //     let key = self.parse_object_property_key()?;
+        //     self.context.set_allow_super(true);
+        //     let value = self.parse_getter_method()?;
+        //     self.context.set_allow_super(prev_super);
+        //     ObjProp::Prop(Prop {
+        //         computed,
+        //         key,
+        //         value,
+        //         kind: PropKind::Get,
+        //         method: false,
+        //         short_hand: false,
+        //         is_static: false,
+        //     })
+        // } else if at_set {
+        //     let computed = self.at_punct(Punct::OpenBracket);
+        //     let key = self.parse_object_property_key()?;
+        //     self.context.set_allow_super(true);
+        //     let value = self.parse_getter_method()?;
+        //     self.context.set_allow_super(prev_super);
+        //     ObjProp::Prop(Prop {
+        //         computed,
+        //         key,
+        //         value,
+        //         kind: PropKind::Set,
+        //         method: false,
+        //         short_hand: false,
+        //         is_static: false,
+        //     })
+        // } else if at_async {
+        //     if self.at_qualified_prop_key() {
+                
+        //     } else if self.at_punct(Punct::Asterisk) {
+        //         if !self.at_qualified_prop_key() {
+        //             //error....
+        //         }
+
+        //     } else {
+
+        //     }
+        // };
         let (key, is_async, computed) = if self.look_ahead.token.is_ident()
             || (!self.context.strict && self.look_ahead.token.matches_keyword(Keyword::Let(())))
         {
             at_get = self.look_ahead.token.matches_ident_str("get");
             at_set = self.look_ahead.token.matches_ident_str("set");
             let ident = self.next_item()?;
-            let computed = self.at_punct(Punct::OpenBracket);
             let is_async = !self.context.has_line_term
                 && ident.token.matches_ident_str("async")
                 && !self.at_punct(Punct::Colon)
-                && !self.at_punct(Punct::Asterisk)
                 && !self.at_punct(Punct::Comma);
             let key = if is_async {
                 if self.at_contextual_keyword("async") {
@@ -3704,7 +3754,7 @@ where
                 let s = self.get_string(&ident.span)?;
                 PropKey::Expr(Expr::Ident(resast::Ident::from(s)))
             };
-            (Some(key), is_async, computed)
+            (Some(key), is_async, false)
         } else if self.at_punct(Punct::Asterisk) {
             self.next_item()?;
             (None, false, false)
@@ -3841,6 +3891,95 @@ where
             return self.expected_token_error(&start, &["object property key"]);
         };
         Ok((is_proto, prop))
+    }
+
+    fn parse_obj_prop_(&mut self) -> Res<(bool, ObjProp<'b>)> {
+        if self.at_punct(Punct::Ellipsis) {
+            // deal with spread...
+        }
+        let mut is_gen = if self.at_punct(Punct::Asterisk) {
+            let _ = self.next_item()?;
+            true
+        } else {
+            false
+        };
+        let mut key = self.parse_object_property_key()?;
+        let mut is_async = false;
+
+        if self.check_key_for_async(&key) && !is_gen {
+            if self.at_punct(Punct::Asterisk) {
+                let _ = self.next_item();
+                is_gen = true;
+            }
+            is_async = true;
+            key = self.parse_object_property_key()?;
+        }
+        todo!()
+    }
+    fn check_key_for_async(&self, key: &PropKey) -> bool {
+        if !Self::async_key_guard(key) {
+            return false;
+        }
+        if self.scanner.has_pending_new_line() {
+            return false;
+        }
+        matches!(self.look_ahead.token, 
+            Token::Ident(_)
+            | Token::Number(_)
+            | Token::String(_)
+            | Token::Keyword(_)
+            | Token::Punct(Punct::OpenBracket)
+            | Token::Punct(Punct::Asterisk)
+        )
+    }
+    fn async_key_guard(key: &PropKey) -> bool {
+        match key {
+            PropKey::Expr(e) => if let Expr::Ident(id) = e {
+                id.name == "async"
+            } else {
+                false
+            },
+            PropKey::Pat(p) => if let Pat::Ident(id) = p {
+                id.name == "async"
+            } else {
+                false
+            },
+            _ => false
+        }
+    }
+    fn parse_property_value_(&mut self, is_async: bool, is_gen: bool, is_get: bool, is_set: bool, computed: bool) -> Res<(PropValue<'b>, PropKind)> {
+        if self.at_punct(Punct::Colon) {
+            if is_async || is_gen  {
+                // error...
+            }
+            let _ = self.next_item()?;
+            let value = self.parse_assignment_expr()?;
+            (PropValue::Expr(value),
+             PropKind::Init)
+        } else if self.at_punct(Punct::OpenParen) {
+            let value = self.parse_property_method(is_gen, is_async)?;
+            (value, PropKind::Init)
+        } else if !computed && (is_set || is_get) && !self.at_punct(Punct::Comma) && !self.at_punct(Punct::OpenParen) {
+            if is_async || is_gen  {
+                // error...
+            }
+            let kind = if_set {
+                PropKind::Set
+            } else {
+                PropKind::Get
+            };
+            let value = self.parse_property_method(false, false)?;
+            (value, kind)
+        } else {
+            if is_async || is_gen  {
+                // error...
+            }
+            (
+                
+            )
+        };
+
+        todo!()
     }
 
     #[inline]
@@ -6381,4 +6520,12 @@ enum StmtCtx<'a> {
     Label(&'a str),
     While,
     With,
+}
+
+struct PropPrefix<'a> {
+    is_set: bool,
+    is_get: bool,
+    is_gen: bool,
+    is_async: bool,
+    key: PropKey<'a>,
 }
