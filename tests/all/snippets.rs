@@ -723,6 +723,41 @@ fn invalid_group_regression() {
     run_test(r#"var re = /(?<x>a)|b/"#, false).unwrap();
 }
 
+#[test]
+fn async_func_tokens() {
+    let mut p = Parser::builder()
+        .js("async function f() {}")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Func(Func {
+            body: FuncBody(vec![]),
+            generator: false,
+            id: Some(Ident::new("f".to_owned())),
+            is_async: true,
+            params: vec![],
+        }))]),
+        tokens
+    );
+}
+
+#[test]
+fn func_decl_tokens() {
+    let mut p = Parser::builder().js("function f() {}").build().unwrap();
+    let tokens = p.parse().unwrap();
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Func(Func {
+            body: FuncBody(vec![]),
+            generator: false,
+            id: Some(Ident::new("f".to_owned())),
+            is_async: false,
+            params: vec![],
+        }))]),
+        tokens
+    );
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
