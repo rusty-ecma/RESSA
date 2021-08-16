@@ -2207,7 +2207,7 @@ where
                 if self.at_punct(Punct::Equal) {
                     let _ = self.next_item()?;
                     let init = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
-                     Some(init)
+                    Some(init)
                 } else {
                     return self.expected_token_error(&self.look_ahead, &["="]);
                 }
