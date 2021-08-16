@@ -574,6 +574,11 @@ where
                 }
             },
             _ => {
+                if self.at_async_function() {
+                    let func = self.parse_fn_stmt(ctx.is_none())?;
+                    let decl = Decl::Func(func);
+                    return Ok(ProgramPart::Decl(decl));
+                }
                 let stmt = self.parse_statement(ctx)?;
                 Ok(ProgramPart::Stmt(stmt))
             }
