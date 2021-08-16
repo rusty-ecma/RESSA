@@ -705,6 +705,18 @@ fn dupe_ident_in_loop_left() {
 }
 
 #[test]
+fn assign_multiple_props_nested() {
+    run_test(
+        "var a = {
+        b: c += 1,
+        d: e += 1,
+      };",
+        false,
+    )
+    .unwrap();
+}
+
+#[test]
 #[ignore]
 fn invalid_group_regression() {
     // TODO: named regex groups

@@ -14,18 +14,15 @@ fn moz_central() {
         panic!("Unable to run this test without the files in ./moz-central see CONTRIBUTING.md for more information");
     }
     let failures = walk(&moz_central_path);
-    let fail_count = failures
-        .iter()
-        .filter(|(_, white_list)| !white_list)
-        .count();
-    for (msg, _) in failures.iter().filter(|(_, white_list)| *white_list) {
+    let fail_count = failures.iter().filter(|(_, ok_list)| !ok_list).count();
+    for (msg, _) in failures.iter().filter(|(_, ok_list)| *ok_list) {
         println!("W-{}", msg);
     }
     if fail_count > 0 {
         eprintln!("----------");
         eprintln!("FAILURES");
         eprintln!("----------");
-        for (msg, _) in failures.iter().filter(|(_, white_list)| !white_list) {
+        for (msg, _) in failures.iter().filter(|(_, ok_list)| !ok_list) {
             eprintln!("{}", msg);
         }
         panic!("Failed to parse {} moz_central files", fail_count);
@@ -71,7 +68,7 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                     _ => format!("{}", file_path.path().display()),
                 };
                 let mut msg = format!("Parse Failure {}\n\t\"{}\"", e, loc);
-                let white_list = match ::std::process::Command::new(ESPARSE)
+                let ok_list = match ::std::process::Command::new(ESPARSE)
                     .arg(file_path.path())
                     .output()
                 {
@@ -107,13 +104,13 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
                         panic!("failed to exec esparse {}", e);
                     }
                 };
-                let white_list = if let Some(msg2) = white_list {
+                let ok_list = if let Some(msg2) = ok_list {
                     msg.push_str(&format!("\n{}", msg2));
                     true
                 } else {
                     false
                 };
-                ret.push((msg, white_list));
+                ret.push((msg, ok_list));
             }
         }
     }
@@ -122,9 +119,8 @@ fn walk(path: &Path) -> Vec<(String, bool)> {
 
 fn run(file: &Path) -> Result<(), Error> {
     // Named regex groups
-    if file.ends_with("bug1640487.js")
-    || file.ends_with("bug1640592.js") {
-        return Ok(())
+    if file.ends_with("bug1640487.js") || file.ends_with("bug1640592.js") {
+        return Ok(());
     }
     let mut contents = ::std::fs::read_to_string(file)?;
     if contents.starts_with("|") {
@@ -135,9 +131,8 @@ fn run(file: &Path) -> Result<(), Error> {
         if first.contains("SyntaxError") {
             return Ok(());
         }
-        if first.contains("error:InternalError")
-        /*--> in last line*/
-        {
+        //--> in last line
+        if first.contains("error:InternalError") {
             contents = contents.replace("-->", "//");
         }
     }

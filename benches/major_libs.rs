@@ -45,70 +45,107 @@ lazy_static! {
 }
 
 fn angular1(c: &mut Criterion) {
-    bench(c, &NG, "angular1");
+    bench(c, &NG, "angular1", false);
 }
 
 fn angular1_min(c: &mut Criterion) {
-    bench(c, &NG_MIN, "angular1_min");
+    bench(c, &NG_MIN, "angular1_min", false);
 }
 
 fn jquery(c: &mut Criterion) {
-    bench(c, &JQ, "jquery");
+    bench(c, &JQ, "jquery", false);
 }
 
 fn jquery_min(c: &mut Criterion) {
-    bench(c, &JQ_MIN, "jquery_min");
+    bench(c, &JQ_MIN, "jquery_min", false);
 }
 
 fn react(c: &mut Criterion) {
-    bench(c, &REACT, "react");
+    bench(c, &REACT, "react", false);
 }
 
 fn react_min(c: &mut Criterion) {
-    bench(c, &REACT_MIN, "react_min");
+    bench(c, &REACT_MIN, "react_min", false);
 }
 
 fn react_dom(c: &mut Criterion) {
-    bench(c, &REACT_DOM, "react_dom");
+    bench(c, &REACT_DOM, "react_dom", false);
 }
 
 fn react_dom_min(c: &mut Criterion) {
-    bench(c, &REACT_DOM_MIN, "react_dom_min");
+    bench(c, &REACT_DOM_MIN, "react_dom_min", false);
 }
 
 fn vue(c: &mut Criterion) {
-    bench(c, &VUE, "vue");
+    bench(c, &VUE, "vue", false);
 }
 
 fn vue_min(c: &mut Criterion) {
-    bench(c, &VUE_MIN, "vue_min");
+    bench(c, &VUE_MIN, "vue_min", false);
 }
 
 fn es5(c: &mut Criterion) {
-    bench(c, &EV5, "es5");
+    bench(c, &EV5, "es5", false);
 }
 
 fn es2015(c: &mut Criterion) {
-    bench(c, &EV2015, "es2015");
+    bench(c, &EV2015, "es2015", false);
 }
 
 fn es_module(c: &mut Criterion) {
-    bench(c, &EVMOD, "es_module");
+    bench(c, &EVMOD, "es_module", true);
 }
 
-fn bench(c: &mut Criterion, js: &str, name: &'static str) {
+fn bench(c: &mut Criterion, js: &str, name: &'static str, module: bool) {
     c.bench_function(name, |b| {
         b.iter(|| {
             let p = Parser::builder()
                 .js(&js)
-                .module(true)
+                .module(module)
                 .build()
                 .expect("Unable to crate new parser for es2015-module.js");
             for i in p {
-                black_box(i.unwrap());
+                match i {
+                    Ok(p) => {
+                        black_box(p);
+                    }
+                    Err(e) => {
+                        if let Some(text) = format_error(js, &e) {
+                            panic!("{}:\n{}", e, text);
+                        } else {
+                            panic!("{}", e);
+                        }
+                    }
+                }
             }
         })
     });
+}
+
+fn format_error(js: &str, e: &ressa::Error) -> Option<String> {
+    let pos = e.position()?;
+    let line_count = js.lines().count();
+    if line_count < 5 {
+        return Some(js.to_string());
+    }
+    let skip = pos.line.saturating_sub(2);
+    Some(
+        js.lines()
+            .enumerate()
+            .skip(skip)
+            .take(5)
+            .map(|(i, l)| {
+                if i + 1 == pos.line {
+                    let whitespace = " ".repeat(pos.column);
+                    let tail_ct = l.len() - pos.column;
+                    let arrows = "^".repeat(tail_ct);
+                    format!("{}\n{}{}\n", l, whitespace, arrows)
+                } else {
+                    format!("{}\n", l)
+                }
+            })
+            .collect(),
+    )
 }
 
 fn npm_install() -> Result<(), ::std::io::Error> {

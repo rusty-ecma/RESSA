@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Setup Node.js for use with actions
-      uses: actions/setup-node@v1.1.0
+      uses: actions/setup-node@v2.4.0
     - name: install js test libs from npm
       run: npm install
     - name: Build
@@ -19,21 +19,22 @@ jobs:
       run: curl https://hg.mozilla.org/mozilla-central/archive/tip.zip/js/src/jit-test/tests/ --output moz-central.zip
     - name: unzip moz-central
       run: unzip -qq moz-central.zip -d moz-central
-    - name: clone Test262
-      run: git clone https://github.com/tc39/test262 ./test262_full && mv ./test262_full/test ./test262
+    # - name: clone Test262
+    #   run: git clone https://github.com/tc39/test262 ./test262_full && mv ./test262_full/test ./test262
     - name: Run tests
-      run: cargo test --features=moz_central,test_262
+      run: cargo test --features=moz_central
       env:
         RUST_MIN_STACK: 9999999
     - name: rust-tarpaulin
       uses: actions-rs/tarpaulin@v0.1.0
       env: 
         RUST_MIN_STACK: 9999999
+        ACTIONS_ALLOW_UNSECURE_COMMANDS: true
       with: 
-        args: --features=moz_central,test_262
+        args: --features=moz_central
     - name: Upload to codecov.io
       uses: codecov/codecov-action@v1.0.2
-      if: ${{github.repository}} == 'rusty-ecma/RESSA'
+      continue-on-error: true
       with:
         token: ${{secrets.CODECOV_TOKEN}}
     - name: Check syntax
