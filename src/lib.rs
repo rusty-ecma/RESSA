@@ -121,7 +121,7 @@ struct Context<'a> {
     allow_super_call: bool,
     /// If we have found any possible naming errors
     /// which are not yet resolved
-    first_covert_initialized_name_error: Option<Item<Token<&'a str>>>,
+    first_covert_initialized_name_error: Option<Item<&'a str>>,
     /// If the current expressions is an assignment target
     is_assignment_target: bool,
     /// If the current expression is a binding element
@@ -304,17 +304,17 @@ pub struct Parser<'a, CH> {
     /// `ress` crate for more details)
     scanner: Scanner<'a>,
     /// The next item,
-    look_ahead: Item<Token<&'a str>>,
+    look_ahead: Item<&'a str>,
     /// Since we are looking ahead, we need
     /// to make sure we don't miss the eof
     /// by using this flag
     found_eof: bool,
     /// a possible container for tokens, currently
     /// it is unused
-    _tokens: Vec<Item<Token<&'a str>>>,
+    _tokens: Vec<Item<&'a str>>,
     /// a possible container for comments, currently
     /// it is unused
-    _comments: Vec<Item<Token<&'a str>>>,
+    _comments: Vec<Item<&'a str>>,
     /// The current position we are parsing
     current_position: Position,
     look_ahead_position: Position,
@@ -3985,7 +3985,7 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         let start = self.look_ahead_position;
-        let mut params: Vec<Item<Token<&'b str>>> = Vec::new();
+        let mut params: Vec<Item<&'b str>> = Vec::new();
         let (found_restricted, param) = if self.at_punct(Punct::Ellipsis) {
             self.parse_rest_element(&mut params)?
         } else {
@@ -4001,10 +4001,7 @@ where
         Ok((simple, found_restricted, param))
     }
 
-    fn parse_rest_element(
-        &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
-    ) -> Res<(bool, Pat<'b>)> {
+    fn parse_rest_element(&mut self, params: &mut Vec<Item<&'b str>>) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_rest_element {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -4021,10 +4018,7 @@ where
         Ok((restricted, ret))
     }
 
-    fn parse_binding_rest_el(
-        &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
-    ) -> Res<(bool, Pat<'b>)> {
+    fn parse_binding_rest_el(&mut self, params: &mut Vec<Item<&'b str>>) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_binding_rest_el {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -4036,7 +4030,7 @@ where
 
     fn parse_pattern_with_default(
         &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
+        params: &mut Vec<Item<&'b str>>,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_pattern_with_default {:?}",
@@ -4063,7 +4057,7 @@ where
     fn parse_pattern(
         &mut self,
         kind: Option<VarKind>,
-        params: &mut Vec<Item<Token<&'b str>>>,
+        params: &mut Vec<Item<&'b str>>,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_pattern {:?}",
@@ -4098,7 +4092,7 @@ where
 
     fn parse_array_pattern(
         &mut self,
-        params: &mut Vec<Item<Token<&'b str>>>,
+        params: &mut Vec<Item<&'b str>>,
         _kind: VarKind,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
@@ -5537,11 +5531,11 @@ where
     /// Request the next token from the scanner
     /// swap the last look ahead with this new token
     /// and return the last token
-    fn next_item(&mut self) -> Res<Item<Token<&'b str>>> {
+    fn next_item(&mut self) -> Res<Item<&'b str>> {
         trace!("next_item {}", self.context.has_line_term);
         let mut comment_line_term = false;
         loop {
-            self.context.has_line_term = comment_line_term || self.scanner.pending_new_line;
+            self.context.has_line_term = comment_line_term || self.scanner.has_pending_new_line();
             if let Some(look_ahead) = self.scanner.next() {
                 let look_ahead = look_ahead?;
                 if cfg!(feature = "debug_look_ahead") {
@@ -5763,7 +5757,7 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         if self.at_contextual_keyword("async") {
-            !self.scanner.pending_new_line
+            !self.scanner.has_pending_new_line()
                 && if let Some(peek) = self.scanner.look_ahead() {
                     if let Ok(peek) = peek {
                         peek.token.matches_keyword(Keyword::Function(()))
@@ -5872,7 +5866,7 @@ where
             .ok_or_else(|| self.op_error("Unable to get &str from scanner"))
     }
 
-    fn expected_token_error<T>(&self, item: &Item<Token<&'b str>>, expectation: &[&str]) -> Res<T> {
+    fn expected_token_error<T>(&self, item: &Item<&'b str>, expectation: &[&str]) -> Res<T> {
         if cfg!(feature = "error_backtrace") {
             let bt = backtrace::Backtrace::new();
             error!("{:?}", bt);
@@ -5895,7 +5889,7 @@ where
             format!("Expected {}; found {:?}", expectation, item.token),
         ))
     }
-    fn unexpected_token_error<T>(&self, item: &Item<Token<&'b str>>, msg: &str) -> Res<T> {
+    fn unexpected_token_error<T>(&self, item: &Item<&'b str>, msg: &str) -> Res<T> {
         if cfg!(feature = "error_backtrace") {
             let bt = backtrace::Backtrace::new();
             error!("{:?}", bt);

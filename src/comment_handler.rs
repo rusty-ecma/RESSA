@@ -6,7 +6,7 @@ use ress::prelude::*;
 /// the same as whitespace so the default behavior
 /// would be to throw away any comments found
 pub trait CommentHandler<'a> {
-    fn handle_comment(&mut self, comment: Item<Token<&'a str>>);
+    fn handle_comment(&mut self, comment: Item<&'a str>);
 }
 /// The default comment handler,
 /// this will discard comments
@@ -14,14 +14,14 @@ pub trait CommentHandler<'a> {
 pub struct DefaultCommentHandler;
 
 impl<'a> CommentHandler<'a> for DefaultCommentHandler {
-    fn handle_comment(&mut self, _: Item<Token<&'a str>>) {}
+    fn handle_comment(&mut self, _: Item<&'a str>) {}
 }
 
 impl<'a, F> CommentHandler<'a> for F
 where
-    F: FnMut(Item<Token<&'a str>>),
+    F: FnMut(Item<&'a str>),
 {
-    fn handle_comment(&mut self, item: Item<Token<&'a str>>) {
+    fn handle_comment(&mut self, item: Item<&'a str>) {
         self(item)
     }
 }
