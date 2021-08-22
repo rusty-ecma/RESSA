@@ -11,7 +11,7 @@ function trimString(s) {
 }
 ";
     let mut docs = vec![];
-    let ch = |comments: Item<Token<&str>>| {
+    let ch = |comments: Item<&str>| {
         if let Token::Comment(comment) = comments.token {
             docs.push(comment.to_string())
         }
@@ -50,7 +50,7 @@ function trimString(s) {
     return trimStringInner(s);
 }";
     let mut docs = vec![];
-    let ch = |comments: Item<Token<&str>>| {
+    let ch = |comments: Item<&str>| {
         if let Token::Comment(comment) = comments.token {
             docs.push(comment.to_string())
         }
@@ -91,7 +91,7 @@ fn comment_handler3() {
         }
     }
     impl<'a> CommentHandler<'a> for Ch {
-        fn handle_comment(&mut self, comment: Item<Token<&'a str>>) {
+        fn handle_comment(&mut self, comment: Item<&'a str>) {
             let loc = comment.location;
             if let Token::Comment(comment) = comment.token {
                 let s = comment.to_string();
