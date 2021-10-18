@@ -2524,7 +2524,8 @@ where
         let start = self.look_ahead_position;
         let mut super_class = if self.at_keyword(Keyword::Extends(())) {
             let _ = self.next_item()?;
-            let super_class = self.isolate_cover_grammar(Self::parse_left_hand_side_expr)?;
+            let super_class =
+                self.isolate_cover_grammar(Self::parse_left_hand_side_expr_allow_call)?;
             Some(Box::new(super_class))
         } else {
             None
@@ -2546,7 +2547,8 @@ where
         };
         if super_class.is_none() && self.at_keyword(Keyword::Extends(())) {
             let _ = self.next_item()?;
-            let new_super = self.isolate_cover_grammar(Self::parse_left_hand_side_expr)?;
+            let new_super =
+                self.isolate_cover_grammar(Self::parse_left_hand_side_expr_allow_call)?;
             super_class = Some(Box::new(new_super))
         }
         if check_id {
