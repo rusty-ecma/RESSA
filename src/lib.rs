@@ -2606,7 +2606,7 @@ where
         let mut value: Option<PropValue> = None;
         let mut computed = false;
         let mut is_static = false;
-        let is_async = if self.at_contextual_keyword("async") {
+        let mut is_async = if self.at_contextual_keyword("async") {
             let _async = self.next_item()?;
             true
         } else {
@@ -2624,6 +2624,10 @@ where
                 && (Self::qualified_prop_name(&self.look_ahead.token)
                     || self.at_punct(Punct::Asterisk))
             {
+                if self.at_contextual_keyword("async") {
+                    let _async = self.next_item()?;
+                    is_async = true;
+                }
                 token = self.look_ahead.token.clone();
                 computed = self.at_punct(Punct::OpenBracket);
                 is_static = true;

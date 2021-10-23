@@ -818,6 +818,40 @@ fn class_anon_extended_by_call() {
         tokens
     );
 }
+#[test]
+fn class_async_static_method() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("class C {
+            static async m() {}
+        }")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
+            body: ClassBody(vec![Prop {
+                key: PropKey::Expr(Expr::Ident(Ident::new("m".to_owned()))),
+                value: PropValue::Expr(Expr::Func(Func {
+                    id: None,
+                    params: vec![],
+                    body: FuncBody(vec![]),
+                    generator: false,
+                    is_async: true
+                })),
+                kind: PropKind::Method,
+                method: true,
+                computed: false,
+                short_hand: false,
+                is_static: true
+            }]),
+            id: Some(Ident::new("C".to_owned())),
+            super_class: None,
+        }))]),
+        tokens
+    );
+}
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
