@@ -758,6 +758,101 @@ fn func_decl_tokens() {
     );
 }
 
+#[test]
+fn class_extended_by_call() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("class C extends D() {}")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+    let callee = Ident::new("D".to_owned());
+    let callee = Expr::Ident(callee);
+    let callee = Box::new(callee);
+    let super_class = CallExpr {
+        callee,
+        arguments: vec![],
+    };
+    let super_class = Expr::Call(super_class);
+    let super_class = Box::new(super_class);
+    let super_class = Some(super_class);
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
+            body: ClassBody(vec![]),
+            id: Some(Ident::new("C".to_owned())),
+            super_class,
+        }))]),
+        tokens
+    );
+}
+#[test]
+fn class_anon_extended_by_call() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("let c = class extends D() {}")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+    let callee = Ident::new("D".to_owned());
+    let callee = Expr::Ident(callee);
+    let callee = Box::new(callee);
+    let super_class = CallExpr {
+        callee,
+        arguments: vec![],
+    };
+    let super_class = Expr::Call(super_class);
+    let super_class = Box::new(super_class);
+    let super_class = Some(super_class);
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Var(
+            VarKind::Let,
+            vec![VarDecl {
+                id: Pat::Ident(Ident::new("c".to_owned())),
+                init: Some(Expr::Class(Class {
+                    body: ClassBody(vec![]),
+                    id: None,
+                    super_class,
+                }))
+            }]
+        ))]),
+        tokens
+    );
+}
+#[test]
+fn class_async_static_method() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("class C {
+            static async m() {}
+        }")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
+            body: ClassBody(vec![Prop {
+                key: PropKey::Expr(Expr::Ident(Ident::new("m".to_owned()))),
+                value: PropValue::Expr(Expr::Func(Func {
+                    id: None,
+                    params: vec![],
+                    body: FuncBody(vec![]),
+                    generator: false,
+                    is_async: true
+                })),
+                kind: PropKind::Method,
+                method: true,
+                computed: false,
+                short_hand: false,
+                is_static: true
+            }]),
+            id: Some(Ident::new("C".to_owned())),
+            super_class: None,
+        }))]),
+        tokens
+    );
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
