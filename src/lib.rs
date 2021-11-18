@@ -1139,7 +1139,7 @@ where
         );
         let start = self.look_ahead_position;
         let first = self.parse_var_decl(in_for)?;
-        self.context.lexical_names.declare_pat(
+        self.declare_pat(
             &first.id,
             lexical_names::DeclKind::Var(self.context.is_module),
             start,
@@ -1149,7 +1149,7 @@ where
             let _ = self.next_item()?;
             let start = self.look_ahead_position;
             let next = self.parse_var_decl(in_for)?;
-            self.context.lexical_names.declare_pat(
+            self.declare_pat(
                 &next.id,
                 lexical_names::DeclKind::Var(self.context.is_module),
                 start,
@@ -1276,7 +1276,7 @@ where
                 )
             };
             self.add_scope(scope);
-            self.context.lexical_names.declare_pat(p, kind, param_pos)?;
+            self.declare_pat(p, kind, param_pos)?;
         } else {
             self.add_scope(lexical_names::Scope::Catch);
         }
@@ -2133,9 +2133,7 @@ where
         };
         let start_pos = self.look_ahead_position;
         let first = self.parse_lexical_binding(kind, in_for)?;
-        self.context
-            .lexical_names
-            .declare_pat(&first.id, k, start_pos)?;
+        self.declare_pat(&first.id, k, start_pos)?;
         let mut ret = vec![first];
 
         while self.at_punct(Punct::Comma) {
@@ -2143,9 +2141,7 @@ where
             let start_pos = self.look_ahead_position;
             let next = self.parse_lexical_binding(kind, in_for)?;
 
-            self.context
-                .lexical_names
-                .declare_pat(&next.id, k, start_pos)?;
+            self.declare_pat(&next.id, k, start_pos)?;
             ret.push(next);
         }
         Ok(ret)
@@ -2464,6 +2460,13 @@ where
     fn add_scope(&mut self, scope: lexical_names::Scope) {
         trace!("{} add_scope {:?}", self.look_ahead.span.start, scope);
         self.context.lexical_names.new_child(scope);
+    }
+    fn declare_pat(&mut self, pat: &Pat<'b>, kind: DeclKind, pos: Position) -> Res<()> {
+        info!(
+            "{} declare_pat {:?} {:?}",
+            self.look_ahead.span.start, pat, pos
+        );
+        self.context.lexical_names.declare_pat(pat, kind, pos)
     }
 
     fn parse_func_params(&mut self) -> Res<FormalParams<'b>> {
@@ -3997,11 +4000,7 @@ where
         } else {
             self.parse_pattern_with_default(&mut params)?
         };
-        self.context.lexical_names.declare_pat(
-            &param,
-            DeclKind::Var(self.context.is_module),
-            start,
-        )?;
+        self.declare_pat(&param, DeclKind::Var(self.context.is_module), start)?;
         let param = FuncArg::Pat(param);
         let simple = simple && Self::is_simple(&param);
         Ok((simple, found_restricted, param))
@@ -4456,14 +4455,12 @@ where
         let mut params2 = Vec::with_capacity(param_len);
         for param in params {
             match &param {
-                FuncArg::Pat(pat) => self.context.lexical_names.declare_pat(
-                    pat,
-                    DeclKind::Lex(self.context.is_module),
-                    pos,
-                )?,
+                FuncArg::Pat(pat) => {
+                    self.declare_pat(pat, DeclKind::Var(self.context.is_module), pos)?
+                }
                 FuncArg::Expr(expr) => self.context.lexical_names.declare_expr(
                     expr,
-                    DeclKind::Lex(self.context.is_module),
+                    DeclKind::Var(self.context.is_module),
                     pos,
                 )?,
             }
