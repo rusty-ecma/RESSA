@@ -853,6 +853,28 @@ fn class_async_static_method() {
     );
 }
 
+#[test]
+fn redecl_error_in_nested_arrow() {
+    let js = r#"(() => {
+        var a = [1];
+        let arrow = (b) => {
+            var [b] = a;
+        };
+    })();"#;
+    run_test(js, false).unwrap();
+}
+
+#[test]
+fn redecl_error_in_nested_funcs() {
+    let js = r#"(function() {
+        var a = [1];
+        let arrow = function(b) {
+            var [b] = a;
+        };
+    })();"#;
+    run_test(js, false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;

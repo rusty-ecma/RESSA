@@ -83,7 +83,7 @@ impl<'a> DuplicateNameDetector<'a> {
         self.states.last().copied()
     }
     pub fn declare(&mut self, i: Cow<'a, str>, kind: DeclKind, pos: Position) -> Res<()> {
-        log::trace!("DuplicateNameDetector::declare {} {:?}", i, kind);
+        log::trace!("DuplicateNameDetector::declare {} {:?} {:?}", i, kind, pos);
         match kind {
             DeclKind::Lex(is_module) => {
                 self.check_var(i.clone(), pos)?;
@@ -158,7 +158,7 @@ impl<'a> DuplicateNameDetector<'a> {
         }
     }
     pub fn declare_pat(&mut self, pat: &Pat<'a>, kind: DeclKind, pos: Position) -> Res<()> {
-        log::debug!("declare_pat {:?} {:?}", kind, pat);
+        log::trace!("declare_pat {:?} {:?} {:?}", pat, kind, pos);
         match pat {
             Pat::Ident(ref i) => {
                 log::trace!("add_pat ident {:?}", i.name);
@@ -190,6 +190,7 @@ impl<'a> DuplicateNameDetector<'a> {
     }
 
     fn declare_prop(&mut self, prop: &Prop<'a>, kind: DeclKind, pos: Position) -> Res<()> {
+        log::trace!("declare_prop {:?} {:?} {:?}", prop, kind, pos);
         match &prop.value {
             PropValue::Expr(expr) => self.declare_expr(expr, kind, pos),
             PropValue::Pat(pat) => self.declare_pat(pat, kind, pos),
@@ -201,6 +202,7 @@ impl<'a> DuplicateNameDetector<'a> {
         }
     }
     fn declare_literal_ident(&mut self, lit: &Lit<'a>, kind: DeclKind, pos: Position) -> Res<()> {
+        log::trace!("declare_literal_ident {:?} {:?} {:?}", lit, kind, pos);
         match lit {
             Lit::String(s) => match s {
                 StringLit::Double(id) | StringLit::Single(id) => {
@@ -211,6 +213,7 @@ impl<'a> DuplicateNameDetector<'a> {
         }
     }
     pub fn declare_expr(&mut self, expr: &Expr<'a>, kind: DeclKind, pos: Position) -> Res<()> {
+        log::trace!("declare_expr {:?} {:?} {:?}", expr, kind, pos);
         if let Expr::Ident(ref i) = expr {
             log::trace!("add_expr ident {:?}", i.name);
             self.declare(i.name.clone(), kind, pos)
@@ -219,6 +222,7 @@ impl<'a> DuplicateNameDetector<'a> {
         }
     }
     fn check_var(&mut self, i: Cow<'a, str>, pos: Position) -> Res<()> {
+        log::trace!("check_var {:?} {:?}", i, pos);
         if self.var.last_has(&i) {
             if let Some(poses) = self.var.get(&i) {
                 if let Some(old_pos) = poses.last() {
@@ -232,17 +236,21 @@ impl<'a> DuplicateNameDetector<'a> {
     }
 
     fn check_func(&mut self, i: Cow<'a, str>, pos: Position) -> Res<()> {
+        log::trace!("check_func {:?} {:?}", i, pos);
         check(&mut self.func, i, pos)
     }
     fn add_func(&mut self, i: Cow<'a, str>, pos: Position) -> Res<()> {
+        log::trace!("add_func {:?} {:?}", i, pos);
         let _ = self.func.insert(i, pos);
         Ok(())
     }
     fn check_lex(&mut self, i: Cow<'a, str>, pos: Position) -> Res<()> {
+        log::trace!("check_lex {:?} {:?}", i, pos);
         check(&mut self.lex, i, pos)
     }
 
     fn add_var(&mut self, i: Cow<'a, str>, pos: Position) {
+        log::trace!("add_var {:?} {:?}", i, pos);
         if let Some(v) = self.var.get_mut(&i) {
             v.push(pos);
         } else {
@@ -251,6 +259,7 @@ impl<'a> DuplicateNameDetector<'a> {
     }
 
     fn add_lex(&mut self, i: Cow<'a, str>, pos: Position) -> Res<()> {
+        log::trace!("add_lex {:?} {:?}", i, pos);
         add(&mut self.lex, i, pos)?;
         Ok(())
     }
@@ -289,16 +298,19 @@ impl<'a> DuplicateNameDetector<'a> {
     }
 
     pub fn add_export_spec(&mut self, spec: &ExportSpecifier<'a>, pos: Position) -> Res<()> {
+        log::trace!("add_export_spec {:?} {:?}", spec, pos);
         self.add_export_ident(&spec.exported, pos)?;
         self.undefined_module_export_guard(spec.local.name.clone());
         Ok(())
     }
 
     pub fn removed_undefined_export(&mut self, id: &Ident<'a>) {
+        log::trace!("removed_undefined_export {:?}", id);
         self.undefined_module_exports.remove(&id.name);
     }
 
     pub fn add_export_ident(&mut self, id: &Ident<'a>, pos: Position) -> Res<()> {
+        log::trace!("add_export_ident {:?} {:?}", id, pos);
         if !self.exports.insert(id.name.clone()) {
             Err(Error::DuplicateExport(pos, id.name.to_string()))
         } else {
@@ -327,6 +339,7 @@ impl<'a> DuplicateNameDetector<'a> {
 
 /// check the last tier in the chain map for an identifier
 fn check<'a>(map: &mut LexMap<'a>, i: Cow<'a, str>, pos: Position) -> Res<()> {
+    log::trace!("check {:?} {:?} {:?}", map, i, pos);
     trace!("checking for {}", i);
     if map.last_has(&i) {
         if let Some(old_pos) = map.get(&i) {
@@ -339,6 +352,7 @@ fn check<'a>(map: &mut LexMap<'a>, i: Cow<'a, str>, pos: Position) -> Res<()> {
 }
 
 pub fn add<'a>(map: &mut LexMap<'a>, i: Cow<'a, str>, start: Position) -> Res<()> {
+    log::trace!("add {:?} {:?} {:?}", map, i, start);
     if let Some(old_pos) = map.insert(i.clone(), start) {
         if old_pos < start {
             Err(Error::LexicalRedecl(old_pos, start, i.to_string()))
