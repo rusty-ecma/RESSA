@@ -1,3 +1,5 @@
+
+
 //! RESSA (Rusty ECMAScript Syntax Analyzer)
 //! A library for parsing js files
 //!
@@ -55,167 +57,27 @@
 //! checkout the `examples` folders for slightly larger
 //! examples.
 //!
-extern crate ress;
-#[macro_use]
-extern crate log;
-extern crate backtrace;
 
+use resast::spanned::{Dir, Func, Ident, Node, Program, ProgramPart, Slice, VarKind, decl::{Decl, DefaultExportDecl, ExportSpecifier, ImportSpecifier, ModExport, ModImport, NamedExportDecl, NormalImportSpec, VarDecl}, expr::{Expr, Lit, TemplateLit}, pat::Pat, stmt::{BlockStmt, CatchClause, ForInStmt, IfStmt, LoopInit, LoopLeft, Stmt, SwitchCase, SwitchStmt, TryStmt, WhileStmt, WithStmt}};
+use ress::Span;
 use ress::prelude::*;
-pub use ress::Span;
 
-mod comment_handler;
-mod error;
-mod formal_params;
-mod lexical_names;
-mod lhs;
-mod regex;
-pub mod spanned;
-
+use crate::LabelKind;
 pub use crate::comment_handler::CommentHandler;
 pub use crate::comment_handler::DefaultCommentHandler;
 pub use crate::error::Error;
-use formal_params::FormalParams;
-use lexical_names::DeclKind;
-use resast::prelude::*;
-use resast::ClassBody;
+use crate::formal_params;
+use crate::formal_params::FormalParams;
+use crate::lexical_names;
+use crate::lexical_names::DeclKind;
+use crate::lhs;
+use crate::{Context, Config};
+use std::borrow::Cow;
 use std::{
     collections::{HashMap, HashSet},
     mem::replace,
 };
 
-/// The current configuration options.
-/// This will most likely increase over time
-struct Config {
-    /// whether or not to tolerate a subset of errors
-    tolerant: bool,
-}
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum LabelKind {
-    Iteration,
-    Other,
-    Unknown,
-}
-
-/// The current parsing context.
-/// This structure holds the relevant
-/// information to know when some
-/// text might behave differently
-/// depending on what has come before it
-struct Context<'a> {
-    /// If the current JS should be treated
-    /// as a JS module
-    is_module: bool,
-    /// If `in` is allowed as an identifier
-    allow_in: bool,
-    /// If a strict directive is allowed
-    allow_strict_directive: bool,
-    /// If `yield` is allowed as an identifier
-    allow_yield: bool,
-    /// If await is allowed as an identifier
-    allow_await: bool,
-    /// if super is allowed as a keyword
-    allow_super: bool,
-    /// if super is allowed to be part of a call expression
-    /// allow_super should always be true when this is true
-    /// but not the other way around. This is only valid in a
-    /// constructor
-    allow_super_call: bool,
-    /// If we have found any possible naming errors
-    /// which are not yet resolved
-    first_covert_initialized_name_error: Option<Item<&'a str>>,
-    /// If the current expressions is an assignment target
-    is_assignment_target: bool,
-    /// If the current expression is a binding element
-    is_binding_element: bool,
-    /// If we have entered a function body
-    in_function_body: bool,
-    /// If we have entered a loop block
-    in_iteration: bool,
-    /// If we have entered a switch block
-    in_switch: bool,
-    /// The currently known labels, this applies
-    /// to labels only, not all identifiers. Errors
-    /// at that level would need to be handled by
-    /// the calling scope
-    label_set: HashMap<&'a str, LabelKind>,
-    /// If the current scope has a `'use strict';` directive
-    /// in the prelude
-    strict: bool,
-    lexical_names: lexical_names::DuplicateNameDetector<'a>,
-    /// If the scanner has a pending line terminator
-    /// before the next token
-    has_line_term: bool,
-    /// If we have passed the initial prelude where a valid
-    /// `'use strict'` directive would exist
-    past_prolog: bool,
-    /// If we encounter an error, the iterator should stop
-    errored: bool,
-    /// If we find a directive with an octal escape
-    /// we need to error if a 'use strict' directive
-    /// is then found
-    found_directive_octal_escape: bool,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        trace!("default config");
-        Self { tolerant: false }
-    }
-}
-
-impl<'a> Default for Context<'a> {
-    fn default() -> Self {
-        trace!("default context",);
-        Self {
-            is_module: false,
-            allow_await: true,
-            allow_in: true,
-            allow_strict_directive: true,
-            allow_yield: true,
-            allow_super: false,
-            allow_super_call: false,
-            first_covert_initialized_name_error: None,
-            is_assignment_target: false,
-            is_binding_element: false,
-            in_function_body: false,
-            in_iteration: false,
-            in_switch: false,
-            label_set: HashMap::new(),
-            strict: false,
-            lexical_names: lexical_names::DuplicateNameDetector::default(),
-            has_line_term: false,
-            past_prolog: false,
-            errored: false,
-            found_directive_octal_escape: false,
-        }
-    }
-}
-impl<'a> Context<'a> {
-    pub fn set_allow_super(&mut self, value: bool) {
-        trace!("context.set_allow_super({})", value);
-        self.allow_super = value;
-    }
-    pub fn set_is_assignment_target(&mut self, value: bool) -> bool {
-        trace!(
-            "context.set_is_assignment_target({}) -> {}",
-            value,
-            self.is_assignment_target
-        );
-        let old = self.is_assignment_target;
-        self.is_assignment_target = value;
-        old
-    }
-    pub fn set_is_binding_element(&mut self, value: bool) -> bool {
-        trace!(
-            "context.set_is_binding_element({}) -> {}",
-            value,
-            self.is_binding_element
-        );
-        let old = self.is_binding_element;
-        self.is_binding_element = value;
-        old
-    }
-}
 /// This is used to create a `Parser` using
 /// the builder method
 #[derive(Default)]
@@ -493,10 +355,11 @@ where
                     return Err(Error::OctalLiteral(orig.location.start));
                 }
                 self.consume_semicolon()?;
-                Ok(ProgramPart::Dir(Dir {
-                    dir: s.clone_inner(),
-                    expr: Lit::String(s),
-                }))
+                // Ok(ProgramPart::Dir(Dir {
+                //     dir: s.clone_inner(),
+                //     expr: Lit::String(s),
+                // }))
+                todo!()
             } else {
                 Ok(ProgramPart::Stmt(Stmt::Expr(Expr::Lit(lit))))
             }
@@ -567,7 +430,8 @@ where
                     let _var = self.next_item()?;
                     let decls = self.parse_var_decl_list(false)?;
                     self.consume_semicolon()?;
-                    Ok(ProgramPart::Decl(Decl::Var(VarKind::Var, decls)))
+                    // Ok(ProgramPart::Decl(Decl::Var(VarKind::Var, decls)))
+                    todo!()
                 }
                 _ => {
                     let stmt = self.parse_statement(ctx)?;
@@ -606,10 +470,11 @@ where
         if self.look_ahead.is_string() {
             let source = self.parse_module_specifier()?;
             self.consume_semicolon()?;
-            Ok(ModImport {
-                specifiers: Vec::new(),
-                source,
-            })
+            todo!()
+            // Ok(ModImport {
+            //     specifiers: Vec::new(),
+            //     source,
+            // })
         } else {
             // If we are at an open brace, this is the named
             //variant
@@ -653,7 +518,8 @@ where
             // comes from
             let source = self.parse_module_specifier()?;
             self.consume_semicolon()?;
-            Ok(ModImport { specifiers, source })
+            // Ok(ModImport { specifiers, source })
+            todo!()
         }
     }
     /// This will handle the named variant of imports
@@ -700,10 +566,11 @@ where
         if local.name == "arguments" || local.name == "eval" {
             return Err(Error::StrictModeArgumentsOrEval(start));
         }
-        Ok(ImportSpecifier::Normal(NormalImportSpec {
-            imported,
-            local,
-        }))
+        // Ok(ImportSpecifier::Normal(NormalImportSpec {
+        //     imported,
+        //     local,
+        // }))
+        todo!()
     }
 
     fn parse_import_namespace_specifier(&mut self) -> Res<ImportSpecifier<'b>> {
@@ -717,7 +584,8 @@ where
         self.context
             .lexical_names
             .declare(ident.name.clone(), DeclKind::Lex(true), start)?;
-        Ok(ImportSpecifier::Namespace(ident))
+        // Ok(ImportSpecifier::Namespace(ident))
+        todo!()
     }
 
     fn parse_import_default_specifier(&mut self) -> Res<ImportSpecifier<'b>> {
@@ -726,7 +594,8 @@ where
         self.context
             .lexical_names
             .declare(ident.name.clone(), DeclKind::Lex(true), start)?;
-        Ok(ImportSpecifier::Default(ident))
+        // Ok(ImportSpecifier::Default(ident))
+        todo!()
     }
 
     fn parse_export_decl(&mut self) -> Res<ModExport<'b>> {
@@ -767,12 +636,14 @@ where
                     let _start = self.look_ahead_position;
                     let func = self.parse_function_decl(true)?;
                     let decl = Decl::Func(func);
-                    DefaultExportDecl::Decl(decl)
+                    // DefaultExportDecl::Decl(decl)
+                    todo!()
                 } else {
                     let _start = self.look_ahead_position;
                     let expr = self.parse_assignment_expr()?;
                     self.consume_semicolon()?;
-                    DefaultExportDecl::Expr(expr)
+                    // DefaultExportDecl::Expr(expr)
+                    todo!()
                 }
             } else {
                 if self.at_contextual_keyword("from") {
@@ -790,9 +661,11 @@ where
                     self.consume_semicolon()?;
                     expr
                 };
-                DefaultExportDecl::Expr(expr)
+                // DefaultExportDecl::Expr(expr)
+                todo!()
             };
-            Ok(ModExport::Default(decl))
+            // Ok(ModExport::Default(decl))
+            todo!()
         } else if self.at_punct(Punct::Asterisk) {
             let _ = self.next_item()?;
             if !self.at_contextual_keyword("from") {
@@ -804,7 +677,8 @@ where
             let _ = self.next_item()?;
             let source = self.parse_module_specifier()?;
             self.consume_semicolon()?;
-            Ok(ModExport::All(source))
+            // Ok(ModExport::All(source))
+            todo!()
         } else if self.look_ahead.token.is_keyword() {
             if self.look_ahead.token.matches_keyword(Keyword::Let(()))
                 || self.look_ahead.token.matches_keyword(Keyword::Const(()))
@@ -813,15 +687,17 @@ where
                 let lex = self.parse_lexical_decl(false)?;
                 let decl = NamedExportDecl::Decl(lex);
                 self.consume_semicolon()?;
-                Ok(ModExport::Named(decl))
+                // Ok(ModExport::Named(decl))
+                todo!()
             } else if self.look_ahead.token.matches_keyword(Keyword::Var(())) {
                 let _ = self.next_item()?;
                 let _start = self.look_ahead_position;
                 let decls = self.parse_variable_decl_list(false)?;
-                let var = Decl::Var(VarKind::Var, decls);
-                let decl = NamedExportDecl::Decl(var);
-                self.consume_semicolon()?;
-                Ok(ModExport::Named(decl))
+                // let var = Decl::Var(VarKind::Var, decls);
+                // let decl = NamedExportDecl::Decl(var);
+                // self.consume_semicolon()?;
+                // Ok(ModExport::Named(decl))
+                todo!()
             } else if self.look_ahead.token.matches_keyword(Keyword::Class(())) {
                 self.parse_export_decl_class(false)
             } else if self.look_ahead.token.matches_keyword(Keyword::Function(())) {
@@ -837,7 +713,8 @@ where
             let func = self.parse_function_decl(false)?;
             let decl = Decl::Func(func);
             let decl = NamedExportDecl::Decl(decl);
-            Ok(ModExport::Named(decl))
+            // Ok(ModExport::Named(decl))
+            todo!()
         } else {
             self.expect_punct(Punct::OpenBrace)?;
             let mut specifiers = Vec::new();
@@ -852,7 +729,8 @@ where
                         .lexical_names
                         .add_export_ident(&resast::prelude::Ident::from("default"), start)?;
                 } else {
-                    self.context.lexical_names.add_export_spec(&spec, start)?;
+                    // self.context.lexical_names.add_export_spec(&spec, start)?;
+                    todo!()
                 }
                 specifiers.push(spec);
                 if !self.at_punct(Punct::CloseBrace) {
@@ -865,18 +743,21 @@ where
                 let source = self.parse_module_specifier()?;
                 self.consume_semicolon()?;
                 for spec in &specifiers {
-                    self.context
-                        .lexical_names
-                        .removed_undefined_export(&spec.local);
+                    // self.context
+                    //     .lexical_names
+                    //     .removed_undefined_export(&spec.local);
+                    todo!()
                 }
-                let decl = NamedExportDecl::Specifier(specifiers, Some(source));
-                Ok(ModExport::Named(decl))
+                // let decl = NamedExportDecl::Specifier(specifiers, Some(source));
+                // Ok(ModExport::Named(decl))
+                todo!()
             } else if found_default {
                 self.expected_token_error(&self.look_ahead, &[""])
             } else {
                 self.consume_semicolon()?;
-                let decl = NamedExportDecl::Specifier(specifiers, None);
-                Ok(ModExport::Named(decl))
+                // let decl = NamedExportDecl::Specifier(specifiers, None);
+                // Ok(ModExport::Named(decl))
+                todo!()
             }
         }
     }
@@ -885,15 +766,18 @@ where
         let start = self.look_ahead_position;
         let func = self.parse_function_decl(true)?;
         if let Some(id) = &func.id {
-            self.context.lexical_names.add_export_ident(id, start)?;
+            // self.context.lexical_names.add_export_ident(id, start)?;
+            todo!()
         }
         let func = Decl::Func(func);
         if is_default {
-            let decl = DefaultExportDecl::Decl(func);
-            Ok(ModExport::Default(decl))
+            // let decl = DefaultExportDecl::Decl(func);
+            // Ok(ModExport::Default(decl))
+            todo!()
         } else {
-            let decl = NamedExportDecl::Decl(func);
-            Ok(ModExport::Named(decl))
+            // let decl = NamedExportDecl::Decl(func);
+            // Ok(ModExport::Named(decl))
+            todo!()
         }
     }
 
@@ -905,11 +789,13 @@ where
         }
         let decl = Decl::Class(class);
         if is_default {
-            let decl = DefaultExportDecl::Decl(decl);
-            Ok(ModExport::Default(decl))
+            // let decl = DefaultExportDecl::Decl(decl);
+            // Ok(ModExport::Default(decl))
+            todo!()
         } else {
-            let decl = NamedExportDecl::Decl(decl);
-            Ok(ModExport::Named(decl))
+            // let decl = NamedExportDecl::Decl(decl);
+            // Ok(ModExport::Named(decl))
+            todo!()
         }
     }
 
@@ -921,7 +807,8 @@ where
         } else {
             local.clone()
         };
-        Ok(ExportSpecifier { local, exported })
+        // Ok(ExportSpecifier { local, exported })
+        todo!()
     }
 
     fn parse_module_specifier(&mut self) -> Res<Lit<'b>> {
@@ -929,12 +816,14 @@ where
         match &item.token {
             Token::String(ref sl) => Ok(match sl {
                 ress::prelude::StringLit::Double(ref s) => {
-                    self.octal_literal_guard_string(s.contains_octal_escape, item.location.start)?;
-                    resast::prelude::Lit::double_string_from(s.content)
+                    // self.octal_literal_guard_string(s.contains_octal_escape, item.location.start)?;
+                    // resast::prelude::Lit::double_string_from(s.content)
+                    todo!()
                 }
                 ress::prelude::StringLit::Single(ref s) => {
-                    self.octal_literal_guard_string(s.contains_octal_escape, item.location.start)?;
-                    resast::prelude::Lit::single_string_from(s.content)
+                    // self.octal_literal_guard_string(s.contains_octal_escape, item.location.start)?;
+                    // resast::prelude::Lit::single_string_from(s.content)
+                    todo!()
                 }
             }),
             _ => self.expected_token_error(&item, &["[string]"]),
@@ -968,7 +857,7 @@ where
                 }
                 Punct::SemiColon => {
                     let _ = self.next_item()?;
-                    Stmt::Empty
+                    Stmt::Empty(todo!())
                 }
                 _ => {
                     let expr = self.parse_expression_statement()?;
@@ -1066,7 +955,7 @@ where
             }
             WithStmt {
                 object: obj,
-                body: Box::new(Stmt::Empty),
+                body: Box::new(Stmt::Empty(todo!())),
             }
         } else {
             self.expect_punct(Punct::CloseParen)?;
@@ -1099,7 +988,7 @@ where
             if !self.config.tolerant {
                 return self.expected_token_error(&self.look_ahead, &[")"]);
             }
-            Stmt::Empty
+            Stmt::Empty(todo!())
         } else {
             self.expect_punct(Punct::CloseParen)?;
             let prev_iter = self.context.in_iteration;
@@ -1113,10 +1002,11 @@ where
         } else if let Stmt::Expr(Expr::Class(_)) = body {
             Err(Error::InvalidClassPosition(start_pos, "Class declaration cannot be the body of a do while loop, maybe wrap this in a block statement?".to_string()))
         } else {
-            Ok(WhileStmt {
-                test,
-                body: Box::new(body),
-            })
+            // Ok(WhileStmt {
+            //     test,
+            //     body: Box::new(body),
+            // })
+            todo!()
         }
     }
 
@@ -1161,17 +1051,17 @@ where
     }
 
     fn parse_var_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
-        let (_, patt) = self.parse_pattern(Some(VarKind::Var), &mut Vec::new())?;
+        let (_, patt) = self.parse_pattern(Some(VarKind::Var(todo!())), &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&patt) {
             let patt = match patt {
-                Pat::Ident(ident) => ident.name,
+                Pat::Ident(ident) => ident.slice,
                 _ => unreachable!(
                     "restricted patterns should only be reachable by identifer patterns"
                 ),
             };
             return Err(Error::NonStrictFeatureInStrictContext(
                 self.current_position,
-                format!("{} as an identifier", patt),
+                format!("{:?} as an identifier", patt),
             ));
         }
         let init = if self.at_punct(Punct::Equal) {
@@ -1194,7 +1084,7 @@ where
         self.expect_keyword(Keyword::Try(()))?;
         let block = self.parse_block(true)?;
         if !self.context.in_iteration {
-            for part in &block.0 {
+            for part in &block.stmts {
                 if let ProgramPart::Stmt(Stmt::Continue(_)) = &part {
                     return self.unexpected_token_error(&self.look_ahead, "continue in try catch");
                 }
@@ -1203,7 +1093,7 @@ where
         let handler = if self.at_keyword(Keyword::Catch(())) {
             let handler = self.parse_catch_clause()?;
             if !self.context.in_iteration {
-                for part in &handler.body.0 {
+                for part in &handler.body.stmts {
                     if let ProgramPart::Stmt(Stmt::Continue(_)) = &part {
                         return self
                             .unexpected_token_error(&self.look_ahead, "continue in try catch");
@@ -1222,11 +1112,12 @@ where
         if handler.is_none() && finalizer.is_none() {
             return Err(Error::TryWithNoCatchOrFinally(self.current_position));
         }
-        Ok(TryStmt {
-            block,
-            handler,
-            finalizer,
-        })
+        // Ok(TryStmt {
+        //     block,
+        //     handler,
+        //     finalizer,
+        // })
+        todo!()
     }
 
     fn parse_catch_clause(&mut self) -> Res<CatchClause<'b>> {
@@ -1249,10 +1140,11 @@ where
             }
             match param {
                 Pat::Array(_) | Pat::Obj(_) => {
-                    let mut args = HashSet::new();
-                    if formal_params::update_with_pat(&param, &mut args).is_err() {
-                        return Err(Error::InvalidCatchArg(param_pos));
-                    }
+                    // let mut args = HashSet::new();
+                    // if formal_params::update_with_pat(&param, &mut args).is_err() {
+                    //     return Err(Error::InvalidCatchArg(param_pos));
+                    // }
+                    todo!()
                 }
                 _ => (),
             }
@@ -1283,7 +1175,8 @@ where
         }
         let body = self.parse_block(false)?;
         self.remove_scope();
-        Ok(CatchClause { param, body })
+        // Ok(CatchClause { param, body })
+        todo!()
     }
 
     fn parse_finally_clause(&mut self) -> Res<BlockStmt<'b>> {
@@ -1340,10 +1233,11 @@ where
         self.expect_punct(Punct::CloseBrace)?;
         self.remove_scope();
         self.context.in_switch = prev_sw;
-        Ok(SwitchStmt {
-            discriminant,
-            cases,
-        })
+        // Ok(SwitchStmt {
+        //     discriminant,
+        //     cases,
+        // })
+        todo!()
     }
 
     fn parse_switch_case(&mut self) -> Res<SwitchCase<'b>> {
@@ -1369,7 +1263,8 @@ where
             }
             consequent.push(self.parse_statement_list_item(None)?)
         }
-        Ok(SwitchCase { test, consequent })
+        // Ok(SwitchCase { test, consequent })
+        todo!()
     }
 
     fn parse_return_stmt(&mut self) -> Res<Option<Expr<'b>>> {
@@ -1410,7 +1305,10 @@ where
             if !self.config.tolerant {
                 return self.expected_token_error(&self.look_ahead, &[")"]);
             }
-            (Box::new(Stmt::Empty), None)
+            (Box::new(Stmt::Empty(Slice {
+                source: Cow::Borrowed(""),
+                loc: test.loc(),
+            })), None)
         } else {
             self.expect_punct(Punct::CloseParen)?;
             let body_start = self.look_ahead_position;
@@ -1436,11 +1334,12 @@ where
             };
             (Box::new(c), a)
         };
-        Ok(IfStmt {
-            test,
-            consequent,
-            alternate,
-        })
+        // Ok(IfStmt {
+        //     test,
+        //     consequent,
+        //     alternate,
+        // })
+        todo!()
     }
 
     fn parse_if_clause(&mut self) -> Res<Stmt<'b>> {
@@ -1506,26 +1405,27 @@ where
                     return self.expected_token_error(&self.look_ahead, &["variable decl"]);
                 };
                 if self.at_keyword(Keyword::In(())) {
-                    let left = LoopLeft::Variable(kind, decl);
+                    let left = todo!();//LoopLeft::Variable(kind, decl);
                     let stmt = self.parse_for_in_loop(left)?;
                     Ok(Stmt::ForIn(stmt))
                 } else if self.at_contextual_keyword("of") {
-                    if !lhs::is_simple_pat(&decl.id) {
-                        return Err(Error::ForOfNotSimple(init_start));
-                    }
-                    let left = LoopLeft::Variable(kind, decl);
+                    // if !lhs::is_simple_pat(&decl.id) {
+                    //     return Err(Error::ForOfNotSimple(init_start));
+                    // }
+                    let left = todo!();//LoopLeft::Variable(kind, decl);
                     lhs::check_loop_left(&left, init_start)?;
                     let stmt = self.parse_for_of_loop(left, is_await)?;
                     Ok(Stmt::ForOf(stmt))
                 } else {
-                    let init = LoopInit::Variable(kind, vec![decl]);
+                    let init = todo!();//LoopInit::Variable(kind, vec![decl]);
                     let stmt = self.parse_for_loop_cont(Some(init))?;
                     Ok(Stmt::For(stmt))
                 }
             } else {
-                let init = LoopInit::Variable(kind, bindings);
-                let stmt = self.parse_for_loop_cont(Some(init))?;
-                Ok(Stmt::For(stmt))
+                // let init = LoopInit::Variable(kind, bindings);
+                // let stmt = self.parse_for_loop_cont(Some(init))?;
+                // Ok(Stmt::For(stmt))
+                todo!()
             }
         } else if self.at_keyword(Keyword::Const(())) || self.at_keyword(Keyword::Let(())) {
             let kind = self.next_item()?;
@@ -1562,11 +1462,11 @@ where
                 let _in = self.next_item()?;
                 //const or let becomes an ident
                 let k = match var_kind {
-                    VarKind::Var => "var",
-                    VarKind::Let => "let",
-                    VarKind::Const => "const",
+                    VarKind::Var(slice) => slice,
+                    VarKind::Let(slice) => slice,
+                    VarKind::Const(slice) => slice,
                 };
-                let left = LoopLeft::Expr(Expr::ident_from(k));
+                let left = LoopLeft::Expr(Expr::Ident(Ident { slice: k }));
                 let right = self.parse_expression()?;
                 let body_start = self.look_ahead_position;
                 let body = self.parse_loop_body()?;
@@ -1576,11 +1476,12 @@ where
                         "Loop body cannot be a function or labeled function".to_string(),
                     ));
                 }
-                Ok(Stmt::ForIn(ForInStmt {
-                    left,
-                    right,
-                    body: Box::new(body),
-                }))
+                // Ok(Stmt::ForIn(ForInStmt {
+                //     left,
+                //     right,
+                //     body: Box::new(body),
+                // }))
+                todo!()
             } else {
                 let prev_in = self.context.allow_in;
                 self.context.allow_in = false;
@@ -1606,11 +1507,12 @@ where
                                 "Loop body cannot be a function or labeled function".to_string(),
                             ))
                         } else {
-                            Ok(Stmt::ForIn(ForInStmt {
-                                left,
-                                right,
-                                body: Box::new(body),
-                            }))
+                            // Ok(Stmt::ForIn(ForInStmt {
+                            //     left,
+                            //     right,
+                            //     body: Box::new(body),
+                            // }))
+                            todo!()
                         }
                     } else if decl.init.is_none() && self.at_contextual_keyword("of") {
                         let left = LoopLeft::Variable(var_kind, decl);
@@ -1654,11 +1556,12 @@ where
                         "Loop body cannot be a function or labeled function".to_string(),
                     ));
                 }
-                Ok(Stmt::ForIn(ForInStmt {
-                    left,
-                    right,
-                    body: Box::new(body),
-                }))
+                // Ok(Stmt::ForIn(ForInStmt {
+                //     left,
+                //     right,
+                //     body: Box::new(body),
+                // }))
+                todo!()
             } else if self.at_contextual_keyword("of") {
                 if !lhs::is_simple_expr(&init) {
                     return Err(Error::ForOfNotSimple(init_start));
@@ -1786,11 +1689,12 @@ where
                     .to_string(),
             ))
         } else {
-            Ok(ForInStmt {
-                left,
-                right,
-                body: Box::new(body),
-            })
+            // Ok(ForInStmt {
+            //     left,
+            //     right,
+            //     body: Box::new(body),
+            // })
+            todo!()
         }
     }
 
@@ -1865,7 +1769,7 @@ where
         })
     }
 
-    fn parse_break_stmt(&mut self, _s: &'b str) -> Res<Option<resast::Ident<'b>>> {
+    fn parse_break_stmt(&mut self, _s: &'b str) -> Res<Option<Ident<'b>>> {
         debug!(
             "{}: parse_break_stmt {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -1873,7 +1777,7 @@ where
         self.parse_optionally_labeled_statement(Keyword::Break(()))
     }
 
-    fn parse_continue_stmt(&mut self, _s: &'b str) -> Res<Option<resast::Ident<'b>>> {
+    fn parse_continue_stmt(&mut self, _s: &'b str) -> Res<Option<Ident<'b>>> {
         debug!(
             "{}: parse_continue_stmt {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -2329,13 +2233,14 @@ where
         debug!("setting allow_super to {}", prev_super);
         self.context.set_allow_super(prev_super);
         self.remove_scope();
-        Ok(Func {
-            id,
-            params,
-            body,
-            generator: is_gen,
-            is_async,
-        })
+        // Ok(Func {
+        //     id,
+        //     params,
+        //     body,
+        //     generator: is_gen,
+        //     is_async,
+        // })
+        todo!()
     }
 
     fn parse_func(
@@ -2444,15 +2349,16 @@ where
         self.context.allow_yield = prev_yield;
         self.context.set_allow_super(prev_super);
         self.remove_scope();
-        let f = Func {
-            id,
-            params: params.params,
-            body,
-            is_async,
-            generator: is_gen,
-        };
+        // let f = Func {
+        //     id,
+        //     params: params.params,
+        //     body,
+        //     is_async,
+        //     generator: is_gen,
+        // };
 
-        Ok(f)
+        // Ok(f)
+        todo!()
     }
     fn remove_scope(&mut self) {
         trace!("{} remove_scope", self.look_ahead.span.start);
@@ -2841,14 +2747,15 @@ where
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
         self.context.allow_await = prev_await;
-        let func = Func {
-            id: None,
-            params: params.params,
-            is_async: true,
-            generator: false,
-            body,
-        };
-        Ok(PropValue::Expr(Expr::Func(func)))
+        // let func = Func {
+        //     id: None,
+        //     params: params.params,
+        //     is_async: true,
+        //     generator: false,
+        //     body,
+        // };
+        // Ok(PropValue::Expr(Expr::Func(func)))
+        todo!()
     }
 
     fn parse_property_method(&mut self) -> Res<PropValue<'b>> {
@@ -2872,14 +2779,15 @@ where
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
         self.context.allow_yield = prev_yield;
         self.context.allow_strict_directive = prev_strict;
-        let func = Func {
-            id: None,
-            params: params.params,
-            is_async: false,
-            generator: false,
-            body,
-        };
-        Ok(PropValue::Expr(Expr::Func(func)))
+        // let func = Func {
+        //     id: None,
+        //     params: params.params,
+        //     is_async: false,
+        //     generator: false,
+        //     body,
+        // };
+        // Ok(PropValue::Expr(Expr::Func(func)))
+        todo!()
     }
 
     fn parse_generator_method(&mut self) -> Res<PropValue<'b>> {
@@ -2902,14 +2810,15 @@ where
         let body = self.parse_method_body(params.simple, params.found_restricted)?;
         self.remove_scope();
         self.context.allow_yield = prev_yield;
-        let func = Func {
-            id: None,
-            params: params.params,
-            is_async: false,
-            generator: true,
-            body,
-        };
-        Ok(PropValue::Expr(Expr::Func(func)))
+        // let func = Func {
+        //     id: None,
+        //     params: params.params,
+        //     is_async: false,
+        //     generator: true,
+        //     body,
+        // };
+        // Ok(PropValue::Expr(Expr::Func(func)))
+        todo!()
     }
 
     fn parse_getter_method(&mut self) -> Res<PropValue<'b>> {
@@ -2935,13 +2844,14 @@ where
         let body = self.parse_method_body(formal_params.simple, formal_params.found_restricted)?;
         self.remove_scope();
         self.context.allow_yield = prev_yield;
-        Ok(PropValue::Expr(Expr::Func(Func {
-            id: None,
-            params: formal_params.params,
-            body,
-            generator: is_gen,
-            is_async: false,
-        })))
+        // Ok(PropValue::Expr(Expr::Func(Func {
+        //     id: None,
+        //     params: formal_params.params,
+        //     body,
+        //     generator: is_gen,
+        //     is_async: false,
+        // })))
+        todo!()
     }
 
     fn parse_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<FuncBody<'b>> {
@@ -2991,14 +2901,15 @@ where
             }
         }
         let body = self.parse_property_method_body(params.simple, params.found_restricted)?;
-        let func = Func {
-            id: None,
-            params: params.params,
-            body,
-            generator: false,
-            is_async: false,
-        };
-        Ok(PropValue::Expr(Expr::Func(func)))
+        // let func = Func {
+        //     id: None,
+        //     params: params.params,
+        //     body,
+        //     generator: false,
+        //     is_async: false,
+        // };
+        // Ok(PropValue::Expr(Expr::Func(func)))
+        todo!()
     }
 
     fn is_rest(arg: &FuncArg) -> bool {
@@ -3736,10 +3647,11 @@ where
             breaking = quasi.tail;
             quasis.push(quasi);
         }
-        Ok(TemplateLit {
-            expressions,
-            quasis,
-        })
+        // Ok(TemplateLit {
+        //     expressions,
+        //     quasis,
+        // })
+        todo!()
     }
 
     fn parse_template_element(&mut self, is_tagged: bool) -> Res<TemplateElement<'b>> {
@@ -3861,14 +3773,15 @@ where
         debug!("setting allow_super to {}", prev_super);
         self.context.set_allow_super(prev_super);
         self.remove_scope();
-        let func = Func {
-            id,
-            params: formal_params.params,
-            body,
-            generator: is_gen,
-            is_async,
-        };
-        Ok(Expr::Func(func))
+        // let func = Func {
+        //     id,
+        //     params: formal_params.params,
+        //     body,
+        //     generator: is_gen,
+        //     is_async,
+        // };
+        // Ok(Expr::Func(func))
+        todo!()
     }
 
     fn parse_fn_name(&mut self, is_gen: bool) -> Res<resast::Ident<'b>> {
