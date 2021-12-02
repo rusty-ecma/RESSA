@@ -960,7 +960,7 @@ lazy_static! {
         obj_lit_part(vec![]),
         obj_lit_part(vec![
             obj_prop(
-                obj_key_ident_pat("x"),
+                obj_key_ident_expr("x"),
                 PropValue::None,
                 PropKind::Init,
                 false,
@@ -1869,7 +1869,7 @@ lazy_static! {
                 fn_arg_ident_pat("x"),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident_pat("x"),
+                        obj_key_ident_expr("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -1892,7 +1892,7 @@ lazy_static! {
                 fn_arg_ident_pat("x"),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident_pat("x"),
+                        obj_key_ident_expr("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -1916,10 +1916,11 @@ lazy_static! {
                             }
                         )
                     ])
+
                 ),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident_pat("x"),
+                        obj_key_ident_expr("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -2403,6 +2404,7 @@ lazy_static! {
                 Box::new(
                     ModImport {
                         specifiers: vec![
+                            ImportSpecifier::Normal(vec![])
                         ],
                         source: string_lit_double("module")
                     }
@@ -2414,8 +2416,8 @@ lazy_static! {
                 Box::new(
                     ModImport {
                         specifiers: vec![
-                            normal_import("i2", "i2"),
-                            normal_import("a", "i3"),
+                            normal_imports(&[("i2", "i2"),
+                            ("a", "i3")]),
                         ],
                         source: string_lit_double("module")
                     }
@@ -2441,6 +2443,7 @@ lazy_static! {
                     ModImport {
                         specifiers: vec![
                             ImportSpecifier::Default(Ident::from("i6")),
+                            normal_imports(&[]),
                         ],
                         source: string_lit_double("module")
                     }
@@ -2453,8 +2456,8 @@ lazy_static! {
                     ModImport {
                         specifiers: vec![
                             ImportSpecifier::Default(Ident::from("i7")),
-                            normal_import("i8", "i8"),
-                            normal_import("var", "i9"),
+                            normal_imports(&[("i8", "i8"),
+                            ("var", "i9")]),
                         ],
                         source: string_lit_double("module")
                     }
@@ -2849,7 +2852,7 @@ lazy_static! {
         obj_lit_part(vec![]),
         obj_lit_part(vec![
             obj_prop(
-                obj_key_ident_pat("x"),
+                obj_key_ident_expr("x"),
                 PropValue::None,
                 PropKind::Init,
                 false,
@@ -3771,7 +3774,7 @@ lazy_static! {
                 fn_arg_ident_pat("x"),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident_pat("x"),
+                        obj_key_ident_expr("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -3794,7 +3797,7 @@ lazy_static! {
                 fn_arg_ident_pat("x"),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident_pat("x"),
+                        obj_key_ident_expr("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -3821,7 +3824,7 @@ lazy_static! {
                 ),
             ], obj_lit_expr(vec![
                     obj_prop(
-                        obj_key_ident_pat("x"),
+                        obj_key_ident_expr("x"),
                         PropValue::None,
                         PropKind::Init,
                         false,
@@ -4388,17 +4391,26 @@ fn empty_generator_prop(key: PK) -> OP {
             generator: true,
             is_async: false,
         })),
-        PropKind::Init,
+        PropKind::Method,
         true,
         false,
         false,
     )
 }
-fn normal_import(name: &'static str, local: &'static str) -> ImportSpecifier<'static> {
-    ImportSpecifier::Normal(NormalImportSpec {
+
+fn normal_imports(pairs: &[(&'static str, &'static str)]) -> ImportSpecifier<'static> {
+    let imports = pairs
+        .into_iter()
+        .map(|(name, local)| normal_import(name, local))
+        .collect();
+    ImportSpecifier::Normal(imports)
+}
+
+fn normal_import(name: &'static str, local: &'static str) -> NormalImportSpec<'static> {
+    NormalImportSpec {
         local: Ident::from(local),
         imported: Ident::from(name),
-    })
+    }
 }
 fn long_args_array_pat() -> Vec<P> {
     vec![

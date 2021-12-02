@@ -14,27 +14,30 @@ fn es5() {
     let mut p = Parser::new(&js).expect("Failed to create parser");
     let mut tokens = es_tokens::ES5.iter();
     let mut i = 0;
-    let mut last_position = p.next_position();
     while let Some(ref item) = p.next() {
         if let Some(part) = tokens.next() {
             let item = match item {
                 Ok(i) => i,
-                Err(e) => panic!(
-                    "Error parsing {:?}\n{}",
-                    path,
-                    super::format_error(&js, e).unwrap_or_else(String::new)
-                ),
+                Err(e) => {
+                    let path = if let Some(pos) = e.position() {
+                        format!("{}:{}:{}", path, pos.line, pos.column)
+                    } else {
+                        path
+                    };
+                    panic!("Error parsing {:?}\n{}", path, super::format_error(&js, e))
+                }
             };
             if item != part {
+                let pos = p.next_position();
+                let _ = ::std::fs::write("1.parsed.out", format!("{:#?}", item));
+                let _ = ::std::fs::write("2.expected.out", format!("{:#?}", part));
                 panic!(
-                    "Error, part {} doesn't match \n{:?}\n{:?}\nnext start: line: {}, column: {}\n{}",
-                    i, item, part, last_position.start.line, last_position.start.column,
-                    super::hilight_position(&js, &last_position).unwrap_or_else(String::new)
+                    "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
+                    i, path, pos.start.line, pos.start.column, item, part,
                 )
             }
         }
         i += 1;
-        last_position = p.next_position();
     }
 }
 
@@ -51,12 +54,19 @@ fn es2015_script() {
         if let Some(part) = tokens.next() {
             let item = match item {
                 Ok(i) => i,
-                Err(e) => panic!("Error parsing {:?}\n{}", path, e),
+                Err(e) => {
+                    let path = if let Some(pos) = e.position() {
+                        format!("{}:{}:{}", path, pos.line, pos.column)
+                    } else {
+                        path
+                    };
+                    panic!("Error parsing {:?}\n{}", path, e)
+                }
             };
             if item != part {
                 let pos = p.next_position();
-                let _ = ::std::fs::write("left.out", format!("{:#?}", item));
-                let _ = ::std::fs::write("right.out", format!("{:#?}", part));
+                let _ = ::std::fs::write("1.parsed.out", format!("{:#?}", item));
+                let _ = ::std::fs::write("2.expected.out", format!("{:#?}", part));
                 panic!(
                     "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
                     i, path, pos.start.line, pos.start.column, item, part,
@@ -73,7 +83,7 @@ fn es2015_module() {
     let _ = env_logger::try_init();
     let path = Lib::Everything(EverythingVersion::Es2015Module).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
-    let mut p = Parser::builder()
+    let mut p = ressa::spanned::Parser::builder()
         .module(true)
         .js(&js)
         .build()
@@ -84,15 +94,27 @@ fn es2015_module() {
         if let Some(part) = tokens.next() {
             let item = match item {
                 Ok(i) => i,
-                Err(e) => panic!("Error parsing {:?}\n{}", path, e),
+                Err(e) => {
+                    let path = if let Some(pos) = e.position() {
+                        format!("{}:{}:{}", path, pos.line, pos.column)
+                    } else {
+                        path
+                    };
+                    panic!("Error parsing {:?}\n{}", path, super::format_error(&js, &e))
+                }
             };
-            if item != part {
-                let pos = p.next_position();
-                let _ = ::std::fs::write("parsed.out", format!("{:#?}", item));
-                let _ = ::std::fs::write("expected.out", format!("{:#?}", part));
+            let simple = item.clone();
+            let simple: resast::ProgramPart = simple.into();
+            if &simple != part {
+                use resast::spanned::Node;
+                let _ = ::std::fs::write("1.parsed.out", format!("{:#?}", simple));
+                let _ = ::std::fs::write("2.expected.out", format!("{:#?}", part));
+                let loc = item.loc();
+                let path = format!("{}:{}:{}", path, loc.start.line, loc.start.column);
+                let end = format!("{}:{}", loc.end.line, loc.end.column);
                 panic!(
-                    "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
-                    i, path, pos.start.line, pos.start.column, item, part,
+                    "{:?}\n{:?}\nError, part {} does't match from {} to {} \n",
+                    simple, part, i, path, end
                 )
             }
         }

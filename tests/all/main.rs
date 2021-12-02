@@ -90,7 +90,15 @@ pub fn npm_install() -> Result<(), Error> {
     Ok(())
 }
 
-fn format_error(js: &str, e: &ressa::Error) -> Option<String> {
+fn format_error(js: &str, e: &ressa::Error) -> String {
+    if let Some(position) = try_hilight_position(js, e) {
+        format!("{}\n{}", e, position)
+    } else {
+        format!("{}", e)
+    }
+}
+
+fn try_hilight_position(js: &str, e: &ressa::Error) -> Option<String> {
     let start = e.position()?;
     let column = js.lines().nth(start.line.saturating_sub(1))?.len();
     let end = ress::Position {
@@ -99,21 +107,33 @@ fn format_error(js: &str, e: &ressa::Error) -> Option<String> {
     };
     hilight_position(js, &ress::SourceLocation { start, end })
 }
+
 fn hilight_position(js: &str, location: &ress::SourceLocation) -> Option<String> {
     let line_count = js.lines().count();
-    if line_count < 5 {
-        return Some(js.to_string());
-    }
-    let skip = location.start.line.saturating_sub(2);
+    let skip = if line_count < 5 {
+        0
+    } else {
+        location.start.line.saturating_sub(2)
+    };
+
+    println!("hilighting position: {:#?}", location);
     Some(
         js.lines()
+            .map(|l| l.split(&['\u{2028}', '\u{2029}'][..]))
+            .flatten()
             .enumerate()
             .skip(skip)
-            .take(5)
+            .take(5.min(line_count))
             .map(|(i, l)| {
                 if i + 1 == location.start.line {
                     let whitespace = " ".repeat(location.start.column);
-                    let arrows = "^".repeat(location.end.column - location.start.column);
+                    let arrows = "^".repeat(
+                        location
+                            .end
+                            .column
+                            .saturating_sub(location.start.column)
+                            .min(2),
+                    );
                     format!("{}\n{}{}\n", l, whitespace, arrows)
                 } else {
                     format!("{}\n", l)
