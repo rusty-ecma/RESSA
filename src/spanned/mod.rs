@@ -1,5 +1,3 @@
-
-
 //! RESSA (Rusty ECMAScript Syntax Analyzer)
 //! A library for parsing js files
 //!
@@ -58,11 +56,22 @@
 //! examples.
 //!
 
-use resast::spanned::{Dir, Func, Ident, Node, Program, ProgramPart, Slice, VarKind, decl::{Decl, DefaultExportDecl, ExportSpecifier, ImportSpecifier, ModExport, ModImport, NamedExportDecl, NormalImportSpec, VarDecl}, expr::{Expr, Lit, TemplateLit}, pat::Pat, stmt::{BlockStmt, CatchClause, ForInStmt, IfStmt, LoopInit, LoopLeft, Stmt, SwitchCase, SwitchStmt, TryStmt, WhileStmt, WithStmt}};
-use ress::Span;
+use resast::spanned::{
+    decl::{
+        Decl, DefaultExportDecl, ExportSpecifier, ImportSpecifier, ModExport, ModImport,
+        NamedExportDecl, NormalImportSpec, VarDecl, Alias, VarDecls,
+    },
+    expr::{Expr, Lit, StringLit, TemplateLit},
+    pat::{Pat, ArrayPatPart},
+    stmt::{
+        BlockStmt, CatchClause, ForInStmt, IfStmt, LoopInit, LoopLeft, Stmt, SwitchCase,
+        SwitchStmt, TryStmt, WhileStmt, WithStmt,
+    },
+    Dir, Func, Ident, Node, Program, ProgramPart, Slice, VarKind, FuncArg,
+};
 use ress::prelude::*;
+use ress::Span;
 
-use crate::LabelKind;
 pub use crate::comment_handler::CommentHandler;
 pub use crate::comment_handler::DefaultCommentHandler;
 pub use crate::error::Error;
@@ -71,7 +80,8 @@ use crate::formal_params::FormalParams;
 use crate::lexical_names;
 use crate::lexical_names::DeclKind;
 use crate::lhs;
-use crate::{Context, Config};
+use crate::LabelKind;
+use crate::{Config, Context};
 use std::borrow::Cow;
 use std::{
     collections::{HashMap, HashSet},
@@ -355,11 +365,10 @@ where
                     return Err(Error::OctalLiteral(orig.location.start));
                 }
                 self.consume_semicolon()?;
-                // Ok(ProgramPart::Dir(Dir {
-                //     dir: s.clone_inner(),
-                //     expr: Lit::String(s),
-                // }))
-                todo!()
+                Ok(ProgramPart::Dir(Dir {
+                    dir: s.content.source.clone(),
+                    expr: Lit::String(s),
+                }))
             } else {
                 Ok(ProgramPart::Stmt(Stmt::Expr(Expr::Lit(lit))))
             }
@@ -464,17 +473,18 @@ where
                 return Err(Error::InvalidImportError(self.current_position));
             }
         }
-        self.expect_keyword(Keyword::Import(()))?;
-        // if the next toke is a string we are at an import
+        let keyword = self.expect_keyword(Keyword::Import(()))?;
+        // if the next token is a string we are at an import
         // with not specifiers
         if self.look_ahead.is_string() {
             let source = self.parse_module_specifier()?;
             self.consume_semicolon()?;
-            todo!()
-            // Ok(ModImport {
-            //     specifiers: Vec::new(),
-            //     source,
-            // })
+            Ok(ModImport {
+                keyword_import: keyword,
+                specifiers: Vec::new(),
+                keyword_from: None,
+                source,
+            })
         } else {
             // If we are at an open brace, this is the named
             //variant
@@ -527,7 +537,7 @@ where
     /// import {Thing} from 'place';
     /// ```
     fn parse_named_imports(&mut self) -> Res<Vec<ImportSpecifier<'b>>> {
-        self.expect_punct(Punct::OpenBrace)?;
+        let open_brace = self.expect_punct(Punct::OpenBrace)?;
         let mut ret = Vec::new();
         while !self.at_punct(Punct::CloseBrace) {
             ret.push(self.parse_import_specifier()?);
@@ -535,7 +545,8 @@ where
                 self.expect_punct(Punct::Comma)?;
             }
         }
-        self.expect_punct(Punct::CloseBrace)?;
+        let close_brace = self.expect_punct(Punct::CloseBrace)?;
+        
         Ok(ret)
     }
 
@@ -543,9 +554,17 @@ where
         let start = self.look_ahead_position;
         let (imported, local) = if self.look_ahead.token.is_ident() {
             let imported = self.parse_var_ident(false)?;
-            let local = if self.at_contextual_keyword("as") {
+            let local = if let Some(keyword) = self.at_contextual_keyword("as") {
                 let _ = self.next_item();
-                self.parse_var_ident(false)?
+                let alias = self.parse_var_ident(false)?;
+                ImportSpecifier::Normal(NormalImportSpec {
+                    local,
+                    alias: Alias {
+                        ident: alias,
+                        keyword,
+                    }
+                })
+                
             } else {
                 imported.clone()
             };
@@ -1305,10 +1324,13 @@ where
             if !self.config.tolerant {
                 return self.expected_token_error(&self.look_ahead, &[")"]);
             }
-            (Box::new(Stmt::Empty(Slice {
-                source: Cow::Borrowed(""),
-                loc: test.loc(),
-            })), None)
+            (
+                Box::new(Stmt::Empty(Slice {
+                    source: Cow::Borrowed(""),
+                    loc: test.loc(),
+                })),
+                None,
+            )
         } else {
             self.expect_punct(Punct::CloseParen)?;
             let body_start = self.look_ahead_position;
@@ -1405,19 +1427,19 @@ where
                     return self.expected_token_error(&self.look_ahead, &["variable decl"]);
                 };
                 if self.at_keyword(Keyword::In(())) {
-                    let left = todo!();//LoopLeft::Variable(kind, decl);
+                    let left = todo!(); //LoopLeft::Variable(kind, decl);
                     let stmt = self.parse_for_in_loop(left)?;
                     Ok(Stmt::ForIn(stmt))
                 } else if self.at_contextual_keyword("of") {
                     // if !lhs::is_simple_pat(&decl.id) {
                     //     return Err(Error::ForOfNotSimple(init_start));
                     // }
-                    let left = todo!();//LoopLeft::Variable(kind, decl);
+                    let left = todo!(); //LoopLeft::Variable(kind, decl);
                     lhs::check_loop_left(&left, init_start)?;
                     let stmt = self.parse_for_of_loop(left, is_await)?;
                     Ok(Stmt::ForOf(stmt))
                 } else {
-                    let init = todo!();//LoopInit::Variable(kind, vec![decl]);
+                    let init = todo!(); //LoopInit::Variable(kind, vec![decl]);
                     let stmt = self.parse_for_loop_cont(Some(init))?;
                     Ok(Stmt::For(stmt))
                 }
@@ -2012,26 +2034,29 @@ where
             self.look_ahead.span.start, self.look_ahead.token
         );
         let next = self.next_item()?;
-        debug!("next: {:?} {}", next, self.context.allow_yield);
         let kind = match next.token {
             Token::Keyword(ref k) => match k {
-                Keyword::Let(_) => VarKind::Let,
-                Keyword::Const(_) => VarKind::Const,
+                Keyword::Let(_) => VarKind::Let(self.get_slice(&next)?),
+                Keyword::Const(_) => VarKind::Const(self.get_slice(&next)?),
                 _ => return self.expected_token_error(&next, &["let", "const"]),
             },
             _ => return self.expected_token_error(&next, &["let", "const"]),
         };
-        let decl = self.parse_binding_list(kind, in_for)?;
+        let decls = self.parse_binding_list(&kind, in_for)?;
         self.consume_semicolon()?;
-        Ok(Decl::Var(kind, decl))
+        let var_decls = VarDecls {
+            keyword: kind,
+            decls,
+        };
+        Ok(Decl::Var(val_decls))
     }
 
-    fn parse_binding_list(&mut self, kind: VarKind, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
+    fn parse_binding_list(&mut self, kind: &VarKind, in_for: bool) -> Res<Vec<VarDecl<'b>>> {
         debug!(
             "{}: parse_binding_list {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        let k = if kind == VarKind::Var {
+        let k = if matches!(kind, VarKind::Var(_)) {
             lexical_names::DeclKind::Var(self.context.is_module)
         } else {
             lexical_names::DeclKind::Lex(self.context.is_module)
@@ -2097,19 +2122,19 @@ where
         }
     }
 
-    fn parse_lexical_binding(&mut self, kind: VarKind, in_for: bool) -> Res<VarDecl<'b>> {
+    fn parse_lexical_binding(&mut self, kind: &VarKind, in_for: bool) -> Res<VarDecl<'b>> {
         debug!(
             "{}: parse_lexical_binding {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
         let start = self.look_ahead.clone();
-        let (_, id) = self.parse_pattern(Some(kind), &mut Vec::new())?;
+        let (_, id) = self.parse_pattern(Some(&kind), &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&id) && !self.config.tolerant {
             return self.unexpected_token_error(&start, "restricted word");
         }
 
-        let init = if kind == VarKind::Const {
-            if !self.at_keyword(Keyword::In(())) && !self.at_contextual_keyword("of") {
+        let init = if matches!(kind, VarKind::Const(_)) {
+            if self.at_keyword(Keyword::In(())).is_none() && self.at_contextual_keyword("of").is_none() {
                 if self.at_punct(Punct::Equal) {
                     let _ = self.next_item()?;
                     let init = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
@@ -3784,7 +3809,7 @@ where
         todo!()
     }
 
-    fn parse_fn_name(&mut self, is_gen: bool) -> Res<resast::Ident<'b>> {
+    fn parse_fn_name(&mut self, is_gen: bool) -> Res<resast::spanned::Ident<'b>> {
         debug!(
             "{}: parse_fn_name {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -3796,7 +3821,7 @@ where
         }
     }
 
-    fn parse_ident_name(&mut self) -> Res<resast::Ident<'b>> {
+    fn parse_ident_name(&mut self) -> Res<resast::spanned::Ident<'b>> {
         debug!(
             "{}: parse_ident_name {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -3806,12 +3831,12 @@ where
             Token::Ident(_) | Token::Keyword(_) | Token::Boolean(_) | Token::Null => (),
             _ => return self.expected_token_error(&ident, &["identifier"]),
         }
-        let ret = self.get_string(&ident.span)?;
+        let slice = self.slice_from(&ident.span)?;
 
-        Ok(resast::Ident::from(ret))
+        Ok(resast::spanned::Ident { slice })
     }
 
-    fn parse_var_ident(&mut self, is_var: bool) -> Res<resast::Ident<'b>> {
+    fn parse_var_ident(&mut self, is_var: bool) -> Res<resast::spanned::Ident<'b>> {
         debug!(
             "{}: parse_var_ident {:?}",
             self.look_ahead.span.start, self.look_ahead.token
@@ -3827,7 +3852,7 @@ where
                     ident.location.start,
                     format!(
                         "{} is a strict reserved word",
-                        self.get_string(&ident.span)?
+                        self.get_slice(&ident.span)?.source,
                     ),
                 ));
             } else if self.context.strict
@@ -3849,8 +3874,10 @@ where
         }
         let i = match ident.token {
             Token::Ident(_) => {
-                let s = self.get_string(&ident.span)?;
-                resast::Ident::from(s)
+                let slice = self.get_slice(&ident)?;
+                resast::spanned::Ident {
+                    slice,
+                }
             }
             Token::Keyword(ref k) => {
                 if k.is_reserved()
@@ -3859,8 +3886,10 @@ where
                 {
                     return self.unexpected_token_error(&ident, "reserved word as ident");
                 } else {
-                    let s = self.get_string(&ident.span)?;
-                    resast::Ident::from(s)
+                    let slice = self.get_slice(&ident)?;
+                    resast::spanned::Ident {
+                        slice,
+                    }
                 }
             }
             _ => self.expected_token_error(&ident, &["variable identifier"])?,
@@ -3975,7 +4004,7 @@ where
 
     fn parse_pattern(
         &mut self,
-        kind: Option<VarKind>,
+        kind: Option<&VarKind>,
         params: &mut Vec<Item<&'b str>>,
     ) -> Res<(bool, Pat<'b>)> {
         debug!(
@@ -3988,23 +4017,13 @@ where
         } else if self.at_punct(Punct::OpenBrace) {
             self.parse_object_pattern()
         } else {
-            let is_var = if let Some(kind) = kind {
-                match kind {
-                    VarKind::Const | VarKind::Let => {
-                        if self.at_keyword(Keyword::Let(())) {
-                            return self.expected_token_error(&self.look_ahead, &["identifier"]);
-                        }
-                        false
-                    }
-                    VarKind::Var => true,
-                }
-            } else {
-                true
-            };
+            let is_var = matches!(kind, Some(VarKind::Var(_)));
             let ident = self.parse_var_ident(is_var)?;
-            let restricted = ident.name == "eval" || ident.name == "arguments";
+            if !is_var && ident.slice.source == "let" {
+                return self.expected_token_error(&self.look_ahead, &["identifier"]);
+            }
+            let restricted = ident.slice.source == "eval" || ident.slice.source == "arguments";
             params.push(self.look_ahead.clone());
-            debug!("found restricted ident? {} {}", restricted, &ident.name);
             Ok((restricted, Pat::Ident(ident)))
         }
     }
@@ -4018,7 +4037,7 @@ where
             "{}: parse_array_pattern {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        self.expect_punct(Punct::OpenBracket)?;
+        let open_bracket = self.expect_punct(Punct::OpenBracket)?;
         let mut elements = Vec::new();
         while !self.at_punct(Punct::CloseBracket) {
             if self.at_punct(Punct::Comma) {
@@ -5520,12 +5539,13 @@ where
     /// Get the next token and validate that it matches
     /// the punct provided, discarding the result
     /// if it does
-    fn expect_punct(&mut self, p: Punct) -> Res<()> {
+    fn expect_punct(&mut self, p: Punct) -> Res<Slice<'b>> {
         let next = self.next_item()?;
         if !next.token.matches_punct(p) {
             return self.expected_token_error(&next, &[&format!("{:?}", p)]);
         }
-        Ok(())
+
+        self.slice_from(&next).ok_or_else(|| self.op_error("extracting slice from item"))
     }
     fn expect_fat_arrow(&mut self) -> Res<()> {
         if self.look_ahead.token.matches_punct(Punct::EqualGreaterThan) {
@@ -5542,12 +5562,24 @@ where
     /// move on to the next item and validate it matches
     /// the keyword provided, discarding the result
     /// if it does
-    fn expect_keyword(&mut self, k: Keyword<()>) -> Res<()> {
+    fn expect_keyword(&mut self, k: Keyword<()>) -> Res<Slice<'b>> {
         let next = self.next_item()?;
         if !next.token.matches_keyword(k) {
             return self.expected_token_error(&next, &[&format!("{:?}", k)]);
         }
-        Ok(())
+        Ok(Slice {
+            loc: resast::spanned::SourceLocation {
+                start: resast::spanned::Position {
+                    line: next.location.start.line,
+                    column: next.location.start.column,
+                },
+                end: resast::spanned::Position {
+                    line: next.location.end.line,
+                    column: next.location.end.column,
+                },
+            },
+            source: Cow::Borrowed(Cow::Borrowed(self.get_string(&next.span)?))
+        })
     }
     fn at_return_arg(&self) -> bool {
         if self.context.has_line_term {
@@ -5630,8 +5662,11 @@ where
         self.look_ahead.token.matches_punct(p)
     }
     /// Test for if the next token is a specific keyword
-    fn at_keyword(&self, k: Keyword<()>) -> bool {
-        self.look_ahead.token.matches_keyword(k)
+    fn at_keyword(&self, k: Keyword<()>) -> Option<Slice<'b>> {
+        if self.look_ahead.token.matches_keyword(k) {
+            return self.slice_from(&self.look_ahead)
+        }
+        None
     }
     /// This test is for all the operators that might be part
     /// of an assignment statement
@@ -5706,16 +5741,30 @@ where
     }
     /// Tests if a token matches an &str that might represent
     /// a contextual keyword like `async`
-    fn at_contextual_keyword(&self, s: &str) -> bool {
-        self.is_contextual_keyword(s, &self.look_ahead.span)
-    }
-    fn is_contextual_keyword(&self, keyword: &str, span: &Span) -> bool {
-        if let Some(current) = self.scanner.str_for(span) {
-            debug!("at_contextual_keyword {:?} {:?}", keyword, current);
-            current == keyword
-        } else {
-            false
+    fn at_contextual_keyword(&self, s: &str) -> Option<Slice<'b>> {
+        debug!("at_contextual_keyword {:?}", s);
+        let slice = self.slice_from(&self.look_ahead)?;
+        if slice.source == s {
+            return Some(slice);
         }
+        None
+    }
+
+    fn slice_from(&self, item: &Item<&str>) -> Option<Slice<'b>> {
+        let slice = self.scanner.str_for(&item.span)?;
+        Some(Slice {
+            loc: resast::spanned::SourceLocation {
+                start: resast::spanned::Position {
+                    line: item.location.start.line,
+                    column: item.location.start.column,
+                },
+                end: resast::spanned::Position { 
+                    line: item.location.end.line,
+                    column: item.location.end.column,
+                }
+            },
+            source: Cow::Borrowed(slice),
+        })
     }
     /// Sort of keywords `eval` and `arguments` have
     /// a special meaning and will cause problems
@@ -5777,10 +5826,10 @@ where
         &self.original[start..end] == "n"
     }
 
-    fn get_string(&self, span: &Span) -> Res<&'b str> {
-        self.scanner
-            .str_for(span)
-            .ok_or_else(|| self.op_error("Unable to get &str from scanner"))
+    fn get_slice(&self, item: &Item<&str>) -> Res<Slice<'b>> {
+        self
+            .slice_from(item)
+            .ok_or_else(|| self.op_error("Unable to get slice from scanner"))
     }
 
     fn expected_token_error<T>(&self, item: &Item<&'b str>, expectation: &[&str]) -> Res<T> {
