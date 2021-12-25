@@ -3,14 +3,14 @@
 // most of this file is prep for a re-write
 
 use crate::{Error, Position};
-use resast::prelude::*;
+use resast::{spanned::{expr::{Expr, ObjExpr, AssignExpr, ObjProp, PropKey}, pat::{Pat, ObjPatPart, ArrayPatPart, RestPat}, Ident, stmt::LoopLeft}, PropKind};
 use std::{borrow::Cow, collections::HashSet};
 type Res = Result<(), Error>;
 
 pub fn is_simple_expr<'a>(expr: &Expr<'a>) -> bool {
     trace!("is_simple_expr {:?}", expr);
     match expr {
-        Expr::This => false,
+        Expr::This(_) => false,
         _ => true,
     }
 }
@@ -41,8 +41,7 @@ pub fn check_lhs_pat<'a>(pat: &Pat<'a>, allow_let: bool, pos: Position, strict: 
         Pat::Ident(ref id) => check_ident(id, allow_let, pos, strict),
         Pat::Obj(ref obj) => check_obj_pat(obj, allow_let, pos, strict),
         Pat::Assign(ref assign) => check_assign_pat(assign, allow_let, pos, strict),
-        Pat::Array(ref a) => check_array_pat(a, allow_let, pos, strict),
-        Pat::RestElement(ref p) => check_lhs_pat(p, allow_let, pos, strict),
+        Pat::Array(ref a) => check_array_pat(a, allow_let, pos, strict)
     }
 }
 
@@ -83,7 +82,7 @@ fn check_assign_expr<'a>(
 }
 
 fn check_assign_pat<'a>(
-    assign: &AssignPat<'a>,
+    assign: &resast::spanned::pat::AssignPat<'a>,
     allow_let: bool,
     pos: Position,
     strict: bool,
@@ -116,6 +115,7 @@ fn check_array_pat<'a>(
             match part {
                 ArrayPatPart::Expr(expr) => check_lhs_expr(expr, allow_let, pos, strict)?,
                 ArrayPatPart::Pat(pat) => check_lhs_pat(pat, allow_let, pos, strict)?,
+                ArrayPatPart::Rest(RestPat { pat, ..}) => check_lhs_pat(pat, allow_let, pos, strict)?,
             }
         }
     }
@@ -252,10 +252,11 @@ fn check_loop_left_pat<'a>(pat: &Pat<'a>, pos: Position, set: &mut HashSet<Cow<'
         }
         Pat::Array(a) => {
             for p in a {
-                if let Some(p) = p {
+                if let Some(p) = &p {
                     match p {
                         ArrayPatPart::Expr(expr) => check_loop_left_expr(expr, pos, set)?,
                         ArrayPatPart::Pat(pat) => check_loop_left_pat(pat, pos, set)?,
+                        ArrayPatPart::Rest(RestPat { dots: _, pat }) => check_loop_left_pat(pat, pos, set)?,
                     }
                 }
             }
