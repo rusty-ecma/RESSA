@@ -700,10 +700,10 @@ where
         if local.name == "arguments" || local.name == "eval" {
             return Err(Error::StrictModeArgumentsOrEval(start));
         }
-        Ok(ImportSpecifier::Normal(NormalImportSpec {
+        Ok(ImportSpecifier::Normal(vec![NormalImportSpec {
             imported,
             local,
-        }))
+        }]))
     }
 
     fn parse_import_namespace_specifier(&mut self) -> Res<ImportSpecifier<'b>> {
@@ -3960,7 +3960,7 @@ where
             "{}: parse_formal_params {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        self.expect_punct(Punct::OpenParen)?;
+        let open_paren = self.expect_punct(Punct::OpenParen)?;
         let mut args = Vec::new();
         let mut simple: bool = true;
         let mut found_restricted = false;
@@ -3979,10 +3979,12 @@ where
                 }
             }
         }
-        self.expect_punct(Punct::CloseParen)?;
+        let close_paren = self.expect_punct(Punct::CloseParen)?;
 
         Ok(FormalParams {
+            open_paren,
             params: args,
+            close_paren,
             strict: false,
             found_restricted,
             simple,

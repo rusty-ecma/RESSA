@@ -1,15 +1,18 @@
 use resast::prelude::*;
+use resast::spanned::Slice;
 use std::borrow::Cow;
 use std::collections::HashSet;
 
 pub struct FormalParams<'a> {
     pub simple: bool,
-    pub params: Vec<FuncArg<'a>>,
+    pub open_paren: Slice<'a>,
+    pub params: Vec<resast::spanned::FuncArg<'a>>,
+    pub close_paren: Slice<'a>,
     pub strict: bool,
     pub found_restricted: bool,
 }
 
-pub fn have_duplicates<'a>(params: &[FuncArg<'a>]) -> bool {
+pub fn have_duplicates<'a>(params: &[resast::spanned::FuncArg<'a>]) -> bool {
     if let Err(first_dupe) = find_duplicate(params) {
         error!("Found duplicate parameter: {}", first_dupe);
         true
@@ -17,7 +20,7 @@ pub fn have_duplicates<'a>(params: &[FuncArg<'a>]) -> bool {
         false
     }
 }
-pub fn find_duplicate<'a>(params: &[FuncArg<'a>]) -> Result<(), Cow<'a, str>> {
+pub fn find_duplicate<'a>(params: &[resast::spanned::FuncArg<'a>]) -> Result<(), Cow<'a, str>> {
     let mut set = HashSet::new();
     for param in params.iter() {
         match param {
@@ -32,17 +35,17 @@ pub fn find_duplicate<'a>(params: &[FuncArg<'a>]) -> Result<(), Cow<'a, str>> {
     Ok(())
 }
 pub fn update_with_expr<'a>(
-    expr: &Expr<'a>,
+    expr: &resast::spanned::expr::Expr<'a>,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Result<(), Cow<'a, str>> {
     trace!("update_with_expr {:?} {:?}", expr, set);
     match expr {
-        Expr::Ident(id) => {
-            if !set.insert(id.name.clone()) {
-                return Err(id.name.clone());
+        resast::spanned::expr::Expr::Ident(id) => {
+            if !set.insert(id.slice.source.clone()) {
+                return Err(id.slice.source.clone());
             }
         }
-        Expr::Assign(AssignExpr { left, .. }) => match left {
+        resast::spanned::expr::Expr::Assign(AssignExpr { left, .. }) => match left {
             AssignLeft::Expr(assign) => {
                 update_with_expr(assign, set)?;
             }
@@ -50,7 +53,7 @@ pub fn update_with_expr<'a>(
                 update_with_pat(pat, set)?;
             }
         },
-        Expr::Obj(obj) => {
+        resast::spanned::expr::Expr::Obj(obj) => {
             for prop in obj {
                 match prop {
                     ObjProp::Prop(prop) => {
@@ -67,7 +70,7 @@ pub fn update_with_expr<'a>(
     Ok(())
 }
 pub fn update_with_pat<'a>(
-    pat: &Pat<'a>,
+    pat: &resast::spanned::pat::Pat<'a>,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Result<(), Cow<'a, str>> {
     trace!("update_with_pat {:?} {:?}", pat, set);
@@ -114,7 +117,7 @@ pub fn update_with_pat<'a>(
 }
 
 fn update_with_prop<'a>(
-    prop: &Prop<'a>,
+    prop: &resast::spanned::expr::Prop<'a>,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Result<(), Cow<'a, str>> {
     trace!("update_with_prop {:?}, {:?}", prop, set);
