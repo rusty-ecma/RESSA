@@ -960,7 +960,7 @@ lazy_static! {
         obj_lit_part(vec![]),
         obj_lit_part(vec![
             obj_prop(
-                obj_key_ident_pat("x"),
+                obj_key_ident_expr("x"),
                 PropValue::None,
                 PropKind::Init,
                 false,
@@ -1051,7 +1051,7 @@ lazy_static! {
                 obj_value_fn(empty_anon_fn(vec![])),
                 PropKind::Method,
                 true,
-                true,
+                false,
                 false,
             ),
             obj_prop_ident_fn("a", empty_anon_fn(vec![]), PropKind::Method),
@@ -2940,7 +2940,7 @@ lazy_static! {
                 obj_value_fn(empty_anon_fn(vec![])),
                 PropKind::Method,
                 true,
-                true,
+                false,
                 false,
             ),
             obj_prop_ident_fn("a", empty_anon_fn(vec![]), PropKind::Method),
@@ -4395,10 +4395,10 @@ fn empty_generator_prop(key: PK) -> OP {
     )
 }
 fn normal_import(name: &'static str, local: &'static str) -> ImportSpecifier<'static> {
-    ImportSpecifier::Normal(NormalImportSpec {
+    ImportSpecifier::Normal(vec![NormalImportSpec {
         local: Ident::from(local),
         imported: Ident::from(name),
-    })
+    }])
 }
 fn long_args_array_pat() -> Vec<P> {
     vec![
