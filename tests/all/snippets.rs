@@ -875,6 +875,37 @@ fn redecl_error_in_nested_funcs() {
     run_test(js, false).unwrap();
 }
 
+#[test]
+fn generator_prop() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("({*g() {}})")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Stmt(Stmt::Expr(Expr::Obj(vec![
+            ObjProp::Prop(Prop {
+                computed: false,
+                is_static: false,
+                key: PropKey::Expr(Expr::Ident(Ident::new("g".to_owned()))),
+                kind: PropKind::Init,
+                method: true,
+                short_hand: false,
+                value: PropValue::Expr(Expr::Func(Func {
+                    body: FuncBody(vec![]),
+                    generator: true,
+                    id: None,
+                    is_async: false,
+                     params: vec![],
+                }))
+            })
+        ])))]),
+        tokens
+    );
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
