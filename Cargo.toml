@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 backtrace = "0"
-ress = "0.11"
+ress = { path = "../ress" }#"0.11"
 resast = { path = "../resast" }
 log = "0.4"
 walkdir = { version = "2", optional = true }

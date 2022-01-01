@@ -905,6 +905,178 @@ fn generator_prop() {
         tokens
     );
 }
+#[test]
+fn super_tagged_template_in_ctor() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("class X {
+            constructor() {
+                super()`template`
+            }
+        }")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
+            id: Some(Ident::from("X")),
+            super_class: None,
+            body: ClassBody(vec![
+                Prop {
+                    computed: false,
+                    is_static: false,
+                    key: PropKey::Expr(Expr::Ident(Ident::from("constructor"))),
+                    kind: PropKind::Ctor,
+                    method: false,
+                    short_hand: false,
+                    value: PropValue::Expr(Expr::Func(Func {
+                        id: None,
+                        generator: false,
+                        is_async: false,
+                        params: vec![],
+                        body: FuncBody(vec![
+                            ProgramPart::Stmt(Stmt::Expr(Expr::TaggedTemplate(TaggedTemplateExpr {
+                                tag: Box::new(Expr::Call(CallExpr {
+                                    callee: Box::new(Expr::Super),
+                                    arguments: vec![],
+                                })),
+                                quasi: TemplateLit {
+                                    expressions: vec![],
+                                    quasis: vec![TemplateElement {
+                                        tail: true,
+                                        cooked: std::borrow::Cow::Borrowed("template"),
+                                        raw: std::borrow::Cow::Borrowed("`template`"),
+                                    }]
+                                }
+                            })))
+                        ])
+                    })),
+                }
+            ])
+        }))]),
+        tokens
+    );
+}
+
+#[test]
+fn static_get_method() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("class X {
+            static get e() {}
+        }")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
+            id: Some(Ident::from("X")),
+            super_class: None,
+            body: ClassBody(vec![
+                Prop {
+                    computed: false,
+                    is_static: true,
+                    key: PropKey::Expr(Expr::Ident(Ident::from("if"))),
+                    kind: PropKind::Get,
+                    method: false,
+                    short_hand: false,
+                    value: PropValue::Expr(Expr::Func(Func {
+                        id: None,
+                        generator: false,
+                        is_async: false,
+                        params: vec![],
+                        body: FuncBody(vec![])
+                    })),
+                }
+            ])
+        }))]),
+        tokens
+    );
+}
+
+#[test]
+fn generator_method() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("class X {
+            static *e() {}
+        }")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
+            id: Some(Ident::from("X")),
+            super_class: None,
+            body: ClassBody(vec![
+                Prop {
+                    computed: false,
+                    is_static: true,
+                    key: PropKey::Expr(Expr::Ident(Ident::from("e"))),
+                    kind: PropKind::Method,
+                    method: true,
+                    short_hand: false,
+                    value: PropValue::Expr(Expr::Func(Func {
+                        id: None,
+                        generator: true,
+                        is_async: false,
+                        params: vec![],
+                        body: FuncBody(vec![])
+                    })),
+                }
+            ])
+        }))]),
+        tokens
+    );
+}
+
+#[test]
+fn export_all() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("export * from 'module';")
+        .module(true)
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Mod(vec![ProgramPart::Decl(Decl::Export(Box::new(ModExport::All(
+            Lit::String(StringLit::Single(Cow::Borrowed("module")))
+        ))))]),
+        tokens
+    );
+}
+
+#[test]
+fn for_lhs() {
+    env_logger::try_init().ok();
+    run_test("for(var x=(0 in[])in{});", false).unwrap();
+}
+
+#[test]
+fn import_default() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("import i from 'module'")
+        .module(true)
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Import(Box::new(ModImport {
+            source: Lit::String(StringLit::Single(Cow::Borrowed("module"))),
+            specifiers: vec![
+                ImportSpecifier::Default(Ident::from("i"))
+            ]
+        })))]),
+        tokens
+    );
+}
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();

@@ -141,7 +141,7 @@ fn update_with_prop<'a>(
             }
         }
         Prop::Method(value) => update_with_prop_key(&value.id.value, set),
-        Prop::Ctor(value) => Ok(()),
+        Prop::Ctor(_value) => Ok(()),
         Prop::Get(value) => update_with_prop_key(&value.id.value, set),
         Prop::Set(value) => update_with_prop_key(&value.id.value, set),
     }
