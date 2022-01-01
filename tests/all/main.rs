@@ -90,7 +90,16 @@ pub fn npm_install() -> Result<(), Error> {
     Ok(())
 }
 
-fn format_error(js: &str, e: &ressa::Error) -> Option<String> {
+fn format_error(js: &str, e: &ressa::Error) -> String {
+    
+    if let Some(position) = try_hilight_position(js, e) {
+        format!("{}\n{}", e, position)
+    } else {
+        format!("{}", e)
+    }
+}
+
+fn try_hilight_position(js: &str, e: &ressa::Error) -> Option<String> {
     let start = e.position()?;
     let column = js.lines().nth(start.line.saturating_sub(1))?.len();
     let end = ress::Position {
@@ -99,6 +108,7 @@ fn format_error(js: &str, e: &ressa::Error) -> Option<String> {
     };
     hilight_position(js, &ress::SourceLocation { start, end })
 }
+
 fn hilight_position(js: &str, location: &ress::SourceLocation) -> Option<String> {
     let line_count = js.lines().count();
     if line_count < 5 {

@@ -59,14 +59,14 @@
 use resast::spanned::{
     decl::{
         Alias, Decl, DefaultExportDecl, ExportSpecifier, ImportSpecifier, ModExport, ModImport,
-        NamedExportDecl, NormalImportSpec, VarDecl, VarDecls, NormalImportSpecs, NamespaceImportSpec, DefaultImportSpec,
+        NamedExportDecl, NormalImportSpec, VarDecl, VarDecls, NormalImportSpecs, NamespaceImportSpec, DefaultImportSpec, ModExportSpecifier, DefaultExportDeclValue, NamedExportSpec, ExportList, NamedExportSource,
     },
     expr::{
         ArrayExpr, ArrowFuncBody, ArrowFuncExpr, ArrowParamPlaceHolder, AssignExpr, AssignLeft,
         AwaitExpr, BinaryExpr, CallExpr, ConditionalExpr, Expr, Lit, LogicalExpr, MemberExpr,
         MemberIndexer, MetaProp, NewExpr, ObjExpr, ObjProp, Prop, PropGet, PropInit, PropInitKey,
         PropKey, PropMethod, PropSet, PropValue, SequenceExprEntry, SpreadExpr, StringLit,
-        TaggedTemplateExpr, TemplateElement, TemplateLit, UnaryExpr, UpdateExpr, YieldExpr,
+        TaggedTemplateExpr, TemplateElement, TemplateLit, UnaryExpr, UpdateExpr, YieldExpr, PropCtor,
     },
     pat::{ArrayElement, ArrayPat, ArrayPatPart, AssignPat, ObjPat, ObjPatPart, Pat, RestPat},
     stmt::{
@@ -525,7 +525,8 @@ where
                 return self
                 .expected_token_error(&self.look_ahead, &["{", "*", "[ident]", "[string]"]);
             }
-            if let Some(comma) = self.expect_punct(Punct::Comma).ok() {
+            if self.at_punct(Punct::Comma) {
+                let comma = self.expect_punct(Punct::Comma)?;
                 if let Some(last) = specifiers.last_mut() {
                     last.comma = Some(comma);
                 }
@@ -575,42 +576,35 @@ where
 
     fn parse_import_specifier(&mut self) -> Res<NormalImportSpec<'b>> {
         let start = self.look_ahead_position;
-        let (imported, local) = if self.look_ahead.token.is_ident() {
-            let imported = self.parse_var_ident(false)?;
-            let local = if self.at_contextual_keyword("as") {
-                let keyword = self.next_item()?;
-                let keyword = self.get_slice(&keyword)?;
-                let alias = self.parse_var_ident(false)?;
-                return Ok(NormalImportSpec {
-                    local: imported,
-                    alias: Some(Alias {
-                        ident: alias,
-                        keyword,
-                    }),
-                });
-            } else {
-                imported.clone()
-            };
-            (imported, local)
+        let imported = self.parse_ident_name()?;
+        let alias = if self.at_contextual_keyword("as") {
+            let keyword = self.next_item()?;
+            let keyword = self.get_slice(&keyword)?;
+            let alias = self.parse_var_ident(false)?;
+            self.context.lexical_names.declare(
+                alias.slice.source.clone(),
+                DeclKind::Lex(true),
+                start,
+            )?;
+            if alias.slice.source == "arguments" || alias.slice.source == "eval" {
+                return Err(Error::StrictModeArgumentsOrEval(start));
+            }
+            Some(Alias {
+                ident: alias,
+                keyword,
+            })
         } else {
-            let imported = self.parse_ident_name()?;
-            let local = if self.at_contextual_keyword("as") {
-                let _ = self.next_item()?;
-                self.parse_var_ident(false)?
-            } else {
-                imported.clone()
-            };
-            (imported, local)
+            self.context.lexical_names.declare(
+                imported.slice.source.clone(),
+                DeclKind::Lex(true),
+                start,
+            )?;
+            if imported.slice.source == "arguments" || imported.slice.source == "eval" {
+                return Err(Error::StrictModeArgumentsOrEval(start));
+            }
+            None
         };
-        self.context.lexical_names.declare(
-            local.slice.source.clone(),
-            DeclKind::Lex(true),
-            start,
-        )?;
-        if local.slice.source == "arguments" || local.slice.source == "eval" {
-            return Err(Error::StrictModeArgumentsOrEval(start));
-        }
-        Ok(NormalImportSpec { local, alias: None })
+        Ok(NormalImportSpec { imported, alias })
     }
 
     fn parse_import_namespace_specifier(&mut self) -> Res<NamespaceImportSpec<'b>> {
@@ -646,227 +640,275 @@ where
     }
 
     fn parse_export_decl(&mut self) -> Res<ModExport<'b>> {
-        // debug!("{} parse_export_decl", self.look_ahead_position);
-        // if let Some(scope) = self.context.lexical_names.last_scope() {
-        //     trace!("scope: {:?}", self.context.lexical_names.states);
-        //     if !scope.is_top() {
-        //         return Err(Error::InvalidExportError(self.current_position));
-        //     }
-        // }
-        // if !self.context.is_module {
-        //     return Err(Error::UseOfModuleFeatureOutsideOfModule(
-        //         self.current_position,
-        //         "export syntax".to_string(),
-        //     ));
-        // }
-        // self.expect_keyword(Keyword::Export(()))?;
-        // if self.at_keyword(Keyword::Default(())) {
-        //     let keyword = self.next_item()?;
-        //     if let Token::Keyword(k) = &keyword.token {
-        //         if k.has_unicode_escape() {
-        //             return self.unexpected_token_error(
-        //                 &keyword,
-        //                 "Keyword used with escaped character(s)",
-        //             );
-        //         }
-        //     }
-        //     self.context.lexical_names.add_export_ident(
-        //         &resast::prelude::Ident::from("default"),
-        //         self.look_ahead_position,
-        //     )?;
-        //     let decl = if self.at_keyword(Keyword::Function(())) {
-        //         return self.parse_export_decl_func(true);
-        //     } else if self.at_keyword(Keyword::Class(())) {
-        //         return self.parse_export_decl_class(true);
-        //     } else if self.at_contextual_keyword("async") {
-        //         if self.at_async_function() {
-        //             let _start = self.look_ahead_position;
-        //             let func = self.parse_function_decl(true)?;
-        //             let decl = Decl::Func(func);
-        //             DefaultExportDecl::Decl(decl)
-        //         } else {
-        //             let _start = self.look_ahead_position;
-        //             let expr = self.parse_assignment_expr()?;
-        //             self.consume_semicolon()?;
-        //             DefaultExportDecl::Expr(expr)
-        //         }
-        //     } else {
-        //         if self.at_contextual_keyword("from") {
-        //             return Err(Error::InvalidUseOfContextualKeyword(
-        //                 self.current_position,
-        //                 "from".to_string(),
-        //             ));
-        //         }
-        //         let expr = if self.at_punct(Punct::OpenBrace) {
-        //             self.parse_obj_init()?
-        //         } else if self.at_punct(Punct::OpenBracket) {
-        //             self.parse_array_init()?
-        //         } else {
-        //             let expr = self.parse_assignment_expr()?;
-        //             self.consume_semicolon()?;
-        //             expr
-        //         };
-        //         DefaultExportDecl::Expr(expr)
-        //     };
-        //     Ok(ModExport::Default(decl))
-        // } else if self.at_punct(Punct::Asterisk) {
-        //     let _ = self.next_item()?;
-        //     if !self.at_contextual_keyword("from") {
-        //         return Err(Error::InvalidUseOfContextualKeyword(
-        //             self.current_position,
-        //             "from".to_string(),
-        //         ));
-        //     }
-        //     let _ = self.next_item()?;
-        //     let source = self.parse_module_specifier()?;
-        //     self.consume_semicolon()?;
-        //     Ok(ModExport::All(source))
-        // } else if self.look_ahead.token.is_keyword() {
-        //     if self.look_ahead.token.matches_keyword(Keyword::Let(()))
-        //         || self.look_ahead.token.matches_keyword(Keyword::Const(()))
-        //     {
-        //         let _start = self.look_ahead_position;
-        //         let lex = self.parse_lexical_decl(false)?;
-        //         let decl = NamedExportDecl::Decl(lex);
-        //         self.consume_semicolon()?;
-        //         Ok(ModExport::Named(decl))
-        //     } else if self.look_ahead.token.matches_keyword(Keyword::Var(())) {
-        //         let _ = self.next_item()?;
-        //         let _start = self.look_ahead_position;
-        //         let decls = self.parse_variable_decl_list(false)?;
-        //         let var = Decl::Var(VarKind::Var, decls);
-        //         let decl = NamedExportDecl::Decl(var);
-        //         self.consume_semicolon()?;
-        //         Ok(ModExport::Named(decl))
-        //     } else if self.look_ahead.token.matches_keyword(Keyword::Class(())) {
-        //         self.parse_export_decl_class(false)
-        //     } else if self.look_ahead.token.matches_keyword(Keyword::Function(())) {
-        //         self.parse_export_decl_func(false)
-        //     } else {
-        //         self.expected_token_error(
-        //             &self.look_ahead,
-        //             &["let", "var", "const", "class", "function"],
-        //         )
-        //     }
-        // } else if self.at_async_function() {
-        //     let _start = self.look_ahead_position;
-        //     let func = self.parse_function_decl(false)?;
-        //     let decl = Decl::Func(func);
-        //     let decl = NamedExportDecl::Decl(decl);
-        //     Ok(ModExport::Named(decl))
-        // } else {
-        //     self.expect_punct(Punct::OpenBrace)?;
-        //     let mut specifiers = Vec::new();
-        //     let mut found_default = false;
-        //     while !self.at_punct(Punct::CloseBrace) {
-        //         let is_default = self.at_keyword(Keyword::Default(()));
-        //         found_default = found_default || is_default;
-        //         let start = self.look_ahead_position;
-        //         let spec = self.parse_export_specifier()?;
-        //         if is_default {
-        //             self.context
-        //                 .lexical_names
-        //                 .add_export_ident(&resast::prelude::Ident::from("default"), start)?;
-        //         } else {
-        //             // self.context.lexical_names.add_export_spec(&spec, start)?;
-        //             todo!()
-        //         }
-        //         specifiers.push(spec);
-        //         if !self.at_punct(Punct::CloseBrace) {
-        //             self.expect_punct(Punct::Comma)?;
-        //         }
-        //     }
-        //     let _ = self.next_item()?;
-        //     if self.at_contextual_keyword("from") {
-        //         let _ = self.next_item()?;
-        //         let source = self.parse_module_specifier()?;
-        //         self.consume_semicolon()?;
-        //         for spec in &specifiers {
-        //             // self.context
-        //             //     .lexical_names
-        //             //     .removed_undefined_export(&spec.local);
-        //             todo!()
-        //         }
-        //         let decl = NamedExportDecl::Specifier(specifiers, Some(source));
-        //         Ok(ModExport::Named(decl))
-        //     } else if found_default {
-        //         self.expected_token_error(&self.look_ahead, &[""])
-        //     } else {
-        //         self.consume_semicolon()?;
-        //         let decl = NamedExportDecl::Specifier(specifiers, None);
-        //         Ok(ModExport::Named(decl))
-        //     }
-        // }
-        todo!()
+        debug!("{} parse_export_decl", self.look_ahead_position);
+        if let Some(scope) = self.context.lexical_names.last_scope() {
+            trace!("scope: {:?}", self.context.lexical_names.states);
+            if !scope.is_top() {
+                return Err(Error::InvalidExportError(self.current_position));
+            }
+        }
+        if !self.context.is_module {
+            return Err(Error::UseOfModuleFeatureOutsideOfModule(
+                self.current_position,
+                "export syntax".to_string(),
+            ));
+        }
+        let keyword = self.expect_keyword(Keyword::Export(()))?;
+        if self.at_keyword(Keyword::Default(())) {
+           let spec = self.parse_default_export()?;
+           Ok(ModExport{
+               keyword,
+               spec,
+           })
+        } else if self.at_punct(Punct::Asterisk) {
+            let spec = self.parse_all_export()?;
+            self.consume_semicolon()?;
+            Ok(ModExport{
+                keyword,
+                spec,
+            })
+        } else if self.look_ahead.token.is_keyword() {
+            if self.look_ahead.token.matches_keyword(Keyword::Let(()))
+                || self.look_ahead.token.matches_keyword(Keyword::Const(()))
+            {
+                let _start = self.look_ahead_position;
+                let lex = self.parse_lexical_decl(false)?;
+                let decl = NamedExportDecl::Decl(lex);
+                self.consume_semicolon()?;
+                let spec = ModExportSpecifier::Named(decl);
+                Ok(ModExport{
+                    keyword,
+                    spec,
+                })
+            } else if self.look_ahead.token.matches_keyword(Keyword::Var(())) {
+                let keyword_var = self.expect_keyword(Keyword::Var(()))?;
+                let _start = self.look_ahead_position;
+                let decls = self.parse_variable_decl_list(false)?;
+                let decs = VarDecls {
+                    keyword: VarKind::Var(Some(keyword_var)),
+                    decls
+                };
+                let spec = ModExportSpecifier::Named(NamedExportDecl::Decl(Decl::Var(decs)));
+                self.consume_semicolon()?;
+                Ok(ModExport{
+                    keyword,
+                    spec,
+                })
+            } else if self.look_ahead.token.matches_keyword(Keyword::Class(())) {
+                let decl = self.parse_export_decl_class()?;
+                let spec = ModExportSpecifier::Named(NamedExportDecl::Decl(decl));
+                Ok(ModExport{
+                    keyword,
+                    spec,
+                })
+            } else if self.look_ahead.token.matches_keyword(Keyword::Function(())) {
+                let decl = self.parse_export_decl_func()?;
+                let spec = ModExportSpecifier::Named(NamedExportDecl::Decl(decl));
+                Ok(ModExport{
+                    keyword,
+                    spec,
+                })
+            } else {
+                self.expected_token_error(
+                    &self.look_ahead,
+                    &["let", "var", "const", "class", "function"],
+                )
+            }
+        } else if self.at_async_function() {
+            let _start = self.look_ahead_position;
+            let func = self.parse_function_decl(false)?;
+            let decl = Decl::Func(func);
+            let decl = NamedExportDecl::Decl(decl);
+            let spec = ModExportSpecifier::Named(decl);
+            Ok(ModExport{
+                keyword,
+                spec,
+            })
+        } else {
+            let open_brace = self.expect_punct(Punct::OpenBrace)?;
+            let mut specifiers = Vec::new();
+            let mut found_default = false;
+            while !self.at_punct(Punct::CloseBrace) {
+                let is_default = self.at_keyword(Keyword::Default(()));
+                found_default = found_default || is_default;
+                let start = self.look_ahead_position;
+                let spec = self.parse_export_specifier()?;
+                if is_default {
+                    self.context
+                        .lexical_names
+                        .add_export_ident(&Cow::Borrowed("default"), start)?;
+                } else {
+                    self.context.lexical_names.add_export_spec(&spec, start)?;
+                }
+                let comma = if !self.at_punct(Punct::CloseBrace) {
+                    let comma = self.expect_punct(Punct::Comma)?;
+                    Some(comma)
+                } else {
+                    None
+                };
+                specifiers.push(ListEntry {
+                    item: spec,
+                    comma,
+                })
+            }
+            let close_brace = self.expect_punct(Punct::CloseBrace)?;
+            if self.at_contextual_keyword("from") {
+                let keyword_from = self.expect_contextual_keyword("from")?;
+                let source = self.parse_module_specifier()?;
+                self.consume_semicolon()?;
+                for spec in &specifiers {
+                    self.context
+                        .lexical_names
+                        .removed_undefined_export(&spec.item.local);
+                }
+                let spec = NamedExportSpec {
+                    list: ExportList {
+                        open_brace,
+                        elements: specifiers,
+                        close_brace,
+                    },
+                    source: Some(NamedExportSource {
+                        keyword_from,
+                        module: source,
+                    }),
+                };
+                let spec = NamedExportDecl::Specifier(spec);
+                Ok(ModExport {
+                    spec: ModExportSpecifier::Named(spec),
+                    keyword,
+                })
+            } else if found_default {
+                self.unexpected_token_error(&self.look_ahead, "duplicate default in export")
+            } else {
+                self.consume_semicolon()?;
+                let spec = NamedExportSpec {
+                    list: ExportList {
+                        open_brace,
+                        elements: specifiers,
+                        close_brace,
+                    },
+                    source: None,
+                };
+                let spec = NamedExportDecl::Specifier(spec);
+                Ok(ModExport {
+                    spec: ModExportSpecifier::Named(spec),
+                    keyword,
+                })
+            }
+        }
     }
 
-    fn parse_export_decl_func(&mut self, is_default: bool) -> Res<ModExport<'b>> {
-        // let start = self.look_ahead_position;
-        // let func = self.parse_function_decl(true)?;
-        // if let Some(id) = &func.id {
-        //     // self.context.lexical_names.add_export_ident(id, start)?;
-        //     todo!()
-        // }
-        // let func = Decl::Func(func);
-        // if is_default {
-        //     let decl = DefaultExportDecl::Decl(func);
-        //     Ok(ModExport::Default(decl))
-        // } else {
-        //     let decl = NamedExportDecl::Decl(func);
-        //     Ok(ModExport::Named(decl))
-        // }
-        todo!()
+    fn parse_default_export(&mut self) -> Res<ModExportSpecifier<'b>> {
+        let keyword_default = self.next_item()?;
+        if let Token::Keyword(k) = &keyword_default.token {
+            if k.has_unicode_escape() {
+                return self.unexpected_token_error(
+                    &keyword_default,
+                    "Keyword used with escaped character(s)",
+                );
+            }
+        }
+        let keyword = self.get_slice(&keyword_default)?;
+        let value = if self.at_keyword(Keyword::Function(())) {
+            let decl = self.parse_export_decl_func()?;
+            DefaultExportDeclValue::Decl(decl)
+        } else if self.at_keyword(Keyword::Class(())) {
+            let decl = self.parse_export_decl_class()?;
+            DefaultExportDeclValue::Decl(decl)
+        } else if self.at_contextual_keyword("async") {
+            self.parse_async_export()?
+        } else {
+            if self.at_contextual_keyword("from") {
+                return Err(Error::InvalidUseOfContextualKeyword(
+                    self.current_position,
+                    "from".to_string(),
+                ));
+            }
+            let expr = if self.at_punct(Punct::OpenBrace) {
+                self.parse_obj_init()?
+            } else if self.at_punct(Punct::OpenBracket) {
+                self.parse_array_init()?
+            } else {
+                let expr = self.parse_assignment_expr()?;
+                self.consume_semicolon()?;
+                expr
+            };
+            DefaultExportDeclValue::Expr(expr)
+        };
+        Ok(ModExportSpecifier::Default {
+            keyword,
+            value,
+        })
     }
 
-    fn parse_export_decl_class(&mut self, is_default: bool) -> Res<ModExport<'b>> {
-        // let start = self.look_ahead_position;
-        // let class = self.parse_class_decl(true, true)?;
-        // if let Some(id) = &class.id {
-        //     self.context.lexical_names.add_export_ident(id, start)?;
-        // }
-        // let decl = Decl::Class(class);
-        // if is_default {
-        //     let decl = DefaultExportDecl::Decl(decl);
-        //     Ok(ModExport::Default(decl))
-        // } else {
-        //     let decl = NamedExportDecl::Decl(decl);
-        //     Ok(ModExport::Named(decl))
-        // }
-        todo!()
+    fn parse_all_export(&mut self) -> Res<ModExportSpecifier<'b>> {
+        let star = self.expect_punct(Punct::Asterisk)?;
+        let keyword = self.expect_contextual_keyword("from")?;
+        let name = self.parse_module_specifier()?;
+        Ok(ModExportSpecifier::All {
+            star,
+            keyword,
+            name
+        })
+    }
+    
+    fn parse_export_decl_func(&mut self) -> Res<Decl<'b>> {
+        let start = self.look_ahead_position;
+        let func = self.parse_function_decl(true)?;
+        if let Some(id) = &func.id {
+            self.context.lexical_names.add_export_ident(&id.slice.source, start)?;
+        }
+        Ok(Decl::Func(func))
+    }
+
+    fn parse_export_decl_class(&mut self) -> Res<Decl<'b>> {
+        let start = self.look_ahead_position;
+        let class = self.parse_class_decl(true, true)?;
+        if let Some(id) = &class.id {
+            self.context.lexical_names.add_export_ident(&id.slice.source, start)?;
+        }
+        Ok(Decl::Class(class))
+    }
+
+    fn parse_async_export(&mut self) -> Res<DefaultExportDeclValue<'b>> {
+        let exp = if self.at_async_function() {
+            let _start = self.look_ahead_position;
+            let func = self.parse_function_decl(true)?;
+            let decl = Decl::Func(func);
+            DefaultExportDeclValue::Decl(decl)
+        } else {
+            let _start = self.look_ahead_position;
+            let expr = self.parse_assignment_expr()?;
+            self.consume_semicolon()?;
+            DefaultExportDeclValue::Expr(expr)
+        };
+        Ok(exp)
     }
 
     fn parse_export_specifier(&mut self) -> Res<ExportSpecifier<'b>> {
-        // let local = self.parse_ident_name()?;
-        // let exported = if self.at_contextual_keyword("as") {
-        //     let keyword = self.next_item()?;
-        //     let ident = self.parse_ident_name()?;
-        //     Alias {
-        //         keyword: self.get_slice(&keyword)?,
-        //         ident,
-        //     }
-        // } else {
-        //     local.clone()
-        // };
-        // Ok(ExportSpecifier { local, alias: None })
-        todo!()
+        let local = self.parse_ident_name()?;
+        let alias = if self.at_contextual_keyword("as") {
+            let keyword = self.next_item()?;
+            let ident = self.parse_ident_name()?;
+            Some(Alias {
+                keyword: self.get_slice(&keyword)?,
+                ident,
+            })
+        } else {
+            None
+        };
+        Ok(ExportSpecifier { local, alias })
     }
 
     fn parse_module_specifier(&mut self) -> Res<Lit<'b>> {
-        // let item = self.next_item()?;
-        // match &item.token {
-        //     Token::String(ref sl) => Ok(match sl {
-        //         ress::prelude::StringLit::Double(ref s) => {
-        //             // self.octal_literal_guard_string(s.contains_octal_escape, item.location.start)?;
-        //             resast::prelude::Lit::double_string_from(s.content)
-        //         }
-        //         ress::prelude::StringLit::Single(ref s) => {
-        //             // self.octal_literal_guard_string(s.contains_octal_escape, item.location.start)?;
-        //             resast::prelude::Lit::single_string_from(s.content)
-        //         }
-        //     }),
-        //     _ => self.expected_token_error(&item, &["[string]"]),
-        // }
-        todo!()
+        let item = self.next_item()?;
+        match &item.token {
+            Token::String(_) => {
+                let string = self.string_lit_from(&item)?;
+                Ok(Lit::String(string))
+            },
+            _ => self.expected_token_error(&item, &["[string]"]),
+        }
     }
 
     fn parse_statement(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<Stmt<'b>> {
@@ -1236,11 +1278,10 @@ where
             }
             match param {
                 Pat::Array(_) | Pat::Obj(_) => {
-                    // let mut args = HashSet::new();
-                    // if formal_params::update_with_pat(&param, &mut args).is_err() {
-                    //     return Err(Error::InvalidCatchArg(param_pos));
-                    // }
-                    todo!()
+                    let mut args = HashSet::new();
+                    if formal_params::update_with_pat(&param, &mut args).is_err() {
+                        return Err(Error::InvalidCatchArg(param_pos));
+                    }
                 }
                 _ => (),
             }
@@ -1824,7 +1865,7 @@ where
                 init: Some(_),
                 ..
             },
-        ) = left
+        ) = dbg!(&left)
         {
             if kind.is_var() || self.context.strict {
                 return Err(Error::ForOfInAssign(
@@ -1836,7 +1877,7 @@ where
                 Pat::Obj(_) | Pat::Array(_) => {
                     return Err(Error::ForOfInAssign(
                         self.look_ahead_position,
-                        "For in loop left hand side cannot contain an assignment".to_string(),
+                        "For in loop left hand side cannot contain a destructuring assignment".to_string(),
                     ))
                 }
                 _ => (),
@@ -1880,7 +1921,7 @@ where
         if let LoopLeft::Variable(_, VarDecl { init: Some(_), .. }) = left {
             return Err(Error::ForOfInAssign(
                 self.look_ahead_position,
-                "For in loop left hand side cannot contain an assignment".to_string(),
+                "For of loop left hand side cannot contain an assignment".to_string(),
             ));
         }
         let keyword_of = self.next_item()?;
@@ -2697,8 +2738,9 @@ where
             if self.at_punct(Punct::SemiColon) {
                 let _ = self.next_item()?;
             } else {
-                let (ctor, el) = self.parse_class_el(has_ctor)?;
-                has_ctor = ctor;
+
+                let el = self.parse_class_el(has_ctor)?;
+                has_ctor = matches!(el, Prop::Ctor(_));
                 props.push(el)
             }
         }
@@ -2710,12 +2752,14 @@ where
         })
     }
 
-    fn parse_class_el(&mut self, has_ctor: bool) -> Res<(bool, Prop<'b>)> {
+    /// Parse a single class element returning a (true, Prop) if that property is a constructor
+    /// and (false, Prop) otherwise
+    fn parse_class_el(&mut self, has_ctor: bool) -> Res<Prop<'b>> {
         debug!(
             "{}: parse_class_el {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-
+        let start = self.look_ahead_position;
         let keyword_static = if self.at_contextual_keyword("static") {
             let keyword_static = self.next_item()?;
             if self.at_punct(Punct::OpenParen) {
@@ -2757,27 +2801,29 @@ where
         let id = if keyword_async.is_none() && star.is_none() {
             if self.at_contextual_keyword("get") {
                 let get = self.next_item()?;
-                let key = self.prop_key_from(&get)?;
-                let id = PropInitKey {
-                    brackets: None,
-                    value: key,
-                };
-                if self.at_punct(Punct::OpenParen) {
-                    return self.method_def_cont(keyword_static, keyword_async, star, id);
+                if !self.at_punct(Punct::OpenParen) {
+                    let get = self.get_method_def(keyword_static, get)?;
+                    return Ok(Prop::Get(get))
+                    // return self.method_def_cont(keyword_static, keyword_async, star, id);
                 } else {
-                    id
+                    let key = self.prop_key_from(&get)?;
+                    PropInitKey {
+                        brackets: None,
+                        value: key,
+                    }
                 }
             } else if self.at_contextual_keyword("set") {
                 let set = self.next_item()?;
-                let key = self.prop_key_from(&set)?;
-                let id = PropInitKey {
-                    brackets: None,
-                    value: key,
-                };
-                if self.at_punct(Punct::OpenParen) {
-                    return self.method_def_cont(keyword_static, keyword_async, star, id);
+                
+                if !self.at_punct(Punct::OpenParen) {
+                    let set = self.set_method_def(keyword_static, set)?;
+                    return Ok(Prop::Set(set))
                 } else {
-                    id
+                    let key = self.prop_key_from(&set)?;
+                    PropInitKey {
+                        brackets: None,
+                        value: key,
+                    }
                 }
             } else {
                 self.parse_object_property_key()?
@@ -2785,7 +2831,14 @@ where
         } else {
             self.parse_object_property_key()?
         };
-        self.method_def_cont(keyword_static, None, None, id)
+        if Self::is_key(&id.value, "constructor") && keyword_static.is_none() && keyword_async.is_none() && star.is_none() {
+            if has_ctor {
+                return Err(Error::InvalidClassPosition(start, String::from("duplicated constructor in class")));
+            }
+            self.parse_class_ctor(id)
+        } else {
+            self.method_def_cont(keyword_static, keyword_async, star, id)
+        }
         //else {
 
         //     if Self::is_static(&new_key.value)
@@ -2943,8 +2996,11 @@ where
         Ok(ret)
     }
 
-    fn method_def(&mut self, keyword_static: Option<Slice<'b>>) -> Res<Prop<'b>> {
-        let mut star = None;
+    fn method_def(&mut self, keyword_static: Option<Slice<'b>>, mut star: Option<Slice<'b>>) -> Res<Prop<'b>> {
+        debug!(
+            "{}: method_def {:?}",
+            self.look_ahead.span.start, self.look_ahead.token
+        );
         let mut keyword_async = None;
         let id = if self.at_contextual_keyword("get") {
             let item_get = self.next_item()?;
@@ -2974,23 +3030,14 @@ where
                 keyword_async = Some(keyword);
             }
             if self.at_punct(Punct::Asterisk) {
+                if star.is_some() {
+                    self.unexpected_token_error(&self.look_ahead, "found `*` twice in a generator function def")?
+                }
                 star = Some(self.expect_punct(Punct::Asterisk)?);
             }
             self.parse_object_property_key()?
         };
-        let params = self.parse_formal_params()?;
-        let body = self.parse_method_body(true, false)?;
-        let method = PropMethod {
-            keyword_static,
-            keyword_async,
-            star,
-            id,
-            open_paren: params.open_paren,
-            params: params.params,
-            close_paren: params.close_paren,
-            body
-        };
-        Ok(Prop::Method(method))
+        self.method_def_cont(keyword_static, keyword_async, star, id)
     }
 
     fn get_method_def(
@@ -2998,6 +3045,10 @@ where
         keyword_static: Option<Slice<'b>>,
         item_get: Item<&'b str>,
     ) -> Res<PropGet<'b>> {
+        debug!(
+            "{}: get_method_def {:?}",
+            self.look_ahead.span.start, self.look_ahead.token
+        );
         let keyword_get = self.get_slice(&item_get)?;
         let id = self.parse_object_property_key()?;
         let open_paren = self.expect_punct(Punct::OpenParen)?;
@@ -3018,6 +3069,10 @@ where
         keyword_static: Option<Slice<'b>>,
         item_set: Item<&'b str>,
     ) -> Res<PropSet<'b>> {
+        debug!(
+            "{}: set_method_def {:?}",
+            self.look_ahead.span.start, self.look_ahead.token
+        );
         let keyword_set = self.get_slice(&item_set)?;
         let id = self.parse_object_property_key()?;
         let mut params = self.parse_formal_params()?;
@@ -3051,9 +3106,35 @@ where
         keyword_async: Option<Slice<'b>>,
         star: Option<Slice<'b>>,
         id: PropInitKey<'b>,
-    ) -> Res<(bool, Prop<'b>)> {
+    ) -> Res<Prop<'b>> {
+        debug!(
+            "{}: method_def_cont {:?}",
+            self.look_ahead.span.start, self.look_ahead.token
+        );
+        let start = self.look_ahead_position;
+        let prev_yield = self.context.allow_yield;
+        let prev_await = self.context.allow_await;
+        let prev_strict = self.context.allow_strict_directive;
+        if keyword_async.is_some() {
+            self.context.allow_yield = false;
+            self.context.allow_await = false;
+        } else {
+            self.context.allow_yield = !self.context.strict;
+        }
+        
+        self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
+        if formal_params::have_duplicates(&params.params) {
+            return Err(Error::InvalidParameter(
+                start,
+                "Method arguments cannot contain duplicates".to_string(),
+            ));
+        }
+        self.context.allow_strict_directive = params.simple;
         let body = self.parse_method_body(params.simple, params.found_restricted)?;
+        self.context.allow_yield = prev_yield;
+        self.context.allow_await = prev_await;
+        self.context.allow_strict_directive = prev_strict;
         let meth = PropMethod {
             keyword_static,
             keyword_async,
@@ -3064,13 +3145,35 @@ where
             close_paren: params.close_paren,
             body,
         };
-        Ok((params.found_restricted, Prop::Method(meth)))
+        Ok(Prop::Method(meth))
     }
+
+    fn parse_class_ctor(&mut self, id: PropInitKey<'b>) -> Res<Prop<'b>> {
+        debug!(
+            "{}: parse_class_ctor {:?}",
+            self.look_ahead.span.start, self.look_ahead.token
+        );
+        let params = self.parse_formal_params()?;
+        let prev_allow_super_call = self.context.allow_super_call;
+        self.context.allow_super_call = self.context.allow_super;
+        let body = self.parse_method_body(params.simple, params.found_restricted)?;
+        self.context.allow_super_call = prev_allow_super_call;
+        let ctor = PropCtor {
+            keyword: id,
+            open_paren: params.open_paren,
+            params: params.params,
+            close_paren: params.close_paren,
+            body,
+        };
+        Ok(Prop::Ctor(ctor))
+    }
+
     /// Compares `key` with `other` to see if they
     /// match, this takes into account all of the
     /// different shapes that `key` could be, including
     /// identifiers and literals
     fn is_key(key: &PropKey, other: &str) -> bool {
+        trace!("is_key: {:?} <-> {}", key, other);
         match key {
             PropKey::Lit(ref l) => match l {
                 Lit::String(ref s) => s.content.source == other,
@@ -3969,6 +4072,7 @@ where
         let mut is_proto = false;
         let mut keyword_get = None;
         let mut keyword_set = None;
+        let mut star = None;
         let (key, keyword_async, computed) = if self.look_ahead.token.is_ident()
             || (!self.context.strict && self.look_ahead.token.matches_keyword(Keyword::Let(())))
         {
@@ -4008,7 +4112,7 @@ where
             };
             (Some(key), keyword_async, computed)
         } else if self.at_punct(Punct::Asterisk) {
-            self.next_item()?;
+            star = Some(self.expect_punct(Punct::Asterisk)?);
             (None, None, false)
         } else {
             let computed = self.at_punct(Punct::OpenBracket);
@@ -4017,7 +4121,7 @@ where
         };
         let at_qualified = self.at_qualified_prop_key();
         let prev_super = self.context.allow_super;
-        let prop = if keyword_get.is_some() && at_qualified && keyword_async.is_none() {
+        let prop = if keyword_get.is_some() && at_qualified && keyword_async.is_none() && star.is_none() {
             let keyword_get = keyword_get.unwrap();
             let key = self.parse_object_property_key()?;
             self.context.set_allow_super(true);
@@ -4031,8 +4135,8 @@ where
             let value = self.parse_setter_method(None, keyword_set, key)?;
             self.context.set_allow_super(prev_super);
             ObjProp::Prop(value)
-        } else if start.token.matches_punct(Punct::Asterisk) && at_qualified {
-            let value = self.method_def(None)?;
+        } else if star.is_some() && at_qualified {
+            let value = self.method_def(None, star)?;
             ObjProp::Prop(value)
         } else if let Some(key) = key {
             if self.at_punct(Punct::Colon) && keyword_async.is_none() {
@@ -5179,12 +5283,8 @@ where
                 let mut parts = Vec::with_capacity(a.elements.len());
                 for e in a.elements {
                     if let Some(ex) = e.item {
-                        let part = if Self::is_reinterpret_target(&ex) {
-                            let pat = self.reinterpret_expr_as_pat(ex)?;
-                            ArrayPatPart::Pat(pat)
-                        } else {
-                            ArrayPatPart::Expr(ex)
-                        };
+                        let part = self.reinterpret_array_pat_part(ex)?;
+                        
                         parts.push(ListEntry {
                             item: Some(part),
                             comma: e.comma,
@@ -5251,6 +5351,21 @@ where
         }
     }
 
+    fn reinterpret_array_pat_part(&self, part: Expr<'b>) -> Res<ArrayPatPart<'b>> {
+        let ret = if let Expr::Spread(spread) = part {
+            let part = ArrayPatPart::Rest(RestPat {
+                dots: spread.dots,
+                pat: self.reinterpret_expr_as_pat(spread.expr)?
+            });
+            part
+        } else if Self::is_reinterpret_target(&part) {
+            ArrayPatPart::Pat(self.reinterpret_expr_as_pat(part)?)
+        } else {
+            ArrayPatPart::Expr(part)
+        };
+        Ok(ret)
+    }
+
     fn is_reinterpret_target(ex: &Expr) -> bool {
         match ex {
             Expr::Ident(_) => true,
@@ -5267,21 +5382,25 @@ where
 
     fn reinterpret_prop(&self, mut p: Prop<'b>) -> Res<Prop<'b>> {
         if let Prop::Init(inner) = &mut p {
-            if let PropKey::Expr(expr) =
-                std::mem::replace(&mut inner.key.value, Self::dummy_prop_key())
-            {
+            let prop_key = std::mem::replace(&mut inner.key.value, Self::dummy_prop_key());
+            if let PropKey::Expr(expr) = prop_key {
                 if Self::is_reinterpret_target(&expr) {
                     inner.key.value = PropKey::Pat(self.reinterpret_expr_as_pat(expr)?)
                 } else {
                     inner.key.value = PropKey::Expr(expr);
                 }
+            } else {
+                inner.key.value = prop_key;
             }
-            if let Some(PropValue::Expr(expr)) = inner.value.take() {
+            let prop_value = inner.value.take();
+            if let Some(PropValue::Expr(expr)) = prop_value {
                 if Self::is_reinterpret_target(&expr) {
                     inner.value = Some(PropValue::Pat(self.reinterpret_expr_as_pat(expr)?))
                 } else {
                     inner.value = Some(PropValue::Expr(expr))
                 }
+            } else {
+                inner.value = prop_value;
             }
         }
 
@@ -5514,10 +5633,11 @@ where
             let operator = self
                 .unary_operator(op)
                 .ok_or_else(|| self.op_error("Unable to convert unary operator"))?;
-            Ok(Expr::Unary(UnaryExpr {
+            let unary = UnaryExpr {
                 operator,
                 argument: Box::new(arg),
-            }))
+            };
+            Ok(Expr::Unary(unary))
         } else if !self.context.allow_await && self.at_keyword(Keyword::Await(())) {
             debug!("parsing await expr");
             self.parse_await_expr()
@@ -5774,10 +5894,12 @@ where
     fn parse_super(&mut self) -> Res<Expr<'b>> {
         let super_position = self.look_ahead_position;
         if !self.context.allow_super {
+            log::debug!("super when not allowed");
             return Err(Error::InvalidSuper(super_position));
         }
         let keyword = self.expect_keyword(Keyword::Super(()))?;
         if self.at_punct(Punct::OpenParen) && !self.context.allow_super_call {
+            log::debug!("super call when not allowed");
             return Err(Error::InvalidSuper(super_position));
         }
         if !self.at_punct(Punct::OpenBracket)
@@ -6240,24 +6362,17 @@ where
         if !next.token.matches_keyword(k) {
             return self.expected_token_error(&next, &[&format!("{:?}", k)]);
         }
-        let source = self
-            .scanner
-            .str_for(&next.span)
-            .ok_or_else(|| Error::UnexpectedEoF)?;
-        Ok(Slice {
-            loc: resast::spanned::SourceLocation {
-                start: resast::spanned::Position {
-                    line: next.location.start.line,
-                    column: next.location.start.column,
-                },
-                end: resast::spanned::Position {
-                    line: next.location.end.line,
-                    column: next.location.end.column,
-                },
-            },
-            source: Cow::Borrowed(source),
-        })
+        self.get_slice(&next)
     }
+
+    fn expect_contextual_keyword(&mut self, target: &str) -> Res<Slice<'b>> {
+        let next = self.next_item()?;
+        if !next.token.matches_ident_str(target) {
+            return self.expected_token_error(&next, &[target]);
+        }
+        self.get_slice(&next)
+    }
+
     fn at_return_arg(&self) -> bool {
         if self.context.has_line_term {
             return self.look_ahead.is_string() || self.look_ahead.is_template();

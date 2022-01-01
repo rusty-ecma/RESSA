@@ -310,7 +310,7 @@ impl<'a> DuplicateNameDetector<'a> {
 
     pub fn add_export_spec(&mut self, spec: &ExportSpecifier<'a>, pos: Position) -> Res<()> {
         log::trace!("add_export_spec {:?} {:?}", spec, pos);
-        self.add_export_ident(&spec.local, pos)?;
+        self.add_export_ident(&spec.local.slice.source, pos)?;
         self.undefined_module_export_guard(spec.local.slice.source.clone());
         Ok(())
     }
@@ -320,10 +320,10 @@ impl<'a> DuplicateNameDetector<'a> {
         self.undefined_module_exports.remove(&id.slice.source);
     }
 
-    pub fn add_export_ident(&mut self, id: &Ident<'a>, pos: Position) -> Res<()> {
+    pub fn add_export_ident(&mut self, id: &Cow<'a, str>, pos: Position) -> Res<()> {
         log::trace!("add_export_ident {:?} {:?}", id, pos);
-        if !self.exports.insert(id.slice.source.clone()) {
-            Err(Error::DuplicateExport(pos, id.slice.source.to_string()))
+        if !self.exports.insert(id.clone()) {
+            Err(Error::DuplicateExport(pos, id.to_string()))
         } else {
             Ok(())
         }
