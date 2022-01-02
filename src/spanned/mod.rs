@@ -1185,6 +1185,10 @@ where
     }
 
     fn parse_var_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
+        debug!(
+            "{} parse_variable_decl_list in_for: {}",
+            self.look_ahead.span.start, in_for
+        );
         let (_, patt) = self.parse_pattern(true, &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&patt) {
             let patt = match patt {
