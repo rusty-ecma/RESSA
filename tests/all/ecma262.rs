@@ -26,11 +26,8 @@ fn es5() {
                     } else {
                         path
                     };
-                    panic!(
-                    "Error parsing {:?}\n{}",
-                    path,
-                    super::format_error(&js, e)
-                )},
+                    panic!("Error parsing {:?}\n{}", path, super::format_error(&js, e))
+                }
             };
             if item != part {
                 panic!(
@@ -65,7 +62,7 @@ fn es2015_script() {
                         path
                     };
                     panic!("Error parsing {:?}\n{}", path, e)
-                },
+                }
             };
             if item != part {
                 let pos = p.next_position();
@@ -105,7 +102,7 @@ fn es2015_module() {
                         path
                     };
                     panic!("Error parsing {:?}\n{}", path, super::format_error(&js, &e))
-                },
+                }
             };
             let simple = item.clone();
             let simple: resast::ProgramPart = simple.into();

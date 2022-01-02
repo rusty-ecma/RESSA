@@ -74,14 +74,10 @@ pub mod spanned;
 pub use crate::comment_handler::CommentHandler;
 pub use crate::comment_handler::DefaultCommentHandler;
 pub use crate::error::Error;
-use formal_params::FormalParams;
-use lexical_names::DeclKind;
+
 use resast::prelude::*;
-use resast::ClassBody;
-use std::{
-    collections::{HashMap, HashSet},
-    mem::replace,
-};
+
+use std::collections::HashMap;
 
 /// The current configuration options.
 /// This will most likely increase over time
@@ -375,14 +371,4 @@ where
         let ret = self.inner.next()?;
         Some(ret.map(Into::into))
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum StmtCtx<'a> {
-    Do,
-    For,
-    If,
-    Label(&'a str),
-    While,
-    With,
 }
