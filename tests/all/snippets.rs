@@ -887,7 +887,7 @@ fn generator_prop() {
                 computed: false,
                 is_static: false,
                 key: PropKey::Expr(Expr::Ident(Ident::new("g".to_owned()))),
-                kind: PropKind::Init,
+                kind: PropKind::Method,
                 method: true,
                 short_hand: false,
                 value: PropValue::Expr(Expr::Func(Func {
@@ -924,7 +924,7 @@ fn super_tagged_template_in_ctor() {
                 is_static: false,
                 key: PropKey::Expr(Expr::Ident(Ident::from("constructor"))),
                 kind: PropKind::Ctor,
-                method: false,
+                method: true,
                 short_hand: false,
                 value: PropValue::Expr(Expr::Func(Func {
                     id: None,
@@ -972,7 +972,7 @@ fn static_get_method() {
             body: ClassBody(vec![Prop {
                 computed: false,
                 is_static: true,
-                key: PropKey::Expr(Expr::Ident(Ident::from("if"))),
+                key: PropKey::Expr(Expr::Ident(Ident::from("e"))),
                 kind: PropKind::Get,
                 method: false,
                 short_hand: false,
@@ -1059,7 +1059,7 @@ fn import_default() {
     let tokens = p.parse().unwrap();
 
     assert_eq!(
-        Program::Script(vec![ProgramPart::Decl(Decl::Import(Box::new(ModImport {
+        Program::Mod(vec![ProgramPart::Decl(Decl::Import(Box::new(ModImport {
             source: Lit::String(StringLit::Single(Cow::Borrowed("module"))),
             specifiers: vec![ImportSpecifier::Default(Ident::from("i"))]
         })))]),

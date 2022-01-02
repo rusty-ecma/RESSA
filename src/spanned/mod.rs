@@ -413,14 +413,20 @@ where
                                 "es6 import syntax".to_string(),
                             ));
                         }
-                        let import = self.parse_import_decl()?;
-                        let decl = Decl::Import(Box::new(import));
+                        let (import, semi_colon) = self.parse_import_decl()?;
+                        let decl = Decl::Import {
+                            import: Box::new(import),
+                            semi_colon,
+                        };
                         Ok(ProgramPart::Decl(decl))
                     }
                 }
                 Keyword::Export(_) => {
-                    let export = self.parse_export_decl()?;
-                    let decl = Decl::Export(Box::new(export));
+                    let (export, semi_colon) = self.parse_export_decl()?;
+                    let decl = Decl::Export {
+                        export: Box::new(export),
+                        semi_colon,
+                    };
                     Ok(ProgramPart::Decl(decl))
                 }
                 Keyword::Const(_) => {
@@ -452,11 +458,12 @@ where
                     let keyword = self.expect_keyword(Keyword::Var(()))?;
                     let decls = self.parse_var_decl_list(false)?;
 
-                    let _semi_colon = self.consume_semicolon()?;
-                    Ok(ProgramPart::Decl(Decl::Var(VarDecls {
+                    let semi_colon = self.consume_semicolon()?;
+                    let decls = VarDecls {
                         decls,
                         keyword: VarKind::Var(Some(keyword)),
-                    })))
+                    };
+                    Ok(ProgramPart::Decl(Decl::Var { decls, semi_colon }))
                 }
                 _ => {
                     let stmt = self.parse_statement(ctx)?;
@@ -483,7 +490,7 @@ where
     /// import Thing, * as Stuff from 'place';
     /// import 'place';
     /// ```
-    fn parse_import_decl(&mut self) -> Res<ModImport<'b>> {
+    fn parse_import_decl(&mut self) -> Res<(ModImport<'b>, Option<Slice<'b>>)> {
         if let Some(scope) = self.context.lexical_names.last_scope() {
             if !scope.is_top() {
                 return Err(Error::InvalidImportError(self.current_position));
@@ -497,13 +504,15 @@ where
         if self.look_ahead.is_string() {
             let source = self.parse_module_specifier()?;
             let semi_colon = self.consume_semicolon()?;
-            return Ok(ModImport {
-                keyword_import,
-                specifiers,
-                keyword_from: None,
-                source,
+            return Ok((
+                ModImport {
+                    keyword_import,
+                    specifiers,
+                    keyword_from: None,
+                    source,
+                },
                 semi_colon,
-            });
+            ));
         }
         let mut found_asterisk = false;
         while !self.look_ahead.token.is_eof() {
@@ -548,13 +557,15 @@ where
         // comes from
         let source = self.parse_module_specifier()?;
         let semi_colon = self.consume_semicolon()?;
-        Ok(ModImport {
-            keyword_import,
-            specifiers,
-            keyword_from: Some(keyword_from),
-            source,
+        Ok((
+            ModImport {
+                keyword_import,
+                specifiers,
+                keyword_from: Some(keyword_from),
+                source,
+            },
             semi_colon,
-        })
+        ))
     }
     /// This will handle the named variant of imports
     /// ```js
@@ -641,8 +652,9 @@ where
         Ok(DefaultImportSpec { id })
     }
 
-    fn parse_export_decl(&mut self) -> Res<ModExport<'b>> {
+    fn parse_export_decl(&mut self) -> Res<(ModExport<'b>, Option<Slice<'b>>)> {
         debug!("{} parse_export_decl", self.look_ahead_position);
+        let mut semi = None;
         if let Some(scope) = self.context.lexical_names.last_scope() {
             trace!("scope: {:?}", self.context.lexical_names.states);
             if !scope.is_top() {
@@ -656,13 +668,13 @@ where
             ));
         }
         let keyword = self.expect_keyword(Keyword::Export(()))?;
-        if self.at_keyword(Keyword::Default(())) {
+        let ret = if self.at_keyword(Keyword::Default(())) {
             let spec = self.parse_default_export()?;
-            Ok(ModExport { keyword, spec })
+            ModExport { keyword, spec }
         } else if self.at_punct(Punct::Asterisk) {
             let spec = self.parse_all_export()?;
-            self.consume_semicolon()?;
-            Ok(ModExport { keyword, spec })
+            semi = self.consume_semicolon()?;
+            ModExport { keyword, spec }
         } else if self.look_ahead.token.is_keyword() {
             if self.look_ahead.token.matches_keyword(Keyword::Let(()))
                 || self.look_ahead.token.matches_keyword(Keyword::Const(()))
@@ -670,33 +682,36 @@ where
                 let _start = self.look_ahead_position;
                 let lex = self.parse_lexical_decl(false)?;
                 let decl = NamedExportDecl::Decl(lex);
-                self.consume_semicolon()?;
+                semi = self.consume_semicolon()?;
                 let spec = ModExportSpecifier::Named(decl);
-                Ok(ModExport { keyword, spec })
+                ModExport { keyword, spec }
             } else if self.look_ahead.token.matches_keyword(Keyword::Var(())) {
                 let keyword_var = self.expect_keyword(Keyword::Var(()))?;
                 let _start = self.look_ahead_position;
                 let decls = self.parse_variable_decl_list(false)?;
-                let decs = VarDecls {
+                let decls = VarDecls {
                     keyword: VarKind::Var(Some(keyword_var)),
                     decls,
                 };
-                let spec = ModExportSpecifier::Named(NamedExportDecl::Decl(Decl::Var(decs)));
-                self.consume_semicolon()?;
-                Ok(ModExport { keyword, spec })
+                let semi_colon = self.consume_semicolon()?;
+                let spec = ModExportSpecifier::Named(NamedExportDecl::Decl(Decl::Var {
+                    decls,
+                    semi_colon,
+                }));
+                ModExport { keyword, spec }
             } else if self.look_ahead.token.matches_keyword(Keyword::Class(())) {
                 let decl = self.parse_export_decl_class()?;
                 let spec = ModExportSpecifier::Named(NamedExportDecl::Decl(decl));
-                Ok(ModExport { keyword, spec })
+                ModExport { keyword, spec }
             } else if self.look_ahead.token.matches_keyword(Keyword::Function(())) {
                 let decl = self.parse_export_decl_func()?;
                 let spec = ModExportSpecifier::Named(NamedExportDecl::Decl(decl));
-                Ok(ModExport { keyword, spec })
+                ModExport { keyword, spec }
             } else {
-                self.expected_token_error(
+                return self.expected_token_error(
                     &self.look_ahead,
                     &["let", "var", "const", "class", "function"],
-                )
+                );
             }
         } else if self.at_async_function() {
             let _start = self.look_ahead_position;
@@ -704,7 +719,7 @@ where
             let decl = Decl::Func(func);
             let decl = NamedExportDecl::Decl(decl);
             let spec = ModExportSpecifier::Named(decl);
-            Ok(ModExport { keyword, spec })
+            ModExport { keyword, spec }
         } else {
             let open_brace = self.expect_punct(Punct::OpenBrace)?;
             let mut specifiers = Vec::new();
@@ -733,7 +748,7 @@ where
             if self.at_contextual_keyword("from") {
                 let keyword_from = self.expect_contextual_keyword("from")?;
                 let source = self.parse_module_specifier()?;
-                self.consume_semicolon()?;
+                semi = self.consume_semicolon()?;
                 for spec in &specifiers {
                     self.context
                         .lexical_names
@@ -751,14 +766,14 @@ where
                     }),
                 };
                 let spec = NamedExportDecl::Specifier(spec);
-                Ok(ModExport {
+                ModExport {
                     spec: ModExportSpecifier::Named(spec),
                     keyword,
-                })
+                }
             } else if found_default {
-                self.unexpected_token_error(&self.look_ahead, "duplicate default in export")
+                return self.unexpected_token_error(&self.look_ahead, "duplicate default in export");
             } else {
-                self.consume_semicolon()?;
+                semi = self.consume_semicolon()?;
                 let spec = NamedExportSpec {
                     list: ExportList {
                         open_brace,
@@ -768,12 +783,13 @@ where
                     source: None,
                 };
                 let spec = NamedExportDecl::Specifier(spec);
-                Ok(ModExport {
+                ModExport {
                     spec: ModExportSpecifier::Named(spec),
                     keyword,
-                })
+                }
             }
-        }
+        };
+        Ok((ret, semi))
     }
 
     fn parse_default_export(&mut self) -> Res<ModExportSpecifier<'b>> {
@@ -2210,10 +2226,10 @@ where
             let part = self.parse_statement_list_item(None)?;
             if let ProgramPart::Decl(ref decl) = part {
                 match decl {
-                    Decl::Export(_) => {
+                    Decl::Export { .. } => {
                         return Err(Error::InvalidExportError(self.current_position))
                     }
-                    Decl::Import(_) => {
+                    Decl::Import { .. } => {
                         return Err(Error::InvalidImportError(self.current_position))
                     }
                     _ => (),
@@ -2247,12 +2263,12 @@ where
             _ => return self.expected_token_error(&next, &["let", "const"]),
         };
         let decls = self.parse_binding_list(&kind, in_for)?;
-        self.consume_semicolon()?;
-        let var_decls = VarDecls {
+        let semi_colon = self.consume_semicolon()?;
+        let decls = VarDecls {
             keyword: kind,
             decls,
         };
-        Ok(Decl::Var(var_decls))
+        Ok(Decl::Var { decls, semi_colon })
     }
 
     fn parse_binding_list(
@@ -3229,7 +3245,7 @@ where
         let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
         let prev_strict = self.context.allow_strict_directive;
-        self.context.allow_yield = !self.context.strict;
+        self.context.allow_yield = dbg!(!self.context.strict);
         self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
@@ -4395,6 +4411,13 @@ where
                     && !ident.token.matches_keyword(Keyword::Await(())))
                 || !is_var
             {
+                debug!("strict: {}\nis_strict_reserved: {}, matches_let: {}, matches_await: {}, is_var: {}",
+                    self.context.strict,
+                    ident.token.is_strict_reserved(),
+                    ident.token.matches_keyword(Keyword::Let(())),
+                    ident.token.matches_keyword(Keyword::Await(())),
+                    is_var,
+                );
                 return self.expected_token_error(&ident, &["variable identifier", "let", "await"]);
             }
         } else if (self.context.is_module || !self.context.allow_await)
@@ -4404,7 +4427,7 @@ where
                 "invalid await await: {}, module: {}",
                 self.context.allow_await, self.context.is_module
             );
-            return self.expected_token_error(&ident, &["variable identifier"]);
+            return self.expected_token_error(&ident, &["not `await`"]);
         }
         let i = match ident.token {
             Token::Ident(_) => {
@@ -4521,7 +4544,7 @@ where
             "{}: parse_pattern_with_default {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        let (is_restricted, ret) = self.parse_pattern(false, params)?;
+        let (is_restricted, ret) = self.parse_pattern(true, params)?;
         if self.at_punct(Punct::Equal) {
             let operator = self.expect_assign_op(Punct::Equal)?;
             let prev_yield = self.context.allow_yield;
@@ -5199,7 +5222,7 @@ where
     fn reinterpret_expr_as_pat(&self, ex: Expr<'b>) -> Res<Pat<'b>> {
         debug!(
             "{}: reinterpret_expr_as_pat {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start, ex
         );
         match ex {
             Expr::Array(a) => {
@@ -5275,12 +5298,19 @@ where
     }
 
     fn reinterpret_array_pat_part(&self, part: Expr<'b>) -> Res<ArrayPatPart<'b>> {
+        debug!(
+            "{}: reinterpret_array_pat_part {:?}",
+            self.look_ahead.span.start, part
+        );
         let ret = if let Expr::Spread(spread) = part {
-            let part = ArrayPatPart::Rest(RestPat {
-                dots: spread.dots,
-                pat: self.reinterpret_expr_as_pat(spread.expr)?,
-            });
-            part
+            if Self::is_reinterpret_target(&spread.expr) {
+                ArrayPatPart::Rest(RestPat {
+                    dots: spread.dots,
+                    pat: self.reinterpret_expr_as_pat(spread.expr)?,
+                })
+            } else {
+                ArrayPatPart::Expr(Expr::Spread(spread))
+            }
         } else if Self::is_reinterpret_target(&part) {
             ArrayPatPart::Pat(self.reinterpret_expr_as_pat(part)?)
         } else {

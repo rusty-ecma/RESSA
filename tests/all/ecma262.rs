@@ -1,7 +1,6 @@
 #![cfg(test)]
 use super::{get_js_file, EverythingVersion, Lib};
 use env_logger;
-use resast::spanned::SourceLocation;
 
 use crate::es_tokens;
 use ressa::Parser;
@@ -15,7 +14,6 @@ fn es5() {
     let mut p = Parser::new(&js).expect("Failed to create parser");
     let mut tokens = es_tokens::ES5.iter();
     let mut i = 0;
-    let mut last_position = p.next_position();
     while let Some(ref item) = p.next() {
         if let Some(part) = tokens.next() {
             let item = match item {
@@ -30,15 +28,16 @@ fn es5() {
                 }
             };
             if item != part {
+                let pos = p.next_position();
+                let _ = ::std::fs::write("1.parsed.out", format!("{:#?}", item));
+                let _ = ::std::fs::write("2.expected.out", format!("{:#?}", part));
                 panic!(
-                    "Error, part {} doesn't match \n{:?}\n{:?}\nnext start: line: {}, column: {}\n{}",
-                    i, item, part, last_position.start.line, last_position.start.column,
-                    super::hilight_position(&js, &last_position).unwrap_or_else(String::new)
+                    "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
+                    i, path, pos.start.line, pos.start.column, item, part,
                 )
             }
         }
         i += 1;
-        last_position = p.next_position();
     }
 }
 
