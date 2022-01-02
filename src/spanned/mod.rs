@@ -1871,7 +1871,7 @@ where
             },
         ) = dbg!(&left)
         {
-            if kind.is_var() || self.context.strict {
+            if !kind.is_var() || self.context.strict {
                 return Err(Error::ForOfInAssign(
                     self.look_ahead_position,
                     "For in loop left hand side cannot contain an assignment".to_string(),
