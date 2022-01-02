@@ -1,4 +1,3 @@
-
 use super::{Error, Res};
 use res_regex::RegexParser;
 /// Validate that an already parsed regular expression

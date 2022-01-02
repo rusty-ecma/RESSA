@@ -202,7 +202,7 @@ impl<'a> DuplicateNameDetector<'a> {
                 Some(value) => match value {
                     PropValue::Expr(expr) => self.declare_expr(expr, kind, pos),
                     PropValue::Pat(pat) => self.declare_pat(pat, kind, pos),
-                    PropValue::Method(meth) => todo!(),
+                    PropValue::Method(_) => Ok(()),
                 },
                 None => match &prop.key.value {
                     PropKey::Lit(lit) => self.declare_literal_ident(lit, kind, pos),
@@ -210,10 +210,7 @@ impl<'a> DuplicateNameDetector<'a> {
                     PropKey::Pat(pat) => self.declare_pat(pat, kind, pos),
                 },
             },
-            Prop::Method(prop) => todo!(),
-            Prop::Ctor(prop) => todo!(),
-            Prop::Get(prop) => todo!(),
-            Prop::Set(prop) => todo!(),
+            _ => Ok(()),
         }
     }
     fn declare_literal_ident(&mut self, lit: &Lit<'a>, kind: DeclKind, pos: Position) -> Res<()> {

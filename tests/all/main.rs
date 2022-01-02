@@ -91,7 +91,6 @@ pub fn npm_install() -> Result<(), Error> {
 }
 
 fn format_error(js: &str, e: &ressa::Error) -> String {
-    
     if let Some(position) = try_hilight_position(js, e) {
         format!("{}\n{}", e, position)
     } else {

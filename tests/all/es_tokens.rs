@@ -1916,7 +1916,7 @@ lazy_static! {
                             }
                         )
                     ])
-                    
+
                 ),
             ], obj_lit_expr(vec![
                     obj_prop(
@@ -4399,7 +4399,10 @@ fn empty_generator_prop(key: PK) -> OP {
 }
 
 fn normal_imports(pairs: &[(&'static str, &'static str)]) -> ImportSpecifier<'static> {
-    let imports = pairs.into_iter().map(|(name, local)| normal_import(name, local)).collect();
+    let imports = pairs
+        .into_iter()
+        .map(|(name, local)| normal_import(name, local))
+        .collect();
     ImportSpecifier::Normal(imports)
 }
 

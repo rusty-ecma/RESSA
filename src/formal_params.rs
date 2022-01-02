@@ -159,7 +159,7 @@ fn update_with_prop_value<'a>(
         PropValue::Pat(pat) => {
             update_with_pat(pat, set)?;
         }
-        PropValue::Method(_) => {},
+        PropValue::Method(_) => {}
     }
     Ok(())
 }

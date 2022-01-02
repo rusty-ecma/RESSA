@@ -878,10 +878,7 @@ fn redecl_error_in_nested_funcs() {
 #[test]
 fn generator_prop() {
     env_logger::try_init().ok();
-    let mut p = Parser::builder()
-        .js("({*g() {}})")
-        .build()
-        .unwrap();
+    let mut p = Parser::builder().js("({*g() {}})").build().unwrap();
     let tokens = p.parse().unwrap();
 
     assert_eq!(
@@ -898,7 +895,7 @@ fn generator_prop() {
                     generator: true,
                     id: None,
                     is_async: false,
-                     params: vec![],
+                    params: vec![],
                 }))
             })
         ])))]),
@@ -922,38 +919,36 @@ fn super_tagged_template_in_ctor() {
         Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
             id: Some(Ident::from("X")),
             super_class: None,
-            body: ClassBody(vec![
-                Prop {
-                    computed: false,
-                    is_static: false,
-                    key: PropKey::Expr(Expr::Ident(Ident::from("constructor"))),
-                    kind: PropKind::Ctor,
-                    method: false,
-                    short_hand: false,
-                    value: PropValue::Expr(Expr::Func(Func {
-                        id: None,
-                        generator: false,
-                        is_async: false,
-                        params: vec![],
-                        body: FuncBody(vec![
-                            ProgramPart::Stmt(Stmt::Expr(Expr::TaggedTemplate(TaggedTemplateExpr {
-                                tag: Box::new(Expr::Call(CallExpr {
-                                    callee: Box::new(Expr::Super),
-                                    arguments: vec![],
-                                })),
-                                quasi: TemplateLit {
-                                    expressions: vec![],
-                                    quasis: vec![TemplateElement {
-                                        tail: true,
-                                        cooked: std::borrow::Cow::Borrowed("template"),
-                                        raw: std::borrow::Cow::Borrowed("`template`"),
-                                    }]
-                                }
-                            })))
-                        ])
-                    })),
-                }
-            ])
+            body: ClassBody(vec![Prop {
+                computed: false,
+                is_static: false,
+                key: PropKey::Expr(Expr::Ident(Ident::from("constructor"))),
+                kind: PropKind::Ctor,
+                method: false,
+                short_hand: false,
+                value: PropValue::Expr(Expr::Func(Func {
+                    id: None,
+                    generator: false,
+                    is_async: false,
+                    params: vec![],
+                    body: FuncBody(vec![ProgramPart::Stmt(Stmt::Expr(Expr::TaggedTemplate(
+                        TaggedTemplateExpr {
+                            tag: Box::new(Expr::Call(CallExpr {
+                                callee: Box::new(Expr::Super),
+                                arguments: vec![],
+                            })),
+                            quasi: TemplateLit {
+                                expressions: vec![],
+                                quasis: vec![TemplateElement {
+                                    tail: true,
+                                    cooked: std::borrow::Cow::Borrowed("template"),
+                                    raw: std::borrow::Cow::Borrowed("`template`"),
+                                }]
+                            }
+                        }
+                    )))])
+                })),
+            }])
         }))]),
         tokens
     );
@@ -974,23 +969,21 @@ fn static_get_method() {
         Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
             id: Some(Ident::from("X")),
             super_class: None,
-            body: ClassBody(vec![
-                Prop {
-                    computed: false,
-                    is_static: true,
-                    key: PropKey::Expr(Expr::Ident(Ident::from("if"))),
-                    kind: PropKind::Get,
-                    method: false,
-                    short_hand: false,
-                    value: PropValue::Expr(Expr::Func(Func {
-                        id: None,
-                        generator: false,
-                        is_async: false,
-                        params: vec![],
-                        body: FuncBody(vec![])
-                    })),
-                }
-            ])
+            body: ClassBody(vec![Prop {
+                computed: false,
+                is_static: true,
+                key: PropKey::Expr(Expr::Ident(Ident::from("if"))),
+                kind: PropKind::Get,
+                method: false,
+                short_hand: false,
+                value: PropValue::Expr(Expr::Func(Func {
+                    id: None,
+                    generator: false,
+                    is_async: false,
+                    params: vec![],
+                    body: FuncBody(vec![])
+                })),
+            }])
         }))]),
         tokens
     );
@@ -1011,23 +1004,21 @@ fn generator_method() {
         Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
             id: Some(Ident::from("X")),
             super_class: None,
-            body: ClassBody(vec![
-                Prop {
-                    computed: false,
-                    is_static: true,
-                    key: PropKey::Expr(Expr::Ident(Ident::from("e"))),
-                    kind: PropKind::Method,
-                    method: true,
-                    short_hand: false,
-                    value: PropValue::Expr(Expr::Func(Func {
-                        id: None,
-                        generator: true,
-                        is_async: false,
-                        params: vec![],
-                        body: FuncBody(vec![])
-                    })),
-                }
-            ])
+            body: ClassBody(vec![Prop {
+                computed: false,
+                is_static: true,
+                key: PropKey::Expr(Expr::Ident(Ident::from("e"))),
+                kind: PropKind::Method,
+                method: true,
+                short_hand: false,
+                value: PropValue::Expr(Expr::Func(Func {
+                    id: None,
+                    generator: true,
+                    is_async: false,
+                    params: vec![],
+                    body: FuncBody(vec![])
+                })),
+            }])
         }))]),
         tokens
     );
@@ -1044,9 +1035,9 @@ fn export_all() {
     let tokens = p.parse().unwrap();
 
     assert_eq!(
-        Program::Mod(vec![ProgramPart::Decl(Decl::Export(Box::new(ModExport::All(
-            Lit::String(StringLit::Single(Cow::Borrowed("module")))
-        ))))]),
+        Program::Mod(vec![ProgramPart::Decl(Decl::Export(Box::new(
+            ModExport::All(Lit::String(StringLit::Single(Cow::Borrowed("module"))))
+        )))]),
         tokens
     );
 }
@@ -1070,9 +1061,7 @@ fn import_default() {
     assert_eq!(
         Program::Script(vec![ProgramPart::Decl(Decl::Import(Box::new(ModImport {
             source: Lit::String(StringLit::Single(Cow::Borrowed("module"))),
-            specifiers: vec![
-                ImportSpecifier::Default(Ident::from("i"))
-            ]
+            specifiers: vec![ImportSpecifier::Default(Ident::from("i"))]
         })))]),
         tokens
     );

@@ -3,14 +3,11 @@
 // most of this file is prep for a re-write
 
 use crate::{Error, Position};
-use resast::{
-    spanned::{
-        expr::{ArrayExpr, AssignExpr, AssignLeft, Expr, ObjExpr, ObjProp, Prop, PropKey},
-        pat::{ArrayElement, ArrayPatPart, ObjPatPart, Pat, RestPat},
-        stmt::LoopLeft,
-        Ident, ListEntry, VarKind,
-    },
-    PropKind,
+use resast::spanned::{
+    expr::{ArrayExpr, AssignExpr, AssignLeft, Expr, ObjExpr, ObjProp, Prop, PropKey},
+    pat::{ArrayPatPart, ObjPatPart, Pat, RestPat},
+    stmt::LoopLeft,
+    Ident, ListEntry, VarKind,
 };
 use std::{borrow::Cow, collections::HashSet};
 type Res = Result<(), Error>;
@@ -160,7 +157,7 @@ fn check_prop<'a>(prop: &Prop<'a>, allow_let: bool, pos: Position, strict: bool)
 
 pub fn check_prop_key<'a>(key: &PropKey<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
     match &key {
-        PropKey::Lit(value) => Err(Error::InvalidLHS(pos)),
+        PropKey::Lit(_value) => Err(Error::InvalidLHS(pos)),
         PropKey::Expr(value) => check_lhs_expr(value, allow_let, pos, strict),
         PropKey::Pat(value) => check_lhs_pat(value, allow_let, pos, strict),
     }
