@@ -965,28 +965,28 @@ fn super_in_new_class_expr() {
     let tokens = p.parse().unwrap();
     let call_super = CallExpr {
         callee: Box::new(Expr::Super),
-        arguments: vec![]
+        arguments: vec![],
     };
     let arrow_call_super = ArrowFuncExpr {
         id: None,
         expression: false,
         generator: false,
-        body: ArrowFuncBody::FuncBody(FuncBody(vec![
-            ProgramPart::Stmt(Stmt::Expr(Expr::Call(call_super)))
-        ])),
+        body: ArrowFuncBody::FuncBody(FuncBody(vec![ProgramPart::Stmt(Stmt::Expr(Expr::Call(
+            call_super,
+        )))])),
         is_async: false,
-        params: vec![]
+        params: vec![],
     };
     let arrow_call_super = Expr::ArrowFunc(arrow_call_super);
     let call_arrow = CallExpr {
         callee: Box::new(arrow_call_super),
-        arguments: vec![]
+        arguments: vec![],
     };
     let call_arrow = Expr::Call(call_arrow);
     let assign_left = Box::new(Pat::ident_from("a"));
     let assign_arrow = AssignPat {
         left: assign_left,
-        right: Box::new(call_arrow)
+        right: Box::new(call_arrow),
     };
     let key = PropKey::Expr(Expr::ident_from("constructor"));
     let value = Func {
@@ -994,7 +994,7 @@ fn super_in_new_class_expr() {
         params: vec![FuncArg::Pat(Pat::Assign(assign_arrow))],
         body: FuncBody(vec![]),
         generator: false,
-        is_async: false
+        is_async: false,
     };
     let value = PropValue::Expr(Expr::Func(value));
     let ctor = Prop {
