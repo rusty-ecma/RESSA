@@ -902,6 +902,7 @@ fn generator_prop() {
         tokens
     );
 }
+
 #[test]
 fn super_tagged_template_in_ctor() {
     env_logger::try_init().ok();
@@ -950,6 +951,71 @@ fn super_tagged_template_in_ctor() {
                 })),
             }])
         }))]),
+        tokens
+    );
+}
+
+#[test]
+fn super_in_new_class_expr() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("new class extends X { constructor(a = (()=>{ super() })()) { } }")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+    let call_super = CallExpr {
+        callee: Box::new(Expr::Super),
+        arguments: vec![]
+    };
+    let arrow_call_super = ArrowFuncExpr {
+        id: None,
+        expression: false,
+        generator: false,
+        body: ArrowFuncBody::FuncBody(FuncBody(vec![
+            ProgramPart::Stmt(Stmt::Expr(Expr::Call(call_super)))
+        ])),
+        is_async: false,
+        params: vec![]
+    };
+    let arrow_call_super = Expr::ArrowFunc(arrow_call_super);
+    let call_arrow = CallExpr {
+        callee: Box::new(arrow_call_super),
+        arguments: vec![]
+    };
+    let call_arrow = Expr::Call(call_arrow);
+    let assign_left = Box::new(Pat::ident_from("a"));
+    let assign_arrow = AssignPat {
+        left: assign_left,
+        right: Box::new(call_arrow)
+    };
+    let key = PropKey::Expr(Expr::ident_from("constructor"));
+    let value = Func {
+        id: None,
+        params: vec![FuncArg::Pat(Pat::Assign(assign_arrow))],
+        body: FuncBody(vec![]),
+        generator: false,
+        is_async: false
+    };
+    let value = PropValue::Expr(Expr::Func(value));
+    let ctor = Prop {
+        computed: false,
+        is_static: false,
+        method: true,
+        short_hand: false,
+        kind: PropKind::Ctor,
+        key,
+        value,
+    };
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Stmt(Stmt::Expr(Expr::New(NewExpr {
+            arguments: vec![],
+            callee: Box::new(Expr::Class(Class {
+                id: None,
+                super_class: Some(Box::new(Expr::Ident(Ident::from("X")))),
+                body: ClassBody(vec![ctor])
+            }))
+        })))]),
         tokens
     );
 }
@@ -1063,6 +1129,58 @@ fn import_default() {
             source: Lit::String(StringLit::Single(Cow::Borrowed("module"))),
             specifiers: vec![ImportSpecifier::Default(Ident::from("i"))]
         })))]),
+        tokens
+    );
+}
+
+#[test]
+fn loop_yield() {
+    env_logger::try_init().ok();
+    let mut p = Parser::builder()
+        .js("var x = {
+            *['y']() {
+                yield 0;
+                yield 0;
+            }
+        };")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Var(
+            VarKind::Var,
+            vec![VarDecl {
+                id: Pat::Ident(Ident::from("x")),
+                init: Some(Expr::Obj(vec![ObjProp::Prop(Prop {
+                    key: PropKey::Lit(Lit::String(StringLit::Single(Cow::Borrowed("y")))),
+                    computed: true,
+                    is_static: false,
+                    kind: PropKind::Method,
+                    method: true,
+                    short_hand: false,
+                    value: PropValue::Expr(Expr::Func(Func {
+                        id: None,
+                        params: vec![],
+                        body: FuncBody(vec![
+                            ProgramPart::Stmt(Stmt::Expr(Expr::Yield(YieldExpr {
+                                argument: Some(Box::new(Expr::Lit(Lit::Number(Cow::Borrowed(
+                                    "0"
+                                ))))),
+                                delegate: false,
+                            }))),
+                            ProgramPart::Stmt(Stmt::Expr(Expr::Yield(YieldExpr {
+                                argument: Some(Box::new(Expr::Lit(Lit::Number(Cow::Borrowed(
+                                    "0"
+                                ))))),
+                                delegate: false,
+                            }))),
+                        ]),
+                        generator: true,
+                        is_async: false,
+                    }))
+                })]))
+            }]
+        ))]),
         tokens
     );
 }
