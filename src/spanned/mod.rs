@@ -771,7 +771,8 @@ where
                     keyword,
                 }
             } else if found_default {
-                return self.unexpected_token_error(&self.look_ahead, "duplicate default in export");
+                return self
+                    .unexpected_token_error(&self.look_ahead, "duplicate default in export");
             } else {
                 semi = self.consume_semicolon()?;
                 let spec = NamedExportSpec {
@@ -3128,6 +3129,8 @@ where
         if keyword_async.is_some() {
             self.context.allow_yield = false;
             self.context.allow_await = false;
+        } else if star.is_some() {
+            self.context.allow_yield = false;
         } else {
             self.context.allow_yield = !self.context.strict;
         }
@@ -3163,9 +3166,9 @@ where
             "{}: parse_class_ctor {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        let params = self.parse_formal_params()?;
         let prev_allow_super_call = self.context.allow_super_call;
         self.context.allow_super_call = self.context.allow_super;
+        let params = self.parse_formal_params()?;
         let body = self.parse_method_body(params.simple, params.found_restricted)?;
         self.context.allow_super_call = prev_allow_super_call;
         let ctor = PropCtor {
@@ -3245,7 +3248,7 @@ where
         let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
         let prev_strict = self.context.allow_strict_directive;
-        self.context.allow_yield = dbg!(!self.context.strict);
+        self.context.allow_yield = !self.context.strict;
         self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
         if formal_params::have_duplicates(&params.params) {
@@ -4779,7 +4782,7 @@ where
             if self.at_punct(Punct::EqualGreaterThan) {
                 self.context.set_is_assignment_target(false);
                 self.context.set_is_binding_element(false);
-                let is_async = Self::is_async(&current);
+                let is_async = keyword.is_some();
                 let prev_strict = self.context.allow_strict_directive;
                 let prev_await = self.context.allow_await;
                 self.context.allow_await = !is_async;
@@ -4919,15 +4922,6 @@ where
             FuncArg::Expr(Expr::Ident(ref ident)) | FuncArg::Pat(Pat::Ident(ref ident)) => {
                 ident.name() == "arguments" || ident.name() == "eval"
             }
-            _ => false,
-        }
-    }
-
-    fn is_async(expr: &Expr) -> bool {
-        match expr {
-            Expr::Func(ref f) => f.is_async(),
-            Expr::ArrowFunc(ref f) => f.keyword.is_some(),
-            Expr::ArrowParamPlaceHolder(inner) => inner.keyword.is_some(),
             _ => false,
         }
     }
