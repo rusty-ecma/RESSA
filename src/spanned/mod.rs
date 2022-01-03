@@ -77,7 +77,7 @@ use resast::spanned::{
         WhileStmt, WithStmt,
     },
     AssignOp, BinaryOp, Class, ClassBody, Dir, Func, FuncArg, FuncBody, Ident, ListEntry,
-    LogicalOp, Node, Program, ProgramPart, Slice, UnaryOp, UpdateOp, VarKind,
+    LogicalOp, Node, Program, ProgramPart, Slice, UnaryOp, UpdateOp, VarKind, SuperClass,
 };
 use ress::prelude::*;
 use ress::Span;
@@ -2096,7 +2096,7 @@ where
                         super_class: None,
                         body,
                     };
-                    let expr = Expr::Class(cls);
+                    let expr = Expr::Class(Box::new(cls));
                     Stmt::Expr {
                         expr,
                         semi_colon: None,
@@ -2674,10 +2674,14 @@ where
         let keyword = self.expect_keyword(Keyword::Class(()))?;
         let start = self.look_ahead_position;
         let mut super_class = if self.at_keyword(Keyword::Extends(())) {
-            let _ = self.next_item()?;
-            let super_class =
+            let keyword_extends = self.expect_keyword(Keyword::Extends(()))?;
+
+            let expr =
                 self.isolate_cover_grammar(Self::parse_left_hand_side_expr_allow_call)?;
-            Some(Box::new(super_class))
+            Some(SuperClass {
+                keyword_extends,
+                expr,
+            })
         } else {
             None
         };
@@ -2697,10 +2701,13 @@ where
             Some(self.parse_var_ident(false)?)
         };
         if super_class.is_none() && self.at_keyword(Keyword::Extends(())) {
-            let _ = self.next_item()?;
-            let new_super =
+            let keyword_extends = self.expect_keyword(Keyword::Extends(()))?;
+            let expr =
                 self.isolate_cover_grammar(Self::parse_left_hand_side_expr_allow_call)?;
-            super_class = Some(Box::new(new_super))
+            super_class = Some(SuperClass {
+                keyword_extends,
+                expr,
+            })
         }
         if check_id {
             if let Some(ref i) = id {
@@ -3529,7 +3536,7 @@ where
                     Ok(Expr::This(slice))
                 } else if self.at_keyword(Keyword::Class(())) {
                     let cls = self.parse_class_decl(true, false)?;
-                    Ok(Expr::Class(cls))
+                    Ok(Expr::Class(Box::new(cls)))
                 } else if self.at_import_call()? {
                     // TODO: Double check this
                     let ident = self.parse_ident_name()?;
