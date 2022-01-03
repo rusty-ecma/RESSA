@@ -2843,144 +2843,6 @@ where
         } else {
             self.method_def_cont(keyword_static, keyword_async, star, id)
         }
-        //else {
-
-        //     if Self::is_static(&new_key.value)
-        //         && (Self::qualified_prop_name(&self.look_ahead.token)
-        //             || self.at_punct(Punct::Asterisk))
-        //     {
-        //         if self.at_contextual_keyword("async") {
-        //             let keyword = self.next_item()?;
-        //             keyword_async = self.slice_from(&keyword);
-        //         }
-        //         token = self.look_ahead.token.clone();
-        //         computed = self.at_punct(Punct::OpenBracket);
-        //         is_static = true;
-        //         if self.at_punct(Punct::Asterisk) {
-        //             let _ = self.next_item()?;
-        //         } else {
-        //             key = Some(self.parse_object_property_key()?);
-        //         }
-        //     } else {
-        //         is_ctor = Self::is_key(&new_key.value, "constructor");
-        //         key = Some(new_key);
-        //     }
-        //     if token.is_ident()
-        //         && !self.context.has_line_term
-        //         && self.at_contextual_keyword("async")
-        //         && !self.look_ahead.token.matches_punct(Punct::Colon)
-        //         && !self.look_ahead.token.matches_punct(Punct::OpenParen)
-        //         && !self.look_ahead.token.matches_punct(Punct::Asterisk)
-        //     {
-        //         return self.expected_token_error(&self.look_ahead, &[":", "(", "*"]);
-        //     }
-        // let mut method = false;
-
-        // let look_ahead_prop_key = Self::qualified_prop_name(&self.look_ahead.token);
-        // if token.is_ident() {
-        //     let (at_get, at_set) = if let Some(ref k) = key {
-        //         (
-        //             Self::is_key(&k.value, "get") && look_ahead_prop_key,
-        //             Self::is_key(&k.value, "set") && look_ahead_prop_key,
-        //         )
-        //     } else {
-        //         (false, false)
-        //     };
-
-        //     if at_get {
-        //         kind = Some(PropKind::Get);
-        //         computed = self.at_punct(Punct::OpenBracket);
-        //         self.context.allow_yield = false;
-        //         key = Some(self.parse_object_property_key()?);
-        //         value = Some(self.parse_getter_method()?);
-        //     } else if at_set {
-        //         kind = Some(PropKind::Set);
-        //         computed = self.at_punct(Punct::OpenBracket);
-        //         key = Some(self.parse_object_property_key()?);
-        //         value = Some(self.parse_setter_method()?);
-        //     }
-        // } else if token.matches_punct(Punct::Asterisk) && look_ahead_prop_key {
-        //     kind = Some(PropKind::Init);
-        //     computed = self.at_punct(Punct::OpenBracket);
-        //     key = Some(self.parse_object_property_key()?);
-        //     value = Some(self.parse_generator_method()?);
-        //     method = true;
-        // }
-
-        // if kind.is_none() && key.is_some() && self.at_punct(Punct::OpenParen) {
-        //     if is_ctor {
-        //         self.context.allow_super_call = self.context.allow_super;
-        //     } else {
-        //         self.context.allow_super_call = false;
-        //     }
-        //     kind = Some(PropKind::Method);
-        //     method = true;
-        //     value = Some(if is_async {
-        //         self.parse_async_property_method()?
-        //     } else {
-        //         self.parse_property_method()?
-        //     });
-        // }
-
-        // let mut kind = if let Some(k) = kind {
-        //     k
-        // } else {
-        //     return self.expected_token_error(&self.look_ahead, &["method identifier"]);
-        // };
-
-        // if kind == PropKind::Init {
-        //     kind = PropKind::Method;
-        // }
-
-        // let key = if let Some(k) = key {
-        //     k
-        // } else {
-        //     return self.expected_token_error(&self.look_ahead, &[]);
-        // };
-        // if !computed {
-        //     if is_static && Self::is_key(&key, "prototype") {
-        //         return self.expected_token_error(&self.look_ahead, &[]);
-        //     }
-        //     if !is_static && is_ctor {
-        //         if kind != PropKind::Method || !method {
-        //             return self
-        //                 .expected_token_error(&self.look_ahead, &["[constructor declaration]"]);
-        //         }
-        //         if let Some(ref v) = value {
-        //             if Self::is_generator(&v) {
-        //                 return self.expected_token_error(
-        //                     &self.look_ahead,
-        //                     &["[non-generator function declaration]"],
-        //                 );
-        //             }
-        //         }
-        //         if has_ctor {
-        //             return self.expected_token_error(&self.look_ahead, &[]);
-        //         } else {
-        //             has_ctor = is_ctor;
-        //         }
-        //         kind = PropKind::Ctor;
-        //     }
-        // }
-
-        // let value = if let Some(v) = value {
-        //     v
-        // } else {
-        //     return self.expected_token_error(&self.look_ahead, &[]);
-        // };
-        // self.context.allow_super_call = prev_super_call;
-        // Ok((
-        //     has_ctor,
-        //     Prop {
-        //         key,
-        //         value,
-        //         kind,
-        //         method,
-        //         computed,
-        //         short_hand: false,
-        //         is_static,
-        //     },
-        // ))
     }
 
     fn prop_key_from(&self, item: &Item<&'b str>) -> Res<PropKey<'b>> {
@@ -4787,9 +4649,11 @@ where
                 let prev_await = self.context.allow_await;
                 self.context.allow_await = !is_async;
                 self.add_scope(lexical_names::Scope::FuncTop);
-                if let Some(params) =
-                    self.reinterpret_as_cover_formals_list(current.clone(), start_pos)?
+                if matches!(current, Expr::ArrowParamPlaceHolder(_) | Expr::Ident(_)) 
+                    
                 {
+                    
+                    let params = self.reinterpret_as_cover_formals_list(current.clone(), start_pos)?;
                     let mut simple = true;
                     for arg in &params.params {
                         if self.context.strict && Self::check_arg_strict_mode(&arg.item) {
@@ -4953,7 +4817,7 @@ where
         &mut self,
         expr: Expr<'b>,
         pos: Position,
-    ) -> Res<Option<FormalsList<'b>>> {
+    ) -> Res<FormalsList<'b>> {
         let mut formals_list = if let Expr::Ident(ref ident) = expr {
             if self.context.strict && Self::is_strict_reserved(ident) {
                 return Err(Error::NonStrictFeatureInStrictContext(
@@ -4979,7 +4843,7 @@ where
                 close_paren: inner.close_paren,
             }
         } else {
-            return Ok(None);
+            return Err(self.reinterpret_error("expr", "params"));
         };
         let mut invalid_param = false;
         let param_len = formals_list.params.len();
@@ -5147,7 +5011,7 @@ where
             self.context.allow_strict_directive = false;
         }
         formals_list.params = params2;
-        Ok(Some(formals_list))
+        Ok(formals_list)
     }
 
     fn is_await(arg: &FuncArg) -> bool {
