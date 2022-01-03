@@ -1,6 +1,6 @@
 [package]
 name = "ressa"
-version = "0.7.6"
+version = "0.8.0-alpha.1"
 authors = ["Robert Masen <r@robertmasen.pizza>"]
 repository = "https://github.com/rusty-ecma/RESSA"
 description = "An ECMAscript parser"
@@ -13,7 +13,7 @@ edition = "2018"
 [dependencies]
 backtrace = "0.3"
 ress = "0.11"
-resast = { path = "../resast" }
+resast = "0.5.0-alpha.1"
 log = "0.4"
 walkdir = { version = "2", optional = true }
 indicatif = { version = "0.12", optional = true, features = ["with_rayon"] }
