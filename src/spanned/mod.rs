@@ -4649,11 +4649,9 @@ where
                 let prev_await = self.context.allow_await;
                 self.context.allow_await = !is_async;
                 self.add_scope(lexical_names::Scope::FuncTop);
-                if matches!(current, Expr::ArrowParamPlaceHolder(_) | Expr::Ident(_)) 
-                    
-                {
-                    
-                    let params = self.reinterpret_as_cover_formals_list(current.clone(), start_pos)?;
+                if matches!(current, Expr::ArrowParamPlaceHolder(_) | Expr::Ident(_)) {
+                    let params =
+                        self.reinterpret_as_cover_formals_list(current.clone(), start_pos)?;
                     let mut simple = true;
                     for arg in &params.params {
                         if self.context.strict && Self::check_arg_strict_mode(&arg.item) {
