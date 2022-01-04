@@ -1185,6 +1185,55 @@ fn loop_yield() {
     );
 }
 
+#[test]
+fn obj_expr_stmt() {
+    use resast::spanned::{
+        expr::{Expr, ObjExpr, WrappedExpr},
+        stmt::Stmt,
+        Program, ProgramPart, Slice, SourceLocation,
+    };
+    use ressa::spanned::Parser;
+    env_logger::try_init().ok();
+    let mut p = Parser::builder().js("({});").build().unwrap();
+    let tokens = p.parse().unwrap();
+    let open_brace = Slice {
+        source: "{".into(),
+        loc: SourceLocation::new(1, 2, 1, 3),
+    };
+    let close_brace = Slice {
+        source: "}".into(),
+        loc: SourceLocation::new(1, 3, 1, 4),
+    };
+    let obj = ObjExpr {
+        open_brace,
+        close_brace,
+        props: vec![],
+    };
+    let expr = Expr::Obj(obj);
+    let wrapped = WrappedExpr {
+        open_paren: Slice {
+            source: "(".into(),
+            loc: SourceLocation::new(1, 1, 1, 2),
+        },
+        expr,
+        close_paren: Slice {
+            source: ")".into(),
+            loc: SourceLocation::new(1, 4, 1, 5),
+        },
+    };
+    let expr = Expr::Wrapped(Box::new(wrapped));
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Stmt(Stmt::Expr {
+            expr,
+            semi_colon: Some(Slice {
+                source: ";".into(),
+                loc: SourceLocation::new(1, 5, 1, 6)
+            })
+        })]),
+        tokens
+    );
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
