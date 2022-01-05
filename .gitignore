@@ -20,3 +20,4 @@ moz-central
 !tests/test262/hilight.js
 test262_full
 *.zip
+bench.sh

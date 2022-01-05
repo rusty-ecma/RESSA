@@ -576,10 +576,13 @@ where
         let open_brace = self.expect_punct(Punct::OpenBrace)?;
         let mut ret = Vec::new();
         while !self.at_punct(Punct::CloseBrace) {
-            ret.push(self.parse_import_specifier()?);
-            if !self.at_punct(Punct::CloseBrace) {
-                self.expect_punct(Punct::Comma)?;
-            }
+            let spec = self.parse_import_specifier()?;
+            let comma = if !self.at_punct(Punct::CloseBrace) {
+                Some(self.expect_punct(Punct::Comma)?)
+            } else {
+                None
+            };
+            ret.push(ListEntry { item: spec, comma });
         }
         let close_brace = self.expect_punct(Punct::CloseBrace)?;
 
@@ -4703,9 +4706,9 @@ where
                         let afe = ArrowFuncExpr {
                             keyword: keyword.clone(),
                             star: None,
-                            open_paren: None,
+                            open_paren: params.open_paren,
                             params: params.params,
-                            close_paren: None,
+                            close_paren: params.close_paren,
                             arrow,
                             body: ArrowFuncBody::FuncBody(body),
                         };
@@ -6456,6 +6459,7 @@ where
             .scanner
             .str_for(&item.span)
             .ok_or(Error::UnexpectedEoF)?;
+        println!("{:?}", source);
         // regex will be on 1 line if `validate` is successful
         let line = item.location.start.line;
         let open_slash = Slice {
