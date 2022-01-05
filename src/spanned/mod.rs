@@ -68,16 +68,17 @@ use resast::spanned::{
         AwaitExpr, BinaryExpr, CallExpr, ConditionalExpr, Expr, Lit, LogicalExpr, MemberExpr,
         MemberIndexer, MetaProp, NewExpr, ObjExpr, ObjProp, Prop, PropCtor, PropGet, PropInit,
         PropInitKey, PropKey, PropMethod, PropSet, PropValue, SpreadExpr, StringLit,
-        TaggedTemplateExpr, TemplateElement, TemplateLit, UnaryExpr, UpdateExpr, YieldExpr,
+        TaggedTemplateExpr, TemplateElement, TemplateLit, UnaryExpr, UpdateExpr, WrappedExpr,
+        YieldExpr,
     },
     pat::{ArrayPat, ArrayPatPart, AssignPat, ObjPat, ObjPatPart, Pat, RestPat},
     stmt::{
-        BlockStmt, CatchArg, CatchClause, DoWhileStmt, FinallyClause, ForInStmt, ForOfStmt,
-        ForStmt, IfStmt, LabeledStmt, LoopInit, LoopLeft, Stmt, SwitchCase, SwitchStmt, TryStmt,
-        WhileStmt, WithStmt,
+        BlockStmt, CatchArg, CatchClause, DoWhileStmt, ElseStmt, FinallyClause, ForInStmt,
+        ForOfStmt, ForStmt, IfStmt, LabeledStmt, LoopInit, LoopLeft, Stmt, SwitchCase, SwitchStmt,
+        TryStmt, WhileStmt, WithStmt,
     },
     AssignOp, BinaryOp, Class, ClassBody, Dir, Func, FuncArg, FuncBody, Ident, ListEntry,
-    LogicalOp, Node, Program, ProgramPart, Slice, UnaryOp, UpdateOp, VarKind, SuperClass,
+    LogicalOp, Node, Program, ProgramPart, Slice, SuperClass, UnaryOp, UpdateOp, VarKind,
 };
 use ress::prelude::*;
 use ress::Span;
@@ -575,10 +576,13 @@ where
         let open_brace = self.expect_punct(Punct::OpenBrace)?;
         let mut ret = Vec::new();
         while !self.at_punct(Punct::CloseBrace) {
-            ret.push(self.parse_import_specifier()?);
-            if !self.at_punct(Punct::CloseBrace) {
-                self.expect_punct(Punct::Comma)?;
-            }
+            let spec = self.parse_import_specifier()?;
+            let comma = if !self.at_punct(Punct::CloseBrace) {
+                Some(self.expect_punct(Punct::Comma)?)
+            } else {
+                None
+            };
+            ret.push(ListEntry { item: spec, comma });
         }
         let close_brace = self.expect_punct(Punct::CloseBrace)?;
 
@@ -1466,14 +1470,15 @@ where
             ));
         }
         let alternate = if self.at_keyword(Keyword::Else(())) {
-            let _ = self.next_item()?;
-            let e = self.parse_if_clause()?;
-            if Self::is_labeled_func(&e) {
+            let keyword = self.expect_keyword(Keyword::Else(()))?;
+            let body = self.parse_if_clause()?;
+            if Self::is_labeled_func(&body) {
                 return Err(Error::InvalidFuncPosition(
                     body_start,
                     "Else body cannot be a labelled function".to_string(),
                 ));
             }
+            let e = ElseStmt { keyword, body };
             Some(Box::new(e))
         } else {
             None
@@ -1976,9 +1981,11 @@ where
         let open_paren = self.expect_punct(Punct::OpenParen)?;
         let test = self.parse_expression()?;
         let close_paren = self.expect_punct(Punct::CloseParen)?;
-        if self.look_ahead.token.matches_punct(Punct::SemiColon) {
-            self.expect_punct(Punct::SemiColon)?;
-        }
+        let semi_colon = if self.look_ahead.token.matches_punct(Punct::SemiColon) {
+            Some(self.expect_punct(Punct::SemiColon)?)
+        } else {
+            None
+        };
         Ok(DoWhileStmt {
             keyword_do,
             body: Box::new(body),
@@ -1986,6 +1993,7 @@ where
             open_paren,
             test,
             close_paren,
+            semi_colon,
         })
     }
 
@@ -2676,8 +2684,7 @@ where
         let mut super_class = if self.at_keyword(Keyword::Extends(())) {
             let keyword_extends = self.expect_keyword(Keyword::Extends(()))?;
 
-            let expr =
-                self.isolate_cover_grammar(Self::parse_left_hand_side_expr_allow_call)?;
+            let expr = self.isolate_cover_grammar(Self::parse_left_hand_side_expr_allow_call)?;
             Some(SuperClass {
                 keyword_extends,
                 expr,
@@ -2702,8 +2709,7 @@ where
         };
         if super_class.is_none() && self.at_keyword(Keyword::Extends(())) {
             let keyword_extends = self.expect_keyword(Keyword::Extends(()))?;
-            let expr =
-                self.isolate_cover_grammar(Self::parse_left_hand_side_expr_allow_call)?;
+            let expr = self.isolate_cover_grammar(Self::parse_left_hand_side_expr_allow_call)?;
             super_class = Some(SuperClass {
                 keyword_extends,
                 expr,
@@ -3760,7 +3766,12 @@ where
                         ));
                     }
                 }
-                Ok(ex)
+                let wrapped = WrappedExpr {
+                    open_paren,
+                    expr: ex,
+                    close_paren,
+                };
+                Ok(Expr::Wrapped(Box::new(wrapped)))
             }
         }
     }
@@ -4695,9 +4706,9 @@ where
                         let afe = ArrowFuncExpr {
                             keyword: keyword.clone(),
                             star: None,
-                            open_paren: None,
+                            open_paren: params.open_paren,
                             params: params.params,
-                            close_paren: None,
+                            close_paren: params.close_paren,
                             arrow,
                             body: ArrowFuncBody::FuncBody(body),
                         };
@@ -5982,6 +5993,7 @@ where
             self.context.set_is_assignment_target(false);
             self.context.set_is_binding_element(false);
             let new = NewExpr {
+                keyword,
                 callee: Box::new(callee),
                 open_paren,
                 arguments,
@@ -6427,19 +6439,11 @@ where
                 column: item.location.start.column + 1,
             }
         };
-        let end = if contents.ends_with(NEW_LINES) {
-            let line = item.location.end.line - 1;
-            // unwrapping here is safe because we know there is at least 1 new line
-            let column = contents.lines().rev().next().unwrap().len();
-            Position { line, column }
-        } else {
-            Position {
-                line: item.location.end.line,
-                column: item.location.end.column - 1,
-            }
-        };
         let content = Slice {
-            loc: SourceLocation { start, end },
+            loc: SourceLocation {
+                start,
+                end: close.loc.start,
+            },
             source: Cow::Borrowed(contents),
         };
         Ok(StringLit {
@@ -6455,6 +6459,7 @@ where
             .scanner
             .str_for(&item.span)
             .ok_or(Error::UnexpectedEoF)?;
+        println!("{:?}", source);
         // regex will be on 1 line if `validate` is successful
         let line = item.location.start.line;
         let open_slash = Slice {
