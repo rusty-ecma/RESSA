@@ -4032,7 +4032,7 @@ where
             } else {
                 return self.expected_token_error(&start, &["object property key"]);
             };
-        log::debug!("prop: {:?}", prop);
+        log::trace!("prop: {:?}", prop);
         Ok((is_proto, prop))
     }
 
@@ -5721,12 +5721,12 @@ where
     fn parse_super(&mut self) -> Res<Expr<'b>> {
         let super_position = self.look_ahead_position;
         if !self.context.allow_super {
-            log::debug!("super when not allowed");
+            log::trace!("super when not allowed");
             return Err(Error::InvalidSuper(super_position));
         }
         let keyword = self.expect_keyword(Keyword::Super(()))?;
         if self.at_punct(Punct::OpenParen) && !self.context.allow_super_call {
-            log::debug!("super call when not allowed");
+            log::trace!("super call when not allowed");
             return Err(Error::InvalidSuper(super_position));
         }
         if !self.at_punct(Punct::OpenBracket)
@@ -6459,7 +6459,6 @@ where
             .scanner
             .str_for(&item.span)
             .ok_or(Error::UnexpectedEoF)?;
-        println!("{:?}", source);
         // regex will be on 1 line if `validate` is successful
         let line = item.location.start.line;
         let open_slash = Slice {
