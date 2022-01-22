@@ -2614,7 +2614,7 @@ where
         self.context.lexical_names.new_child(scope);
     }
     fn declare_pat(&mut self, pat: &Pat<'b>, kind: DeclKind, pos: Position) -> Res<()> {
-        info!(
+        trace!(
             "{} declare_pat {:?} {:?}",
             self.look_ahead.span.start, pat, pos
         );
