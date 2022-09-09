@@ -1234,6 +1234,25 @@ fn obj_expr_stmt() {
     );
 }
 
+#[test]
+#[ignore = "Diagnostic to see how badly our recursive decent is performing"]
+fn blow_the_stack() {
+    fn do_it(ct: usize) {
+        println!("do_it {}", ct);
+        let mut js = String::from("function x() {");
+        for _i in 1..ct {
+            js.push_str("return function() {");
+        }
+        for _i in 0..ct {
+            js.push('}');
+        }
+        run_test(&js, false).unwrap();
+    }
+    for i in 1..100 {
+        do_it(i)
+    }
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let _ = env_logger::try_init();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
