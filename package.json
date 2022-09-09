@@ -1,8 +1,8 @@
 {
   "devDependencies": {
     "acorn": "^8.7.0",
-    "angular": "^1.5.6",
-    "dexie": "^2.0.4",
+    "angular": "^1.6.10",
+    "dexie": "^3.2.2",
     "esprima": "^4.0.1",
     "everything.js": "^1.0.3",
     "jquery": "^3.3.1",
@@ -10,6 +10,5 @@
     "react": "^16.4.2",
     "react-dom": "^16.4.2",
     "vue": "^2.5.17"
-  },
-  "dependencies": {}
+  }
 }
