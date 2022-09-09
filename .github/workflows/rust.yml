@@ -22,7 +22,7 @@ jobs:
     # - name: clone Test262
     #   run: git clone https://github.com/tc39/test262 ./test262_full && mv ./test262_full/test ./test262
     - name: Run tests
-      run: cargo test --features=moz_central
+      run: cargo test --release --features=moz_central
       env:
         RUST_MIN_STACK: 9999999
     - name: rust-tarpaulin
