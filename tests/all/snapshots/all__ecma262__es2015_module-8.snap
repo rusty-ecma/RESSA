@@ -1,0 +1,31 @@
+---
+source: tests/all/ecma262.rs
+expression: res
+---
+[
+    Decl(
+        Export(
+            Default(
+                Expr(
+                    Assign(
+                        AssignExpr {
+                            operator: Equal,
+                            left: Expr(
+                                Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                            ),
+                            right: Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        },
+                    ),
+                ),
+            ),
+        ),
+    ),
+]

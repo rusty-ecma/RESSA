@@ -1,0 +1,28 @@
+---
+source: tests/all/ecma262.rs
+expression: res
+---
+[
+    Decl(
+        Export(
+            Default(
+                Expr(
+                    Sequence(
+                        [
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                            Lit(
+                                Number(
+                                    "1",
+                                ),
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+        ),
+    ),
+]
