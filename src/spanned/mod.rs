@@ -99,6 +99,43 @@ use std::{
     mem::replace,
 };
 
+macro_rules! inherit_cover_grammar {
+    ($parser:ident, $meth:ident) => {
+        {
+            let is_binding = $parser.context.set_is_binding_element(true);
+            let is_assign = $parser.context.set_is_assignment_target(true);
+            let prev_first = $parser.context.first_covert_initialized_name_error.take();
+            let ret = $parser.$meth();
+            $parser.context
+                .set_is_binding_element($parser.context.is_binding_element && is_binding);
+            $parser.context
+                .set_is_assignment_target($parser.context.is_assignment_target && is_assign);
+            if prev_first.is_some() {
+                $parser.context.first_covert_initialized_name_error = prev_first;
+            }
+            ret
+        }
+    };
+}
+
+macro_rules! isolate_cover_grammar {
+    ($parser:ident, $meth:ident) => {
+        {
+            let is_binding = $parser.context.set_is_binding_element(true);
+            let is_assign = $parser.context.set_is_assignment_target(true);
+            let first_covert = $parser.context.first_covert_initialized_name_error.take();
+            let ret = $parser.$meth();
+            if let Some(_name_err) = &$parser.context.first_covert_initialized_name_error {
+                //TODO: throwUnexpectedToken
+            }
+            $parser.context.set_is_binding_element(is_binding);
+            $parser.context.set_is_assignment_target(is_assign);
+            $parser.context.first_covert_initialized_name_error = first_covert;
+            ret
+        }
+    };
+}
+
 /// This is used to create a `Parser` using
 /// the builder method
 #[derive(Default)]
@@ -314,6 +351,7 @@ where
     ///     //assert_eq!(program, expectation);
     /// }
     /// ```
+    #[tracing::instrument(level = "trace", skip(self))]
     pub fn parse(&mut self) -> Res<Program> {
         debug!(
             "{}: parse_script {:?}",
@@ -329,7 +367,9 @@ where
             Program::Script(body?)
         })
     }
+
     /// Parse all of the directives into a single prologue
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_directive_prologues(&mut self) -> Res<Vec<ProgramPart<'b>>> {
         debug!(
             "{}: parse_directive_prologues {:?}",
@@ -344,7 +384,9 @@ where
         }
         Ok(ret)
     }
+
     /// Parse a single directive
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_directive(&mut self) -> Res<ProgramPart<'b>> {
         debug!(
             "{}: parse_directive {:?}",
@@ -392,15 +434,18 @@ where
             Ok(ProgramPart::Stmt(Stmt::Expr { expr, semi_colon }))
         }
     }
+
     /// This is where we will begin our recursive decent. First
     /// we check to see if we are at at token that is a known
     /// statement or declaration (import/export/function/const/let/class)
     /// otherwise we move on to `Parser::parse_statement`
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_statement_list_item(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<ProgramPart<'b>> {
         debug!("{}: parse_statement_list_item", self.look_ahead.span.start);
         self.context.set_is_assignment_target(true);
         self.context.set_is_binding_element(true);
         let tok = self.look_ahead.token.clone();
+        tracing::debug!("look_ahead.token: {:?}", tok);
         match &tok {
             Token::Keyword(ref k) => match k {
                 Keyword::Import(_) => {
@@ -491,6 +536,7 @@ where
     /// import Thing, * as Stuff from 'place';
     /// import 'place';
     /// ```
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_import_decl(&mut self) -> Res<(ModImport<'b>, Option<Slice<'b>>)> {
         if let Some(scope) = self.context.lexical_names.last_scope() {
             if !scope.is_top() {
@@ -572,6 +618,7 @@ where
     /// ```js
     /// import {Thing} from 'place';
     /// ```
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_named_imports(&mut self) -> Res<NormalImportSpecs<'b>> {
         let open_brace = self.expect_punct(Punct::OpenBrace)?;
         let mut ret = Vec::new();
@@ -593,6 +640,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_import_specifier(&mut self) -> Res<NormalImportSpec<'b>> {
         let start = self.look_ahead_position;
         let imported = self.parse_ident_name()?;
@@ -626,6 +674,7 @@ where
         Ok(NormalImportSpec { imported, alias })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_import_namespace_specifier(&mut self) -> Res<NamespaceImportSpec<'b>> {
         let star = self.expect_punct(Punct::Asterisk)?;
         if !self.at_contextual_keyword("as") {
@@ -647,6 +696,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_import_default_specifier(&mut self) -> Res<DefaultImportSpec<'b>> {
         let start = self.look_ahead_position;
         let id = self.parse_ident_name()?;
@@ -656,6 +706,7 @@ where
         Ok(DefaultImportSpec { id })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_export_decl(&mut self) -> Res<(ModExport<'b>, Option<Slice<'b>>)> {
         debug!("{} parse_export_decl", self.look_ahead_position);
         let mut semi = None;
@@ -797,6 +848,7 @@ where
         Ok((ret, semi))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_default_export(&mut self) -> Res<ModExportSpecifier<'b>> {
         let keyword_default = self.next_item()?;
         if let Token::Keyword(k) = &keyword_default.token {
@@ -837,6 +889,7 @@ where
         Ok(ModExportSpecifier::Default { keyword, value })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_all_export(&mut self) -> Res<ModExportSpecifier<'b>> {
         let star = self.expect_punct(Punct::Asterisk)?;
         let keyword = self.expect_contextual_keyword("from")?;
@@ -848,6 +901,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_export_decl_func(&mut self) -> Res<Decl<'b>> {
         let start = self.look_ahead_position;
         let func = self.parse_function_decl(true)?;
@@ -859,6 +913,7 @@ where
         Ok(Decl::Func(func))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_export_decl_class(&mut self) -> Res<Decl<'b>> {
         let start = self.look_ahead_position;
         let class = self.parse_class_decl(true, true)?;
@@ -870,6 +925,7 @@ where
         Ok(Decl::Class(class))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_async_export(&mut self) -> Res<DefaultExportDeclValue<'b>> {
         let exp = if self.at_async_function() {
             let _start = self.look_ahead_position;
@@ -885,6 +941,7 @@ where
         Ok(exp)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_export_specifier(&mut self) -> Res<ExportSpecifier<'b>> {
         let local = self.parse_ident_name()?;
         let alias = if self.at_contextual_keyword("as") {
@@ -900,6 +957,7 @@ where
         Ok(ExportSpecifier { local, alias })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_module_specifier(&mut self) -> Res<Lit<'b>> {
         let item = self.next_item()?;
         match &item.token {
@@ -910,7 +968,7 @@ where
             _ => self.expected_token_error(&item, &["[string]"]),
         }
     }
-
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_statement(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_statement {:?}",
@@ -1052,6 +1110,7 @@ where
         Ok(stmt)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_with_stmt(&mut self) -> Res<WithStmt<'b>> {
         debug!(
             "{}: parse_with_stmt {:?}",
@@ -1098,6 +1157,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_while_stmt(&mut self) -> Res<WhileStmt<'b>> {
         debug!(
             "{}: parse_while_stmt {:?}",
@@ -1134,6 +1194,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_var_stmt(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_var_stmt {:?}",
@@ -1152,6 +1213,7 @@ where
         Ok(stmt)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_var_decl_list(&mut self, in_for: bool) -> Res<Vec<ListEntry<'b, VarDecl<'b>>>> {
         debug!(
             "{} parse_var_decl_list {:?}",
@@ -1183,6 +1245,7 @@ where
         Ok(ret)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_var_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
         debug!(
             "{} parse_variable_decl_list in_for: {}",
@@ -1203,7 +1266,7 @@ where
         }
         let (init, eq) = if self.at_punct(Punct::Equal) {
             let eq = self.next_item()?;
-            let init = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+            let init = isolate_cover_grammar!(self, parse_assignment_expr)?;
             (Some(init), self.slice_from(&eq))
         } else if !Self::is_pat_ident(&patt) && !in_for {
             return self.expected_token_error(&self.look_ahead, &["="]);
@@ -1213,6 +1276,7 @@ where
         Ok(VarDecl { id: patt, eq, init })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_try_stmt(&mut self) -> Res<TryStmt<'b>> {
         debug!(
             "{}: parse_try_stmt {:?}",
@@ -1257,6 +1321,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_catch_clause(&mut self) -> Res<CatchClause<'b>> {
         debug!(
             "{}: parse_catch_clause {:?}",
@@ -1323,6 +1388,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_finally_clause(&mut self) -> Res<FinallyClause<'b>> {
         debug!(
             "{}: parse_finally_clause {:?}",
@@ -1333,6 +1399,7 @@ where
         Ok(FinallyClause { keyword, body })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_throw_stmt(&mut self) -> Res<(Slice<'b>, Expr<'b>, Option<Slice<'b>>)> {
         debug!(
             "{}: parse_throw_stmt {:?}",
@@ -1347,6 +1414,7 @@ where
         Ok((keyword, arg, semi_colon))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_switch_stmt(&mut self) -> Res<SwitchStmt<'b>> {
         debug!(
             "{}: parse_switch_stmt {:?}",
@@ -1389,6 +1457,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_switch_case(&mut self) -> Res<SwitchCase<'b>> {
         debug!(
             "{}: parse_switch_case {:?}",
@@ -1421,6 +1490,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_return_stmt(&mut self) -> Res<(Slice<'b>, Option<Expr<'b>>, Option<Slice<'b>>)> {
         debug!(
             "{}: parse_return_stmt {:?}",
@@ -1446,6 +1516,7 @@ where
         Ok((keyword, ret, semi_colon))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_if_stmt(&mut self) -> Res<IfStmt<'b>> {
         debug!(
             "{}: parse_if_stmt {:?}",
@@ -1494,6 +1565,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_if_clause(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_if_clause {:?}",
@@ -1521,6 +1593,7 @@ where
         Ok(decl)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_for_stmt(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_for_stmt {:?}",
@@ -1699,7 +1772,7 @@ where
         } else {
             let prev_in = self.context.allow_in;
             self.context.allow_in = false;
-            let init = self.inherit_cover_grammar(Self::parse_assignment_expr)?;
+            let init = inherit_cover_grammar!(self, parse_assignment_expr)?;
             self.context.allow_in = prev_in;
             if self.at_keyword(Keyword::In(())) {
                 let keyword_in = self.expect_keyword(Keyword::In(()))?;
@@ -1770,7 +1843,7 @@ where
                         if let Some(last) = seq.last_mut() {
                             last.comma = Some(comma);
                         }
-                        let el = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+                        let el = isolate_cover_grammar!(self, parse_assignment_expr)?;
                         seq.push(ListEntry::no_comma(el));
                     }
                     LoopInit::Expr(Expr::Sequence(seq))
@@ -1951,6 +2024,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_loop_body(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_loop_body {:?}",
@@ -1963,6 +2037,7 @@ where
         Ok(ret)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_do_while_stmt(&mut self) -> Res<DoWhileStmt<'b>> {
         debug!(
             "{}: parse_do_while_stmt {:?}",
@@ -1997,6 +2072,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_break_stmt(&mut self) -> Res<(Slice<'b>, Option<Ident<'b>>, Option<Slice<'b>>)> {
         debug!(
             "{}: parse_break_stmt {:?}",
@@ -2005,6 +2081,7 @@ where
         self.parse_optionally_labeled_statement(Keyword::Break(()))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_continue_stmt(&mut self) -> Res<(Slice<'b>, Option<Ident<'b>>, Option<Slice<'b>>)> {
         debug!(
             "{}: parse_continue_stmt {:?}",
@@ -2054,6 +2131,7 @@ where
         Ok((keyword, label, semi_colon))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_debugger_stmt(&mut self) -> Res<Stmt<'b>> {
         debug!(
             "{}: parse_debugger_stmt {:?}",
@@ -2067,6 +2145,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_labelled_statement(&mut self) -> Res<Stmt<'b>> {
         debug!("parse_labelled_statement, {:?}", self.look_ahead.token);
         let start = self.look_ahead.span;
@@ -2142,6 +2221,7 @@ where
         Ok(Stmt::Expr { expr, semi_colon })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_expression_statement(&mut self) -> Res<(Expr<'b>, Option<Slice<'b>>)> {
         debug!(
             "{}: parse_expression_statement {:?}",
@@ -2153,6 +2233,7 @@ where
         Ok((ret, semi))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn expr_stmt_guard(&mut self) -> Res<()> {
         let start = self.look_ahead_position;
         match &self.look_ahead.token {
@@ -2194,12 +2275,13 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_expression {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        let ret = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+        let ret = isolate_cover_grammar!(self, parse_assignment_expr)?;
         if self.at_punct(Punct::Comma) {
             let mut list = vec![ListEntry::no_comma(ret)];
             while !self.look_ahead.token.is_eof() {
@@ -2210,7 +2292,7 @@ where
                 if let Some(last) = list.last_mut() {
                     last.comma = Some(comma);
                 }
-                let expr = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+                let expr = isolate_cover_grammar!(self, parse_assignment_expr)?;
                 list.push(ListEntry::no_comma(expr));
             }
             return Ok(Expr::Sequence(list));
@@ -2353,7 +2435,7 @@ where
             if !self.at_keyword(Keyword::In(())) && !self.at_contextual_keyword("of") {
                 if self.at_punct(Punct::Equal) {
                     let eq = self.expect_punct(Punct::Equal)?;
-                    let init = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+                    let init = isolate_cover_grammar!(self, parse_assignment_expr)?;
                     (Some(init), Some(eq))
                 } else {
                     return self.expected_token_error(&self.look_ahead, &["="]);
@@ -2363,7 +2445,7 @@ where
             }
         } else if !in_for && !Self::is_pat_ident(&id) || self.at_punct(Punct::Equal) {
             let eq = self.expect_punct(Punct::Equal)?;
-            let init = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+            let init = isolate_cover_grammar!(self, parse_assignment_expr)?;
             (Some(init), Some(eq))
         } else {
             (None, None)
@@ -2605,6 +2687,7 @@ where
 
         Ok(f)
     }
+    #[tracing::instrument(level = "trace", skip(self))]
     fn remove_scope(&mut self) {
         trace!("{} remove_scope", self.look_ahead.span.start);
         self.context.lexical_names.remove_child();
@@ -2621,6 +2704,7 @@ where
         self.context.lexical_names.declare_pat(pat, kind, pos)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_func_params(&mut self) -> Res<FormalParams<'b>> {
         let start = self.look_ahead_position;
         let formal_params = self.parse_formal_params()?;
@@ -2638,6 +2722,7 @@ where
         Ok(formal_params)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_function_source_el(&mut self) -> Res<FuncBody<'b>> {
         debug!(
             "{}: parse_function_source_el {:?}",
@@ -2684,7 +2769,7 @@ where
         let mut super_class = if self.at_keyword(Keyword::Extends(())) {
             let keyword_extends = self.expect_keyword(Keyword::Extends(()))?;
 
-            let expr = self.isolate_cover_grammar(Self::parse_left_hand_side_expr_allow_call)?;
+            let expr = isolate_cover_grammar!(self, parse_left_hand_side_expr_allow_call)?;
             Some(SuperClass {
                 keyword_extends,
                 expr,
@@ -2709,7 +2794,7 @@ where
         };
         if super_class.is_none() && self.at_keyword(Keyword::Extends(())) {
             let keyword_extends = self.expect_keyword(Keyword::Extends(()))?;
-            let expr = self.isolate_cover_grammar(Self::parse_left_hand_side_expr_allow_call)?;
+            let expr = isolate_cover_grammar!(self, parse_left_hand_side_expr_allow_call)?;
             super_class = Some(SuperClass {
                 keyword_extends,
                 expr,
@@ -2737,6 +2822,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_class_body(&mut self) -> Res<ClassBody<'b>> {
         debug!(
             "{}: parse_class_body {:?}",
@@ -2764,6 +2850,7 @@ where
 
     /// Parse a single class element returning a (true, Prop) if that property is a constructor
     /// and (false, Prop) otherwise
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_class_el(&mut self, has_ctor: bool) -> Res<Prop<'b>> {
         debug!(
             "{}: parse_class_el {:?}",
@@ -2858,6 +2945,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn prop_key_from(&self, item: &Item<&'b str>) -> Res<PropKey<'b>> {
         let ret = match &item.token {
             Token::Boolean(_) => PropKey::Pat(Pat::Ident(self.get_slice(&item)?.into())),
@@ -2875,6 +2963,7 @@ where
         Ok(ret)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn method_def(
         &mut self,
         keyword_static: Option<Slice<'b>>,
@@ -2926,6 +3015,7 @@ where
         self.method_def_cont(keyword_static, keyword_async, star, id)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn get_method_def(
         &mut self,
         keyword_static: Option<Slice<'b>>,
@@ -2950,6 +3040,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn set_method_def(
         &mut self,
         keyword_static: Option<Slice<'b>>,
@@ -2986,6 +3077,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn method_def_cont(
         &mut self,
         keyword_static: Option<Slice<'b>>,
@@ -3036,6 +3128,7 @@ where
         Ok(Prop::Method(meth))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_class_ctor(&mut self, id: PropInitKey<'b>) -> Res<Prop<'b>> {
         debug!(
             "{}: parse_class_ctor {:?}",
@@ -3078,6 +3171,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_async_property_method(
         &mut self,
         keyword_async: Slice<'b>,
@@ -3115,6 +3209,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_property_method(&mut self, id: PropInitKey<'b>) -> Res<PropMethod<'b>> {
         debug!(
             "{}: parse_property_method {:?}",
@@ -3148,6 +3243,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_getter_method(
         &mut self,
         key: PropInitKey<'b>,
@@ -3185,6 +3281,7 @@ where
         }))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<FuncBody<'b>> {
         debug!(
             "{}: parse_method_body {:?}",
@@ -3197,7 +3294,7 @@ where
         let prev_allow_strict = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
         let start = self.look_ahead.clone();
-        let body = self.isolate_cover_grammar(Self::parse_function_source_el)?;
+        let body = isolate_cover_grammar!(self, parse_function_source_el)?;
         if self.context.strict && found_restricted && !self.config.tolerant {
             self.unexpected_token_error(&start, "restricted ident")?;
         }
@@ -3207,6 +3304,7 @@ where
         Ok(body)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_setter_method(
         &mut self,
         keyword_static: Option<Slice<'b>>,
@@ -3259,6 +3357,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_property_method_body(
         &mut self,
         simple: bool,
@@ -3275,7 +3374,7 @@ where
         let prev_allow = self.context.allow_strict_directive;
         self.context.allow_strict_directive = simple;
         let start_pos = self.look_ahead_position;
-        let ret = self.isolate_cover_grammar(Self::parse_function_source_el)?;
+        let ret = isolate_cover_grammar!(self, parse_function_source_el)?;
         if self.context.strict && found_restricted {
             self.tolerate_error(Error::NonStrictFeatureInStrictContext(
                 start_pos,
@@ -3297,6 +3396,7 @@ where
             || tok.matches_punct(Punct::OpenBracket)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_object_property_key(&mut self) -> Res<PropInitKey<'b>> {
         debug!(
             "{}: parse_object_property_key {:?}",
@@ -3352,7 +3452,7 @@ where
             };
             Ok(init)
         } else if item.token.matches_punct(Punct::OpenBracket) {
-            let key = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+            let key = isolate_cover_grammar!(self, parse_assignment_expr)?;
             let id = if Self::is_valid_property_key_lit(&key) {
                 match key {
                     Expr::Lit(lit) => PropKey::Lit(lit),
@@ -3426,6 +3526,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_primary_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_primary_expression {:?}",
@@ -3574,6 +3675,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_group_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_group_expr {:?}",
@@ -3613,7 +3715,7 @@ where
                 Ok(Expr::ArrowParamPlaceHolder(inner))
             } else {
                 self.context.set_is_binding_element(true);
-                let mut ex = self.inherit_cover_grammar(Self::parse_assignment_expr)?;
+                let mut ex = inherit_cover_grammar!(self, parse_assignment_expr)?;
                 if self.at_punct(Punct::Comma) {
                     let mut exprs = vec![ListEntry {
                         item: ex,
@@ -3677,7 +3779,7 @@ where
                             };
                             return Ok(Expr::ArrowParamPlaceHolder(inner));
                         } else {
-                            let el = self.inherit_cover_grammar(Self::parse_assignment_expr)?;
+                            let el = inherit_cover_grammar!(self, parse_assignment_expr)?;
                             exprs.push(ListEntry {
                                 item: el,
                                 comma: None,
@@ -3776,6 +3878,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn convert_expr_to_func_arg_strict(&self, expr: Expr<'b>) -> Res<FuncArg<'b>> {
         if !self.context.strict {
             return Ok(FuncArg::Expr(expr));
@@ -3794,6 +3897,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_array_init(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_array_init {:?}",
@@ -3823,7 +3927,7 @@ where
                     comma,
                 })
             } else {
-                let el = self.inherit_cover_grammar(Self::parse_assignment_expr)?;
+                let el = inherit_cover_grammar!(self, parse_assignment_expr)?;
 
                 let comma = if !self.at_punct(Punct::CloseBracket) {
                     Some(self.expect_punct(Punct::Comma)?)
@@ -3844,6 +3948,8 @@ where
             close_bracket,
         }))
     }
+
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_obj_init(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_obj_init {:?}",
@@ -3890,6 +3996,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_obj_prop(&mut self) -> Res<(bool, ObjProp<'b>)> {
         debug!(
             "{}: parse_obj_prop {:?}",
@@ -3972,7 +4079,7 @@ where
                         is_proto = true;
                     }
                     let colon = self.expect_punct(Punct::Colon)?;
-                    let value = self.inherit_cover_grammar(Self::parse_assignment_expr)?;
+                    let value = inherit_cover_grammar!(self, parse_assignment_expr)?;
                     let value = PropValue::Expr(value);
                     let prop = PropInit {
                         key,
@@ -3998,7 +4105,7 @@ where
                         self.context.first_covert_initialized_name_error =
                             Some(self.look_ahead.clone());
                         let operator = AssignOp::Equal(self.expect_punct(Punct::Equal)?);
-                        let inner = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+                        let inner = isolate_cover_grammar!(self, parse_assignment_expr)?;
                         let value = if let Token::Ident(_) = &start.token {
                             let slice = self.get_slice(&start)?;
                             let p = AssignPat {
@@ -4061,6 +4168,7 @@ where
             }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_template_lit(&mut self, is_tagged: bool) -> Res<TemplateLit<'b>> {
         debug!(
             "{}: parse_template_Lit {:?}",
@@ -4087,6 +4195,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_template_element(&mut self, is_tagged: bool) -> Res<TemplateElement<'b>> {
         debug!(
             "{}: parse_template_element {:?}",
@@ -4137,6 +4246,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_function_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_function_expr {:?}",
@@ -4242,6 +4352,7 @@ where
         Ok(Expr::Func(func))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_fn_name(&mut self, is_gen: bool) -> Res<resast::spanned::Ident<'b>> {
         debug!(
             "{}: parse_fn_name {:?}",
@@ -4254,6 +4365,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_ident_name(&mut self) -> Res<resast::spanned::Ident<'b>> {
         debug!(
             "{}: parse_ident_name {:?}",
@@ -4269,6 +4381,7 @@ where
         Ok(slice.into())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_var_ident(&mut self, is_var: bool) -> Res<resast::spanned::Ident<'b>> {
         debug!(
             "{}: parse_var_ident {:?}",
@@ -4333,6 +4446,7 @@ where
         Ok(i)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_formal_params(&mut self) -> Res<FormalParams<'b>> {
         debug!(
             "{}: parse_formal_params {:?}",
@@ -4372,6 +4486,7 @@ where
         })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_formal_param(&mut self, simple: bool) -> Res<(bool, bool, FuncArg<'b>)> {
         debug!(
             "{}: parse_formal_param {:?}",
@@ -4392,6 +4507,7 @@ where
         Ok((simple, found_restricted, param))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_rest_element(&mut self, params: &mut Vec<Item<&'b str>>) -> Res<(bool, RestPat<'b>)> {
         debug!(
             "{}: parse_rest_element {:?}",
@@ -4409,6 +4525,7 @@ where
         Ok((restricted, ret))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_binding_rest_el(&mut self, params: &mut Vec<Item<&'b str>>) -> Res<RestPat<'b>> {
         debug!(
             "{}: parse_binding_rest_el {:?}",
@@ -4419,6 +4536,7 @@ where
         Ok(RestPat { dots, pat })
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_pattern_with_default(
         &mut self,
         params: &mut Vec<Item<&'b str>>,
@@ -4432,7 +4550,7 @@ where
             let operator = self.expect_assign_op(Punct::Equal)?;
             let prev_yield = self.context.allow_yield;
             self.context.allow_yield = true;
-            let right = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+            let right = isolate_cover_grammar!(self, parse_assignment_expr)?;
             self.context.allow_yield = prev_yield;
             return Ok((
                 is_restricted,
@@ -4446,6 +4564,7 @@ where
         Ok((is_restricted, ret))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_pattern(
         &mut self,
         is_var: bool,
@@ -4470,6 +4589,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_array_pattern(&mut self, params: &mut Vec<Item<&'b str>>) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_array_pattern {:?}",
@@ -4523,6 +4643,7 @@ where
         Ok((false, Pat::Array(arr)))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_object_pattern(&mut self) -> Res<(bool, Pat<'b>)> {
         debug!(
             "{}: parse_object_pattern {:?}",
@@ -4552,6 +4673,7 @@ where
         Ok((false, Pat::Obj(obj)))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_rest_prop(&mut self) -> Res<ObjPatPart<'b>> {
         debug!(
             "{}: parse_rest_prop {:?}",
@@ -4570,6 +4692,7 @@ where
         Ok(part)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_property_pattern(&mut self) -> Res<ObjPatPart<'b>> {
         debug!(
             "{}: parse_property_pattern {:?}",
@@ -4613,6 +4736,7 @@ where
         Ok(ObjPatPart::Assign(prop))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_assignment_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_assignment_expr {:?}",
@@ -4714,7 +4838,7 @@ where
                         };
                         current = Expr::ArrowFunc(afe);
                     } else {
-                        let a = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+                        let a = isolate_cover_grammar!(self, parse_assignment_expr)?;
                         self.context.allow_await = prev_await;
                         self.remove_scope();
                         current = Expr::ArrowFunc(ArrowFuncExpr {
@@ -4740,6 +4864,8 @@ where
             Ok(current)
         }
     }
+
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_assignment_after_start(&mut self, start: Expr<'b>) -> Res<AssignExpr<'b>> {
         if self.context.strict && Self::is_ident(&start) {
             if let Expr::Ident(ref i) = start {
@@ -4787,7 +4913,7 @@ where
                 );
             }
         };
-        let right = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+        let right = isolate_cover_grammar!(self, parse_assignment_expr)?;
         self.context.first_covert_initialized_name_error = None;
         Ok(AssignExpr {
             operator: op,
@@ -4829,6 +4955,7 @@ where
     /// Returns a pair with first element indicating
     /// that an argument is not simple and the second
     /// being the formalized arguments list
+    #[tracing::instrument(level = "trace", skip(self))]
     fn reinterpret_as_cover_formals_list(
         &mut self,
         expr: Expr<'b>,
@@ -5093,6 +5220,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn reinterpret_expr_as_pat(&self, ex: Expr<'b>) -> Res<Pat<'b>> {
         debug!(
             "{}: reinterpret_expr_as_pat {:?}",
@@ -5171,6 +5299,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn reinterpret_array_pat_part(&self, part: Expr<'b>) -> Res<ArrayPatPart<'b>> {
         debug!(
             "{}: reinterpret_array_pat_part {:?}",
@@ -5207,6 +5336,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn reinterpret_prop(&self, mut p: Prop<'b>) -> Res<Prop<'b>> {
         if let Prop::Init(inner) = &mut p {
             let prop_key = std::mem::replace(&mut inner.key.value, Self::dummy_prop_key());
@@ -5246,6 +5376,7 @@ where
         }))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_yield_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_yield_expr {:?}",
@@ -5274,21 +5405,22 @@ where
         Ok(Expr::Yield(y))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_conditional_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_conditional_expr {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        let expr = self.inherit_cover_grammar(Self::parse_binary_expression)?;
+        let expr = inherit_cover_grammar!(self, parse_binary_expression)?;
         if self.at_punct(Punct::QuestionMark) {
             let question_mark = self.expect_punct(Punct::QuestionMark)?;
             let prev_in = self.context.allow_in;
             self.context.allow_in = true;
-            let if_true = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+            let if_true = isolate_cover_grammar!(self, parse_assignment_expr)?;
             self.context.allow_in = prev_in;
 
             let colon = self.expect_punct(Punct::Colon)?;
-            let if_false = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+            let if_false = isolate_cover_grammar!(self, parse_assignment_expr)?;
 
             let c = ConditionalExpr {
                 test: Box::new(expr),
@@ -5304,12 +5436,13 @@ where
         Ok(expr)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_binary_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_binary_expression {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
-        let mut current = self.inherit_cover_grammar(Self::parse_exponentiation_expression)?;
+        let mut current = inherit_cover_grammar!(self, parse_exponentiation_expression)?;
         let token = self.look_ahead.clone();
         let mut prec = self.bin_precedence(&token.token);
         if prec > 0 {
@@ -5317,7 +5450,7 @@ where
             self.context.set_is_assignment_target(false);
             self.context.set_is_binding_element(false);
             let mut left = current.clone();
-            let mut right = self.isolate_cover_grammar(Self::parse_exponentiation_expression)?;
+            let mut right = isolate_cover_grammar!(self, parse_exponentiation_expression)?;
             let mut stack = vec![left.clone(), right.clone()];
             let mut ops = vec![token];
             let mut precs = vec![prec];
@@ -5362,7 +5495,7 @@ where
                 }
                 ops.push(self.next_item()?);
                 precs.push(prec);
-                let exp = self.isolate_cover_grammar(Self::parse_exponentiation_expression)?;
+                let exp = isolate_cover_grammar!(self, parse_exponentiation_expression)?;
                 stack.push(exp);
             }
             current = stack
@@ -5403,12 +5536,13 @@ where
         Ok(current)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_exponentiation_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_exponentiation_expression",
             self.look_ahead.span.start
         );
-        let expr = self.inherit_cover_grammar(Self::parse_unary_expression)?;
+        let expr = inherit_cover_grammar!(self, parse_unary_expression)?;
         if self.at_punct(Punct::DoubleAsterisk) {
             if let Expr::Unary(_) = expr {
                 return Err(Error::OperationError(
@@ -5422,7 +5556,7 @@ where
             self.context.set_is_assignment_target(false);
             self.context.set_is_binding_element(false);
             let left = expr;
-            let right = self.isolate_cover_grammar(Self::parse_exponentiation_expression)?;
+            let right = isolate_cover_grammar!(self, parse_exponentiation_expression)?;
             return Ok(Expr::Binary(BinaryExpr {
                 operator: BinaryOp::PowerOf(stars),
                 left: Box::new(left),
@@ -5433,6 +5567,7 @@ where
         Ok(expr)
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_unary_expression(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_unary_expression {:?} allow_await: {}",
@@ -5447,7 +5582,7 @@ where
             || self.at_keyword(Keyword::TypeOf(()))
         {
             let op = self.next_item()?;
-            let arg = self.inherit_cover_grammar(Self::parse_unary_expression)?;
+            let arg = inherit_cover_grammar!(self, parse_unary_expression)?;
             if op.token.matches_keyword(Keyword::Delete(()))
                 && self.context.strict
                 && Self::is_ident(&arg)
@@ -5473,6 +5608,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn unary_operator(&self, item: Item<&str>) -> Option<UnaryOp<'b>> {
         let slice = self.slice_from(&item)?;
         match &item.token {
@@ -5539,6 +5675,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_await_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_await_expr {:?}",
@@ -5554,6 +5691,7 @@ where
         Ok(Expr::Await(Box::new(ret)))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_update_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_update_expr {:?}",
@@ -5572,7 +5710,7 @@ where
                 _ => unreachable!("Already validated that the next token would be ++ or --"),
             };
             let start = self.look_ahead.clone();
-            let ex = self.inherit_cover_grammar(Self::parse_unary_expression)?;
+            let ex = inherit_cover_grammar!(self, parse_unary_expression)?;
             if let Expr::Ident(ref i) = ex {
                 if Self::is_restricted_word(i) && self.context.strict {
                     return self.unexpected_token_error(&start, "restricted ident");
@@ -5590,7 +5728,7 @@ where
             self.context.set_is_binding_element(false);
             Ok(Expr::Update(ret))
         } else {
-            let expr = self.inherit_cover_grammar(Self::parse_left_hand_side_expr_allow_call)?;
+            let expr = inherit_cover_grammar!(self, parse_left_hand_side_expr_allow_call)?;
             if !self.context.has_line_term
                 && self.look_ahead.token.is_punct()
                 && (self.at_punct(Punct::DoublePlus) || self.at_punct(Punct::DoubleDash))
@@ -5654,6 +5792,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_left_hand_side_expr(&mut self) -> Res<Expr<'b>> {
         if !self.context.allow_in {
             return Err(Error::InvalidUseOfContextualKeyword(
@@ -5676,7 +5815,7 @@ where
                 self.context.set_is_binding_element(false);
                 self.context.set_is_assignment_target(true);
                 let open_bracket = self.expect_punct(Punct::OpenBracket)?;
-                let prop = self.isolate_cover_grammar(Self::parse_expression)?;
+                let prop = isolate_cover_grammar!(self, parse_expression)?;
                 let close_bracket = self.expect_punct(Punct::CloseBracket)?;
                 let indexer = MemberIndexer::Computed {
                     open_bracket,
@@ -5718,6 +5857,7 @@ where
     ///
     /// > note: This will handle any invalid super expression
     /// scenarios
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_super(&mut self) -> Res<Expr<'b>> {
         let super_position = self.look_ahead_position;
         if !self.context.allow_super {
@@ -5738,6 +5878,7 @@ where
         Ok(Expr::Super(keyword))
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_left_hand_side_expr_allow_call(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_left_hand_side_expr_allow_call",
@@ -5813,7 +5954,7 @@ where
                 self.context.set_is_assignment_target(true);
                 self.context.set_is_binding_element(false);
                 let open_bracket = self.expect_punct(Punct::OpenBracket)?;
-                let prop = self.isolate_cover_grammar(Self::parse_expression)?;
+                let prop = isolate_cover_grammar!(self, parse_expression)?;
                 let close_bracket = self.expect_punct(Punct::CloseBracket)?;
                 let indexer = MemberIndexer::Computed {
                     open_bracket,
@@ -5841,6 +5982,7 @@ where
         Ok(expr)
     }
     /// Parse the arguments of an async function
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_async_args(&mut self) -> Res<(Slice<'b>, Vec<ListEntry<'b, Expr<'b>>>, Slice<'b>)> {
         debug!(
             "{}: parse_async_args {:?}",
@@ -5857,7 +5999,7 @@ where
                     let expr = Expr::Spread(Box::new(spread));
                     (expr, true)
                 } else {
-                    let arg = self.isolate_cover_grammar(Self::parse_async_arg)?;
+                    let arg = isolate_cover_grammar!(self, parse_async_arg)?;
                     (arg, false)
                 };
                 ret.push(ListEntry::no_comma(arg));
@@ -5887,6 +6029,7 @@ where
     }
     /// Parse an argument of an async function
     /// note: not sure this is needed
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_async_arg(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_async_arg {:?}",
@@ -5899,6 +6042,7 @@ where
     /// Expect a comma separator,
     /// if parsing with tolerance we can tolerate
     /// a non-existent comma
+    #[tracing::instrument(level = "trace", skip(self))]
     fn expect_comma_sep(&mut self) -> Res<Slice<'b>> {
         debug!(
             "{}: expect_comma_sep {:?}",
@@ -5908,17 +6052,19 @@ where
     }
 
     /// Parse an expression preceded by the `...` operator
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_spread_element(&mut self) -> Res<SpreadExpr<'b>> {
         debug!(
             "{}: parse_spread_element {:?}",
             self.look_ahead.span.start, self.look_ahead.token
         );
         let dots = self.expect_punct(Punct::Ellipsis)?;
-        let expr = self.inherit_cover_grammar(Self::parse_assignment_expr)?;
+        let expr = inherit_cover_grammar!(self, parse_assignment_expr)?;
         Ok(SpreadExpr { dots, expr })
     }
 
     /// Parse function arguments, expecting to open with `(` and close with `)`
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_args(&mut self) -> Res<(Slice<'b>, Vec<ListEntry<'b, Expr<'b>>>, Slice<'b>)> {
         debug!(
             "{}: parse_args {:?}",
@@ -5932,7 +6078,7 @@ where
                     let expr = self.parse_spread_element()?;
                     Expr::Spread(Box::new(expr))
                 } else {
-                    let expr = self.isolate_cover_grammar(Self::parse_assignment_expr)?;
+                    let expr = isolate_cover_grammar!(self, parse_assignment_expr)?;
                     expr
                 };
                 args.push(ListEntry::no_comma(expr));
@@ -5954,6 +6100,7 @@ where
     /// This will parse one of two expressions `new Thing()`
     /// or `new.target`. The later is only valid in a function
     /// body
+    #[tracing::instrument(level = "trace", skip(self))]
     fn parse_new_expr(&mut self) -> Res<Expr<'b>> {
         debug!(
             "{}: parse_new_expr {:?}",
@@ -5983,7 +6130,7 @@ where
         } else if self.at_keyword(Keyword::Import(())) {
             self.expected_token_error(&self.look_ahead, &["not import"])
         } else {
-            let callee = self.isolate_cover_grammar(Self::parse_left_hand_side_expr)?;
+            let callee = isolate_cover_grammar!(self, parse_left_hand_side_expr)?;
             let (open_paren, arguments, close_paren) = if self.at_punct(Punct::OpenParen) {
                 let (open, args, close) = self.parse_args()?;
                 (Some(open), args, Some(close))
@@ -6048,6 +6195,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self, f))]
     fn isolate_cover_grammar<T>(&mut self, f: impl Fn(&mut Self) -> Res<T>) -> Res<T> {
         let is_binding = self.context.set_is_binding_element(true);
         let is_assign = self.context.set_is_assignment_target(true);
@@ -6062,6 +6210,7 @@ where
         Ok(ret)
     }
 
+    #[tracing::instrument(level = "trace", skip(self, f))]
     fn inherit_cover_grammar<T>(&mut self, f: impl Fn(&mut Self) -> Res<T>) -> Res<T> {
         let is_binding = self.context.set_is_binding_element(true);
         let is_assign = self.context.set_is_assignment_target(true);
@@ -6080,6 +6229,7 @@ where
     /// Request the next token from the scanner
     /// swap the last look ahead with this new token
     /// and return the last token
+    #[tracing::instrument(level = "trace", skip(self))]
     fn next_item(&mut self) -> Res<Item<&'b str>> {
         trace!("next_item {}", self.context.has_line_term);
         let mut comment_line_term = false;
@@ -6170,6 +6320,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
     fn expect_fat_arrow(&mut self) -> Res<Slice<'b>> {
         if self.look_ahead.token.matches_punct(Punct::EqualGreaterThan) {
             if self.context.has_line_term {
@@ -6209,6 +6360,7 @@ where
             && !self.at_punct(Punct::CloseBrace)
             && !self.look_ahead.is_eof()
     }
+    #[tracing::instrument(level = "trace", skip(self))]
     fn at_import_call(&mut self) -> Res<bool> {
         debug!(
             "{}: at_import_call {:?}",
@@ -6256,6 +6408,7 @@ where
     /// (not including any comments)
     /// must be an identifier, `let`, `yield`
     /// `{`, or `[`
+    #[tracing::instrument(level = "trace", skip(self))]
     fn at_lexical_decl(&mut self) -> bool {
         if let Token::Keyword(Keyword::Let(ref s)) = self.look_ahead.token {
             if s.contains("\\u") {
@@ -6320,6 +6473,7 @@ where
     /// The keyword `async` is conditional, that means to decided
     /// if we are actually at an async function we need to check the
     /// next token would need to be on the same line
+    #[tracing::instrument(level = "trace", skip(self))]
     fn at_async_function(&mut self) -> bool {
         debug!(
             "{}: at_async_function {:?}",
@@ -6344,6 +6498,7 @@ where
     /// check the next token, if it is a semi-colon it will
     /// consume it otherwise we need to either be at a line terminator
     /// EoF or a close brace
+    #[tracing::instrument(level = "trace", skip(self))]
     fn consume_semicolon(&mut self) -> Res<Option<Slice<'b>>> {
         trace!("consume_semicolon {}", self.context.has_line_term);
         if self.at_punct(Punct::SemiColon) {
@@ -6718,6 +6873,7 @@ where
     CH: CommentHandler<'b> + Sized,
 {
     type Item = Res<ProgramPart<'b>>;
+    #[tracing::instrument(level = "trace", skip(self))]
     fn next(&mut self) -> Option<Self::Item> {
         if self.look_ahead.token.is_eof() || self.context.errored {
             None
