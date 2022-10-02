@@ -187,26 +187,18 @@ impl<'a> Default for Context<'a> {
     }
 }
 impl<'a> Context<'a> {
+    #[tracing::instrument(level = "trace", skip(self))]
     pub fn set_allow_super(&mut self, value: bool) {
-        trace!("context.set_allow_super({})", value);
         self.allow_super = value;
     }
+    #[tracing::instrument(level = "trace", skip(self))]
     pub fn set_is_assignment_target(&mut self, value: bool) -> bool {
-        trace!(
-            "context.set_is_assignment_target({}) -> {}",
-            value,
-            self.is_assignment_target
-        );
         let old = self.is_assignment_target;
         self.is_assignment_target = value;
         old
     }
+    #[tracing::instrument(level = "trace", skip(self))]
     pub fn set_is_binding_element(&mut self, value: bool) -> bool {
-        trace!(
-            "context.set_is_binding_element({}) -> {}",
-            value,
-            self.is_binding_element
-        );
         let old = self.is_binding_element;
         self.is_binding_element = value;
         old

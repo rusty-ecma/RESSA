@@ -3,8 +3,6 @@ extern crate env_logger;
 extern crate log;
 extern crate ress;
 extern crate ressa;
-#[macro_use]
-extern crate lazy_static;
 
 mod comment_handler;
 mod ecma262;

@@ -1238,7 +1238,7 @@ fn obj_expr_stmt() {
 #[ignore = "Diagnostic to see how badly our recursive decent is performing"]
 fn blow_the_stack() {
     fn do_it(ct: usize) {
-        println!("do_it {}", ct);
+        eprintln!("do_it {}", ct);
         let mut js = String::from("function x() {");
         for _i in 1..ct {
             js.push_str("return function() {");
@@ -1248,14 +1248,49 @@ fn blow_the_stack() {
         }
         run_test(&js, false).unwrap();
     }
+    for i in 1..7 {
+        do_it(i)
+    }
+}
+#[test]
+#[ignore = "Diagnostic to see how badly our recursive decent is performing"]
+fn blow_the_stack_spanned() {
+    use ressa::spanned::Parser;
+    init_tracing();
+    fn do_it(ct: usize) {
+        eprintln!("do_it {}", ct);
+        let mut js = String::from("function x() {");
+        for _i in 1..ct {
+            js.push_str("return function() {");
+        }
+        for _i in 0..ct {
+            js.push('}');
+        }
+        let mut p = Parser::builder().js(&js).module(false).build().unwrap();
+        p.parse().unwrap();
+        // run_test(&js, false).unwrap();
+    }
     for i in 1..100 {
         do_it(i)
     }
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
-    let _ = env_logger::try_init();
+    init_tracing();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
     p.parse()?;
     Ok(())
+}
+
+fn init_tracing() {
+    // let _ = env_logger::try_init();
+    let _subscriber = tracing_subscriber::fmt()
+        .compact()
+        .without_time()
+        .with_ansi(false)
+        .with_max_level(tracing::Level::TRACE)
+        .with_span_events(
+            tracing_subscriber::fmt::format::FmtSpan::ENTER
+            | tracing_subscriber::fmt::format::FmtSpan::EXIT
+        ).try_init().ok();
 }

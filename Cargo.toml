@@ -21,6 +21,7 @@ rayon = { version = "1", optional = true }
 pulldown-cmark = { version = "0.7", optional = true }
 res-regex = "0.1"
 hash-chain = "0.3"
+tracing = "0.1"
 
 [features]
 default = []
@@ -45,6 +46,7 @@ serde_yaml = "0.9"
 term = "0.6"
 term-painter = "0.2.4"
 walkdir = "2"
+tracing-subscriber = "0.3"
 
 [[bench]]
 name = "major_libs"
