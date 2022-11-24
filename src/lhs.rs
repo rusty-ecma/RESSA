@@ -13,7 +13,7 @@ use std::{borrow::Cow, collections::HashSet};
 type Res = Result<(), Error>;
 
 pub fn is_simple_expr<'a>(expr: &Expr<'a>) -> bool {
-    trace!("is_simple_expr {:?}", expr);
+    log::trace!("is_simple_expr {:?}", expr);
     match expr {
         Expr::This(_) => false,
         _ => true,
@@ -21,7 +21,7 @@ pub fn is_simple_expr<'a>(expr: &Expr<'a>) -> bool {
 }
 
 pub fn is_simple_pat<'a>(pat: &Pat<'a>) -> bool {
-    trace!("is_simple_pat {:?}", pat);
+    log::trace!("is_simple_pat {:?}", pat);
     match pat {
         Pat::Ident(ref id) => match &*id.slice.source {
             "this" => false,
@@ -179,7 +179,7 @@ pub fn check_loop_left<'a>(left: &LoopLeft<'a>, pos: Position) -> Res {
 }
 
 pub fn check_loop_head_expr<'a>(left: &Expr<'a>, pos: Position) -> Res {
-    debug!("check_loop_head_expr");
+    log::debug!("check_loop_head_expr");
     let mut set = HashSet::new();
     match left {
         Expr::Array(ref a) => check_binding_array(&a.elements, pos, &mut set),
@@ -194,7 +194,7 @@ fn check_binding_obj<'a>(
     pos: Position,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Res {
-    debug!("check_binding_obj");
+    log::debug!("check_binding_obj");
     for part in obj {
         if let ObjProp::Prop(prop) = &part.item {
             match prop {
@@ -213,7 +213,7 @@ pub fn check_binding_array<'a>(
     pos: Position,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Res {
-    debug!("check_binding_array");
+    log::debug!("check_binding_array");
     for part in a {
         if let Some(part) = &part.item {
             if let Expr::Sequence(_) = part {
@@ -230,7 +230,7 @@ fn check_loop_left_prop_key<'a>(
     pos: Position,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Res {
-    debug!("check_loop_left_prop_key");
+    log::debug!("check_loop_left_prop_key");
     match prop {
         PropKey::Expr(expr) => check_loop_left_expr(expr, pos, set),
         PropKey::Pat(pat) => check_loop_left_pat(pat, pos, set),
@@ -243,7 +243,7 @@ fn check_loop_left_expr<'a>(
     pos: Position,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Res {
-    debug!("check_loop_left_expr");
+    log::debug!("check_loop_left_expr");
     match expr {
         Expr::Ident(ident) => {
             if !set.insert(ident.slice.source.clone()) {
@@ -257,7 +257,7 @@ fn check_loop_left_expr<'a>(
 }
 
 fn check_loop_left_pat<'a>(pat: &Pat<'a>, pos: Position, set: &mut HashSet<Cow<'a, str>>) -> Res {
-    debug!("check_loop_left_pat");
+    log::debug!("check_loop_left_pat");
     match pat {
         Pat::Ident(ident) => {
             if !set.insert(ident.slice.source.clone()) {

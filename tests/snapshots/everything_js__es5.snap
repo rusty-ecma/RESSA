@@ -1,5 +1,5 @@
 ---
-source: tests/all/ecma262.rs
+source: tests/everything_js.rs
 expression: tokens
 ---
 Script(

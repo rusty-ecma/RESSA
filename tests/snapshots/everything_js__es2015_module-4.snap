@@ -1,5 +1,5 @@
 ---
-source: tests/all/ecma262.rs
+source: tests/everything_js.rs
 expression: res
 ---
 [
@@ -9,11 +9,7 @@ expression: res
                 Decl(
                     Func(
                         Func {
-                            id: Some(
-                                Ident {
-                                    name: "i16",
-                                },
-                            ),
+                            id: None,
                             params: [],
                             body: FuncBody(
                                 [],

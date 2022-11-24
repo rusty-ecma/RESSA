@@ -1,4 +1,5 @@
-#![cfg(test)]
+#![cfg(feature = "moz_central")]
+
 use ressa::{Builder, Error};
 use std::path::Path;
 use walkdir::WalkDir;

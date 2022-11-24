@@ -1,20 +1,8 @@
-extern crate env_logger;
-#[macro_use]
-extern crate log;
-extern crate ress;
-extern crate ressa;
-
-mod comment_handler;
-mod ecma262;
-mod major_libs;
-mod snippets;
-#[cfg(feature = "moz_central")]
-mod spider_monkey;
-
+#![allow(unused)]
 use std::{fs::read_to_string, io::Error};
 
 #[derive(Clone, Copy, Debug)]
-enum Lib {
+pub enum Lib {
     Jquery,
     Angular,
     React,
@@ -25,7 +13,7 @@ enum Lib {
     Everything(EverythingVersion),
 }
 #[derive(Clone, Copy, Debug)]
-enum EverythingVersion {
+pub enum EverythingVersion {
     Es5,
     Es2015Module,
     Es2015Script,

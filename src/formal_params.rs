@@ -24,7 +24,7 @@ pub struct FormalsList<'a> {
 
 pub fn have_duplicates<'a>(params: &[Param<'a>]) -> bool {
     if let Err(first_dupe) = find_duplicate(params) {
-        error!("Found duplicate parameter: {}", first_dupe);
+        log::error!("Found duplicate parameter: {}", first_dupe);
         true
     } else {
         false
@@ -52,7 +52,7 @@ pub fn update_with_expr<'a>(
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Result<(), Cow<'a, str>> {
     use resast::spanned::expr::{AssignExpr, AssignLeft};
-    trace!("update_with_expr {:?} {:?}", expr, set);
+    log::trace!("update_with_expr {:?} {:?}", expr, set);
     match expr {
         resast::spanned::expr::Expr::Ident(id) => {
             if !set.insert(id.slice.source.clone()) {
@@ -87,7 +87,7 @@ pub fn update_with_pat<'a>(
     pat: &resast::spanned::pat::Pat<'a>,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Result<(), Cow<'a, str>> {
-    trace!("update_with_pat {:?} {:?}", pat, set);
+    log::trace!("update_with_pat {:?} {:?}", pat, set);
     match pat {
         Pat::Ident(id) => {
             if !set.insert(id.slice.source.clone()) {
@@ -151,7 +151,7 @@ fn update_with_prop_value<'a>(
     prop: &PropValue<'a>,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Result<(), Cow<'a, str>> {
-    trace!("update_with_prop {:?}, {:?}", prop, set);
+    log::trace!("update_with_prop {:?}, {:?}", prop, set);
     match &prop {
         PropValue::Expr(expr) => {
             update_with_expr(expr, set)?;
@@ -176,7 +176,7 @@ fn update_with_prop_key<'a>(
 }
 
 fn update_with_lit<'a>(lit: &Lit<'a>, set: &mut HashSet<Cow<'a, str>>) -> Result<(), Cow<'a, str>> {
-    trace!("update_with_lit {:?}, {:?}", lit, set);
+    log::trace!("update_with_lit {:?}, {:?}", lit, set);
     if let Lit::String(s) = lit {
         if !set.insert(s.content.source.clone()) {
             return Err(s.content.source.clone());

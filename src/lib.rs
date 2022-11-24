@@ -55,10 +55,6 @@
 //! checkout the `examples` folders for slightly larger
 //! examples.
 //!
-extern crate ress;
-#[macro_use]
-extern crate log;
-extern crate backtrace;
 
 use ress::prelude::*;
 pub use ress::Span;
@@ -154,14 +150,14 @@ struct Context<'a> {
 
 impl Default for Config {
     fn default() -> Self {
-        trace!("default config");
+        log::trace!("default config");
         Self { tolerant: false }
     }
 }
 
 impl<'a> Default for Context<'a> {
     fn default() -> Self {
-        trace!("default context",);
+        log::trace!("default context",);
         Self {
             is_module: false,
             allow_await: true,
