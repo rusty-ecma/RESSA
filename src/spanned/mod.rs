@@ -3112,6 +3112,7 @@ where
         }
         self.context.allow_strict_directive = params.simple;
         let body = self.parse_method_body(params.simple, params.found_restricted)?;
+        self.remove_scope();
         self.context.allow_yield = prev_yield;
         self.context.allow_await = prev_await;
         self.context.allow_strict_directive = prev_strict;
