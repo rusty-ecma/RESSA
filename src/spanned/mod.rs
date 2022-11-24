@@ -100,40 +100,38 @@ use std::{
 };
 
 macro_rules! inherit_cover_grammar {
-    ($parser:ident, $meth:ident) => {
-        {
-            let is_binding = $parser.context.set_is_binding_element(true);
-            let is_assign = $parser.context.set_is_assignment_target(true);
-            let prev_first = $parser.context.first_covert_initialized_name_error.take();
-            let ret = $parser.$meth();
-            $parser.context
-                .set_is_binding_element($parser.context.is_binding_element && is_binding);
-            $parser.context
-                .set_is_assignment_target($parser.context.is_assignment_target && is_assign);
-            if prev_first.is_some() {
-                $parser.context.first_covert_initialized_name_error = prev_first;
-            }
-            ret
+    ($parser:ident, $meth:ident) => {{
+        let is_binding = $parser.context.set_is_binding_element(true);
+        let is_assign = $parser.context.set_is_assignment_target(true);
+        let prev_first = $parser.context.first_covert_initialized_name_error.take();
+        let ret = $parser.$meth();
+        $parser
+            .context
+            .set_is_binding_element($parser.context.is_binding_element && is_binding);
+        $parser
+            .context
+            .set_is_assignment_target($parser.context.is_assignment_target && is_assign);
+        if prev_first.is_some() {
+            $parser.context.first_covert_initialized_name_error = prev_first;
         }
-    };
+        ret
+    }};
 }
 
 macro_rules! isolate_cover_grammar {
-    ($parser:ident, $meth:ident) => {
-        {
-            let is_binding = $parser.context.set_is_binding_element(true);
-            let is_assign = $parser.context.set_is_assignment_target(true);
-            let first_covert = $parser.context.first_covert_initialized_name_error.take();
-            let ret = $parser.$meth();
-            if let Some(_name_err) = &$parser.context.first_covert_initialized_name_error {
-                //TODO: throwUnexpectedToken
-            }
-            $parser.context.set_is_binding_element(is_binding);
-            $parser.context.set_is_assignment_target(is_assign);
-            $parser.context.first_covert_initialized_name_error = first_covert;
-            ret
+    ($parser:ident, $meth:ident) => {{
+        let is_binding = $parser.context.set_is_binding_element(true);
+        let is_assign = $parser.context.set_is_assignment_target(true);
+        let first_covert = $parser.context.first_covert_initialized_name_error.take();
+        let ret = $parser.$meth();
+        if let Some(_name_err) = &$parser.context.first_covert_initialized_name_error {
+            //TODO: throwUnexpectedToken
         }
-    };
+        $parser.context.set_is_binding_element(is_binding);
+        $parser.context.set_is_assignment_target(is_assign);
+        $parser.context.first_covert_initialized_name_error = first_covert;
+        ret
+    }};
 }
 
 /// This is used to create a `Parser` using
