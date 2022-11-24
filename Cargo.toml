@@ -1,7 +1,7 @@
 [package]
 name = "ressa"
 version = "0.8.0"
-authors = ["Robert Masen <r@robertmasen.pizza>"]
+authors = ["Robert Masen <r.f.masen@gmail.com>"]
 repository = "https://github.com/rusty-ecma/RESSA"
 description = "An ECMAscript parser"
 license = "MIT"
