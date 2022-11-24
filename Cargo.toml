@@ -29,9 +29,9 @@ debug_look_ahead = []
 moz_central = []
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.4"
 docopt = "1"
-env_logger = "0.6"
+env_logger = "0.9"
 insta = "1.19"
 lazy_static = "1"
 serde = { version = "1", features = ["derive"] }
