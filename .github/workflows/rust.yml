@@ -37,14 +37,14 @@ jobs:
     - name: Check syntax
       run: cargo fmt --all -- --check
     - name: Cache node_modules
-      uses: actions/cache@v1.0.3
+      uses: actions/cache@v3
       with:
         path: ./node_modules
         key: ${{ runner.os }}.node_modules
     - name: before cargo cache
       run: rm -rf ~/.cargo/registry
     - name: Cache cargo directory
-      uses: actions/cache@v1.0.3
+      uses: actions/cache@v3
       with:
         key: ${{ runner.os }}.cargo
         path: ~/.cargo
