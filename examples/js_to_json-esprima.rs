@@ -1,5 +1,5 @@
 use docopt::Docopt;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{
     error::Error,
     ffi::OsStr,
@@ -29,12 +29,6 @@ struct Args {
     flag_out: Option<PathBuf>,
 }
 
-#[cfg(not(feature = "esprima"))]
-fn main() {
-    println!("Please run again with --features esprima");
-}
-
-#[cfg(feature = "esprima")]
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Args = Docopt::new(USAGE)
         .and_then(|o| o.deserialize())
@@ -54,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     Ok(())
 }
-#[cfg(feature = "esprima")]
+
 fn gen_json(from: PathBuf, pretty: bool) -> Result<String, Box<dyn Error>> {
     let js = read_to_string(&from)?;
     let mut p = Parser::builder()

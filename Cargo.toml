@@ -37,8 +37,7 @@ lazy_static = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
-term = "0.6"
-term-painter = "0.2.4"
+term-painter = "0.3"
 walkdir = "2"
 
 [[bench]]
