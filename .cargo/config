@@ -1,4 +1,0 @@
-[alias]
-test262 = "test --features test_262 --test test262 -- test262"
-moz = "test --features moz_central -- --nocapture moz_central"
-test_all = "test --features=test_262,moz_central"
