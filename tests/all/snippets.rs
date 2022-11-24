@@ -854,6 +854,18 @@ fn class_async_static_method() {
 }
 
 #[test]
+fn class_method_export() {
+    let js = r#"
+    class A  {
+        foo(x) {}
+    }
+    
+    export { A }
+    "#;
+    run_test(js, true).unwrap();
+}
+
+#[test]
 fn redecl_error_in_nested_arrow() {
     let js = r#"(() => {
         var a = [1];
