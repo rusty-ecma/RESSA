@@ -1,5 +1,5 @@
 ---
-source: tests/ecma262.rs
+source: tests/everything_js.rs
 expression: res
 ---
 [
@@ -7,15 +7,13 @@ expression: res
         Export(
             Default(
                 Decl(
-                    Func(
-                        Func {
+                    Class(
+                        Class {
                             id: None,
-                            params: [],
-                            body: FuncBody(
+                            super_class: None,
+                            body: ClassBody(
                                 [],
                             ),
-                            generator: true,
-                            is_async: false,
                         },
                     ),
                 ),
