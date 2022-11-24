@@ -6747,10 +6747,6 @@ where
     }
 
     fn expected_token_error<T>(&self, item: &Item<&'b str>, expectation: &[&str]) -> Res<T> {
-        if cfg!(feature = "error_backtrace") {
-            let bt = backtrace::Backtrace::new();
-            error!("{:?}", bt);
-        }
         let pos = item.location.start;
         let expectation = expectation
             .iter()
@@ -6770,10 +6766,6 @@ where
         ))
     }
     fn unexpected_token_error<T>(&self, item: &Item<&'b str>, msg: &str) -> Res<T> {
-        if cfg!(feature = "error_backtrace") {
-            let bt = backtrace::Backtrace::new();
-            error!("{:?}", bt);
-        }
         let pos = item.location.start;
 
         let name = self.scanner.string_for(&item.span).unwrap_or_default();
@@ -6784,34 +6776,18 @@ where
     }
     fn tolerate_error(&self, err: Error) -> Result<(), Error> {
         if !self.config.tolerant {
-            if cfg!(feature = "error_backtrace") {
-                let bt = backtrace::Backtrace::new();
-                error!("{:?}", bt);
-            }
             Err(err)
         } else {
             Ok(())
         }
     }
     fn op_error(&self, msg: &str) -> Error {
-        if cfg!(feature = "error_backtrace") {
-            let bt = backtrace::Backtrace::new();
-            error!("{:?}", bt);
-        }
         Error::OperationError(self.current_position, msg.to_owned())
     }
     fn redecl_error(&self, name: &str) -> Error {
-        if cfg!(feature = "error_backtrace") {
-            let bt = backtrace::Backtrace::new();
-            error!("{:?}", bt);
-        }
         Error::Redecl(self.current_position, name.to_owned())
     }
     fn reinterpret_error(&self, from: &str, to: &str) -> Error {
-        if cfg!(feature = "error_backtrace") {
-            let bt = backtrace::Backtrace::new();
-            error!("{:?}", bt);
-        }
         Error::UnableToReinterpret(self.current_position, from.to_owned(), to.to_owned())
     }
 

@@ -58,7 +58,6 @@
 extern crate ress;
 #[macro_use]
 extern crate log;
-extern crate backtrace;
 
 use ress::prelude::*;
 pub use ress::Span;
