@@ -1,8 +1,10 @@
+# RESSA
+
 [![Rust](https://github.com/rusty-ecma/RESSA/workflows/Rust/badge.svg?branch=featureless_test262)](https://github.com/rusty-ecma/RESSA/actions)
 
 [![crates.io](https://img.shields.io/crates/v/ressa.svg)](https://crates.io/crates/ressa)
 [![last commit master](https://img.shields.io/github/last-commit/FreeMasen/RESSA.svg)](https://github.com/FreeMasen/RESSA/commits/master)
-# RESSA
+
 > Rust EcmaScript Syntax Analyzer
 
 This project is part of a series of crates designed to enable developers to create JavaScript development tools using the Rust programming language. [Rusty ECMA Details](#rusty-ecma-details)
@@ -16,6 +18,7 @@ Conveniently `Parser` implements `Iterator` over `Result<ProgramPart, Error>`,
 this means that you can evaluate your JS in pieces from top to bottom. 
 
 ### Iterator Example
+
 ```rust
 use resast::prelude::*;
 use ressa::*;
@@ -44,6 +47,7 @@ fn main() {
 Another way to interact with a `Parser` would be to utilize the `parse` method. This method will iterate over all of the found `ProgramParts` and collect them into a `Program`,
 
 ### Parse Example
+
 ```rust
 use ressa::{
     Parser,
@@ -66,12 +70,14 @@ function Thing() {
 Once you get to the inner `parts` of a `Program` you have a `Vec<ProgramPart>` which will operate the same as the [iterator example](#iterator-example)
 
 # Rusty ECMA Details
+
 ## The Rust ECMA Crates
+
 - [RESS](https://github.com/freemasen/ress) - Tokenizer or Scanner
 - [RESSA](https://github.com/freemasen/ressa) - Parser
 - [RESAST](https://github.com/freemasen/resast) - AST
 - [RESW](https://github.com/freemasen/resw) - Writer
 
 ## Why So Many?
-While much of what each crate provides is closely coupled with the other crates, the main goal is to provide the largest amount of customizability. For example, someone writing a fuzzer would only need the `RESAST` and `RESW`, it seems silly to require that they also pull in `RESS` and `RESSA` needlessly.
 
+While much of what each crate provides is closely coupled with the other crates, the main goal is to provide the largest amount of customizability. For example, someone writing a fuzzer would only need the `RESAST` and `RESW`, it seems silly to require that they also pull in `RESS` and `RESSA` needlessly.
