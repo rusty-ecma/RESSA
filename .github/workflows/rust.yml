@@ -26,10 +26,9 @@ jobs:
       env:
         RUST_MIN_STACK: 9999999
     - name: rust-tarpaulin
-      uses: actions-rs/tarpaulin@v0.1.0
+      uses: actions-rs/tarpaulin@v0.1
       env: 
         RUST_MIN_STACK: 9999999
-        ACTIONS_ALLOW_UNSECURE_COMMANDS: true
       with: 
         args: --features=moz_central
     - name: Upload to codecov.io
