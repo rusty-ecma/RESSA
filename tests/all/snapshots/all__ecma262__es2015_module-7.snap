@@ -1,0 +1,23 @@
+---
+source: tests/all/ecma262.rs
+expression: res
+---
+[
+    Decl(
+        Export(
+            Default(
+                Decl(
+                    Class(
+                        Class {
+                            id: None,
+                            super_class: None,
+                            body: ClassBody(
+                                [],
+                            ),
+                        },
+                    ),
+                ),
+            ),
+        ),
+    ),
+]

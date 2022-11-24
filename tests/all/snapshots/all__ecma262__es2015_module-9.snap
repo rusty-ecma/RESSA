@@ -1,0 +1,19 @@
+---
+source: tests/all/ecma262.rs
+expression: res
+---
+[
+    Decl(
+        Export(
+            Default(
+                Expr(
+                    Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+]

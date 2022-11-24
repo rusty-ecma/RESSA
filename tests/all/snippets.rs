@@ -50,14 +50,14 @@ fn arrow_func_args() {
 
 #[test]
 fn destructuring_default() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "[a = {y: 2}, a.x = 1] = [];";
     let mut parser = Parser::new(js).expect("failed to create parser");
     parser.parse().expect("failed to parser js");
 }
 #[test]
 fn destructuring_obj() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "0, [...{} [throwlhs()]] = iterable;";
     let mut parser = Parser::new(js).expect("failed to create parser");
     parser.parse().expect("failed to parser js");
@@ -65,7 +65,7 @@ fn destructuring_obj() {
 
 #[test]
 fn strict_global_yield() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "'use strict'
 yield;
 ";
@@ -96,7 +96,7 @@ fn new_line_in_fat_arrow() {
 
 #[test]
 fn arguments_as_param_arrow() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "'use strict';
 var x = arguments => arguments;";
     let mut parser = Parser::new(js).expect("failed to create parser");
@@ -110,7 +110,7 @@ var x = arguments => arguments;";
 
 #[test]
 fn duplicate_proto() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "({
 __proto__: Number,
 '__proto__': Number,
@@ -129,7 +129,7 @@ __proto__: Number,
 #[test]
 #[should_panic = "expected to fail on super call in function"]
 fn super_in_func() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "function() { super() }";
     let mut p = Parser::new(js).unwrap();
     p.parse()
@@ -138,7 +138,7 @@ fn super_in_func() {
 
 #[test]
 fn super_in_ctor() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "
 class A {}
 class B extends A {
@@ -152,7 +152,7 @@ class B extends A {
 
 #[test]
 fn super_in_method() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "
 class A {}
 class B extends A {
@@ -177,7 +177,7 @@ fn super_in_async_method() {
 #[test]
 #[should_panic = "super calls should only be allowed in ctors"]
 fn super_in_method_neg() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "
 class A {}
 class B {
@@ -192,14 +192,14 @@ class B {
 #[test]
 #[should_panic = "super is invalid in an arrow"]
 fn super_in_arrow_func() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "() => super();";
     let mut p = Parser::new(js).unwrap();
     p.parse().expect("super is invalid in an arrow");
 }
 #[test]
 fn super_in_lit_getter() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "({
 get a() { return super.stuff; }
 });";
@@ -210,7 +210,7 @@ get a() { return super.stuff; }
 #[test]
 #[should_panic = "assignment not allowed in `for in` lhs"]
 fn init_in_for_in_loop() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "for (a = 0 in {}) {}";
     let mut p = Parser::new(js).unwrap();
     p.parse().expect("assignment not allowed in `for in` lhs");
@@ -219,7 +219,7 @@ fn init_in_for_in_loop() {
 #[test]
 #[should_panic = "assignment not allowed in `for in` lhs"]
 fn var_init_in_for_in_loop_strict() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "'use strict';
 for (var a = 0 in {}) {}";
     let mut p = Parser::new(js).unwrap();
@@ -227,7 +227,7 @@ for (var a = 0 in {}) {}";
 }
 #[test]
 fn var_init_in_for_in_loop_not_strict() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "for (var a = 0 in {}) {}";
     let mut p = Parser::new(js).unwrap();
     p.parse().expect("assignment not allowed in `for in` lhs");
@@ -235,7 +235,7 @@ fn var_init_in_for_in_loop_not_strict() {
 #[test]
 #[should_panic = "use strict not allowed with fancy params"]
 fn arrow_funct_non_simple_args_use_strict_in_body() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "var x = (a = 0) => {
 'use strict';
 };";
@@ -279,7 +279,7 @@ fn nested_dupe_ident() {
 
 #[test]
 fn super_in_class_expr_ctor() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "new class extends Other {
     constructor() {
         super();
@@ -290,7 +290,7 @@ fn super_in_class_expr_ctor() {
 }
 #[test]
 fn line_term_comment() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "''/*
 */''";
     let mut parser = Parser::new(js).expect("failed to create parser");
@@ -313,7 +313,7 @@ fn await_as_ident_strict() {
 #[test]
 #[should_panic = "await is reserved in an async fn"]
 fn await_as_ident_async_fn() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "async function() { var await = 0; }";
     let mut p = Parser::builder().js(js).module(true).build().unwrap();
     p.parse().expect("await is reserved in an async fn");
@@ -760,7 +760,7 @@ fn func_decl_tokens() {
 
 #[test]
 fn class_extended_by_call() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("class C extends D() {}")
         .build()
@@ -787,7 +787,7 @@ fn class_extended_by_call() {
 }
 #[test]
 fn class_anon_extended_by_call() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("let c = class extends D() {}")
         .build()
@@ -820,7 +820,7 @@ fn class_anon_extended_by_call() {
 }
 #[test]
 fn class_async_static_method() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("class C {
             static async m() {}
@@ -854,6 +854,18 @@ fn class_async_static_method() {
 }
 
 #[test]
+fn class_method_export() {
+    let js = r#"
+    class A  {
+        foo(x) {}
+    }
+    
+    export { A }
+    "#;
+    run_test(js, true).unwrap();
+}
+
+#[test]
 fn redecl_error_in_nested_arrow() {
     let js = r#"(() => {
         var a = [1];
@@ -875,8 +887,408 @@ fn redecl_error_in_nested_funcs() {
     run_test(js, false).unwrap();
 }
 
+#[test]
+fn generator_prop() {
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder().js("({*g() {}})").build().unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Stmt(Stmt::Expr(Expr::Obj(vec![
+            ObjProp::Prop(Prop {
+                computed: false,
+                is_static: false,
+                key: PropKey::Expr(Expr::Ident(Ident::new("g".to_owned()))),
+                kind: PropKind::Method,
+                method: true,
+                short_hand: false,
+                value: PropValue::Expr(Expr::Func(Func {
+                    body: FuncBody(vec![]),
+                    generator: true,
+                    id: None,
+                    is_async: false,
+                    params: vec![],
+                }))
+            })
+        ])))]),
+        tokens
+    );
+}
+
+#[test]
+fn super_tagged_template_in_ctor() {
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder()
+        .js("class X {
+            constructor() {
+                super()`template`
+            }
+        }")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
+            id: Some(Ident::from("X")),
+            super_class: None,
+            body: ClassBody(vec![Prop {
+                computed: false,
+                is_static: false,
+                key: PropKey::Expr(Expr::Ident(Ident::from("constructor"))),
+                kind: PropKind::Ctor,
+                method: true,
+                short_hand: false,
+                value: PropValue::Expr(Expr::Func(Func {
+                    id: None,
+                    generator: false,
+                    is_async: false,
+                    params: vec![],
+                    body: FuncBody(vec![ProgramPart::Stmt(Stmt::Expr(Expr::TaggedTemplate(
+                        TaggedTemplateExpr {
+                            tag: Box::new(Expr::Call(CallExpr {
+                                callee: Box::new(Expr::Super),
+                                arguments: vec![],
+                            })),
+                            quasi: TemplateLit {
+                                expressions: vec![],
+                                quasis: vec![TemplateElement {
+                                    tail: true,
+                                    cooked: std::borrow::Cow::Borrowed("template"),
+                                    raw: std::borrow::Cow::Borrowed("`template`"),
+                                }]
+                            }
+                        }
+                    )))])
+                })),
+            }])
+        }))]),
+        tokens
+    );
+}
+
+#[test]
+fn super_in_new_class_expr() {
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder()
+        .js("new class extends X { constructor(a = (()=>{ super() })()) { } }")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+    let call_super = CallExpr {
+        callee: Box::new(Expr::Super),
+        arguments: vec![],
+    };
+    let arrow_call_super = ArrowFuncExpr {
+        id: None,
+        expression: false,
+        generator: false,
+        body: ArrowFuncBody::FuncBody(FuncBody(vec![ProgramPart::Stmt(Stmt::Expr(Expr::Call(
+            call_super,
+        )))])),
+        is_async: false,
+        params: vec![],
+    };
+    let arrow_call_super = Expr::ArrowFunc(arrow_call_super);
+    let call_arrow = CallExpr {
+        callee: Box::new(arrow_call_super),
+        arguments: vec![],
+    };
+    let call_arrow = Expr::Call(call_arrow);
+    let assign_left = Box::new(Pat::ident_from("a"));
+    let assign_arrow = AssignPat {
+        left: assign_left,
+        right: Box::new(call_arrow),
+    };
+    let key = PropKey::Expr(Expr::ident_from("constructor"));
+    let value = Func {
+        id: None,
+        params: vec![FuncArg::Pat(Pat::Assign(assign_arrow))],
+        body: FuncBody(vec![]),
+        generator: false,
+        is_async: false,
+    };
+    let value = PropValue::Expr(Expr::Func(value));
+    let ctor = Prop {
+        computed: false,
+        is_static: false,
+        method: true,
+        short_hand: false,
+        kind: PropKind::Ctor,
+        key,
+        value,
+    };
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Stmt(Stmt::Expr(Expr::New(NewExpr {
+            arguments: vec![],
+            callee: Box::new(Expr::Class(Class {
+                id: None,
+                super_class: Some(Box::new(Expr::Ident(Ident::from("X")))),
+                body: ClassBody(vec![ctor])
+            }))
+        })))]),
+        tokens
+    );
+}
+
+#[test]
+fn static_get_method() {
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder()
+        .js("class X {
+            static get e() {}
+        }")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
+            id: Some(Ident::from("X")),
+            super_class: None,
+            body: ClassBody(vec![Prop {
+                computed: false,
+                is_static: true,
+                key: PropKey::Expr(Expr::Ident(Ident::from("e"))),
+                kind: PropKind::Get,
+                method: false,
+                short_hand: false,
+                value: PropValue::Expr(Expr::Func(Func {
+                    id: None,
+                    generator: false,
+                    is_async: false,
+                    params: vec![],
+                    body: FuncBody(vec![])
+                })),
+            }])
+        }))]),
+        tokens
+    );
+}
+
+#[test]
+fn generator_method() {
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder()
+        .js("class X {
+            static *e() {}
+        }")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
+            id: Some(Ident::from("X")),
+            super_class: None,
+            body: ClassBody(vec![Prop {
+                computed: false,
+                is_static: true,
+                key: PropKey::Expr(Expr::Ident(Ident::from("e"))),
+                kind: PropKind::Method,
+                method: true,
+                short_hand: false,
+                value: PropValue::Expr(Expr::Func(Func {
+                    id: None,
+                    generator: true,
+                    is_async: false,
+                    params: vec![],
+                    body: FuncBody(vec![])
+                })),
+            }])
+        }))]),
+        tokens
+    );
+}
+
+#[test]
+fn export_all() {
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder()
+        .js("export * from 'module';")
+        .module(true)
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Mod(vec![ProgramPart::Decl(Decl::Export(Box::new(
+            ModExport::All(Lit::String(StringLit::Single(Cow::Borrowed("module"))))
+        )))]),
+        tokens
+    );
+}
+
+#[test]
+fn for_lhs() {
+    env_logger::builder().is_test(true).try_init().ok();
+    run_test("for(var x=(0 in[])in{});", false).unwrap();
+}
+
+#[test]
+fn import_default() {
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder()
+        .js("import i from 'module'")
+        .module(true)
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Mod(vec![ProgramPart::Decl(Decl::Import(Box::new(ModImport {
+            source: Lit::String(StringLit::Single(Cow::Borrowed("module"))),
+            specifiers: vec![ImportSpecifier::Default(Ident::from("i"))]
+        })))]),
+        tokens
+    );
+}
+
+#[test]
+fn loop_yield() {
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder()
+        .js("var x = {
+            *['y']() {
+                yield 0;
+                yield 0;
+            }
+        };")
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Decl(Decl::Var(
+            VarKind::Var,
+            vec![VarDecl {
+                id: Pat::Ident(Ident::from("x")),
+                init: Some(Expr::Obj(vec![ObjProp::Prop(Prop {
+                    key: PropKey::Lit(Lit::String(StringLit::Single(Cow::Borrowed("y")))),
+                    computed: true,
+                    is_static: false,
+                    kind: PropKind::Method,
+                    method: true,
+                    short_hand: false,
+                    value: PropValue::Expr(Expr::Func(Func {
+                        id: None,
+                        params: vec![],
+                        body: FuncBody(vec![
+                            ProgramPart::Stmt(Stmt::Expr(Expr::Yield(YieldExpr {
+                                argument: Some(Box::new(Expr::Lit(Lit::Number(Cow::Borrowed(
+                                    "0"
+                                ))))),
+                                delegate: false,
+                            }))),
+                            ProgramPart::Stmt(Stmt::Expr(Expr::Yield(YieldExpr {
+                                argument: Some(Box::new(Expr::Lit(Lit::Number(Cow::Borrowed(
+                                    "0"
+                                ))))),
+                                delegate: false,
+                            }))),
+                        ]),
+                        generator: true,
+                        is_async: false,
+                    }))
+                })]))
+            }]
+        ))]),
+        tokens
+    );
+}
+
+#[test]
+fn obj_expr_stmt() {
+    use resast::spanned::{
+        expr::{Expr, ObjExpr, WrappedExpr},
+        stmt::Stmt,
+        Program, ProgramPart, Slice, SourceLocation,
+    };
+    use ressa::spanned::Parser;
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder().js("({});").build().unwrap();
+    let tokens = p.parse().unwrap();
+    let open_brace = Slice {
+        source: "{".into(),
+        loc: SourceLocation::new(1, 2, 1, 3),
+    };
+    let close_brace = Slice {
+        source: "}".into(),
+        loc: SourceLocation::new(1, 3, 1, 4),
+    };
+    let obj = ObjExpr {
+        open_brace,
+        close_brace,
+        props: vec![],
+    };
+    let expr = Expr::Obj(obj);
+    let wrapped = WrappedExpr {
+        open_paren: Slice {
+            source: "(".into(),
+            loc: SourceLocation::new(1, 1, 1, 2),
+        },
+        expr,
+        close_paren: Slice {
+            source: ")".into(),
+            loc: SourceLocation::new(1, 4, 1, 5),
+        },
+    };
+    let expr = Expr::Wrapped(Box::new(wrapped));
+    assert_eq!(
+        Program::Script(vec![ProgramPart::Stmt(Stmt::Expr {
+            expr,
+            semi_colon: Some(Slice {
+                source: ";".into(),
+                loc: SourceLocation::new(1, 5, 1, 6)
+            })
+        })]),
+        tokens
+    );
+}
+
+#[test]
+#[ignore = "Diagnostic to see how badly our recursive decent is performing"]
+fn blow_the_stack() {
+    fn do_it(ct: usize) {
+        eprintln!("do_it {}", ct);
+        let mut js = String::from("function x() {");
+        for _i in 1..ct {
+            js.push_str("return function() {");
+        }
+        for _i in 0..ct {
+            js.push('}');
+        }
+        run_test(&js, false).unwrap();
+    }
+    for i in 1..7 {
+        do_it(i)
+    }
+}
+#[test]
+#[ignore = "Diagnostic to see how badly our recursive decent is performing"]
+fn blow_the_stack_spanned() {
+    use ressa::spanned::Parser;
+    env_logger::builder().is_test(true).try_init().ok();
+    fn do_it(ct: usize) {
+        eprintln!("do_it {}", ct);
+        let mut js = String::from("function x() {");
+        for _i in 1..ct {
+            js.push_str("return function() {");
+        }
+        for _i in 0..ct {
+            js.push('}');
+        }
+        let mut p = Parser::builder().js(&js).module(false).build().unwrap();
+        p.parse().unwrap();
+        // run_test(&js, false).unwrap();
+    }
+    for i in 1..100 {
+        do_it(i)
+    }
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
-    let _ = env_logger::try_init();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
     p.parse()?;
     Ok(())

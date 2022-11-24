@@ -3,12 +3,9 @@ extern crate env_logger;
 extern crate log;
 extern crate ress;
 extern crate ressa;
-#[macro_use]
-extern crate lazy_static;
 
 mod comment_handler;
 mod ecma262;
-mod es_tokens;
 mod major_libs;
 mod snippets;
 #[cfg(feature = "moz_central")]
@@ -88,37 +85,4 @@ pub fn npm_install() -> Result<(), Error> {
     c.arg("i");
     c.output()?;
     Ok(())
-}
-
-fn format_error(js: &str, e: &ressa::Error) -> Option<String> {
-    let start = e.position()?;
-    let column = js.lines().nth(start.line.saturating_sub(1))?.len();
-    let end = ress::Position {
-        line: start.line,
-        column,
-    };
-    hilight_position(js, &ress::SourceLocation { start, end })
-}
-fn hilight_position(js: &str, location: &ress::SourceLocation) -> Option<String> {
-    let line_count = js.lines().count();
-    if line_count < 5 {
-        return Some(js.to_string());
-    }
-    let skip = location.start.line.saturating_sub(2);
-    Some(
-        js.lines()
-            .enumerate()
-            .skip(skip)
-            .take(5)
-            .map(|(i, l)| {
-                if i + 1 == location.start.line {
-                    let whitespace = " ".repeat(location.start.column);
-                    let arrows = "^".repeat(location.end.column - location.start.column);
-                    format!("{}\n{}{}\n", l, whitespace, arrows)
-                } else {
-                    format!("{}\n", l)
-                }
-            })
-            .collect(),
-    )
 }

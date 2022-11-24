@@ -2,102 +2,43 @@
 use super::{get_js_file, EverythingVersion, Lib};
 use env_logger;
 
-use crate::es_tokens;
 use ressa::Parser;
 #[test]
 fn es5() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     info!("ES5");
     let path = Lib::Everything(EverythingVersion::Es5).path();
-    println!("path: {:?}", path);
+    debug!("path: {:?}", path);
     let js = get_js_file(&path).unwrap_or_else(|e| panic!("Faield to get {:?}\n{}", path, e));
     let mut p = Parser::new(&js).expect("Failed to create parser");
-    let mut tokens = es_tokens::ES5.iter();
-    let mut i = 0;
-    let mut last_position = p.next_position();
-    while let Some(ref item) = p.next() {
-        if let Some(part) = tokens.next() {
-            let item = match item {
-                Ok(i) => i,
-                Err(e) => panic!(
-                    "Error parsing {:?}\n{}",
-                    path,
-                    super::format_error(&js, e).unwrap_or_else(String::new)
-                ),
-            };
-            if item != part {
-                panic!(
-                    "Error, part {} doesn't match \n{:?}\n{:?}\nnext start: line: {}, column: {}\n{}",
-                    i, item, part, last_position.start.line, last_position.start.column,
-                    super::hilight_position(&js, &last_position).unwrap_or_else(String::new)
-                )
-            }
-        }
-        i += 1;
-        last_position = p.next_position();
-    }
+    let tokens = p.parse().unwrap();
+    insta::assert_debug_snapshot!(tokens);
 }
 
 #[test]
 fn es2015_script() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     info!("ES2015 Script");
     let path = Lib::Everything(EverythingVersion::Es2015Script).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
     let mut p = Parser::new(&js).expect("Failed to create parser");
-    let mut tokens = es_tokens::ES2015.iter();
-    let mut i = 0;
-    while let Some(ref item) = p.next() {
-        if let Some(part) = tokens.next() {
-            let item = match item {
-                Ok(i) => i,
-                Err(e) => panic!("Error parsing {:?}\n{}", path, e),
-            };
-            if item != part {
-                let pos = p.next_position();
-                let _ = ::std::fs::write("left.out", format!("{:#?}", item));
-                let _ = ::std::fs::write("right.out", format!("{:#?}", part));
-                panic!(
-                    "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
-                    i, path, pos.start.line, pos.start.column, item, part,
-                )
-            }
-        }
-        i += 1;
-    }
+    let tokens = p.parse().unwrap();
+    insta::assert_debug_snapshot!(tokens);
 }
 
 #[test]
 fn es2015_module() {
     info!("ES2015 Module");
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let path = Lib::Everything(EverythingVersion::Es2015Module).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
-    let mut p = Parser::builder()
+    let mut p = ressa::spanned::Parser::builder()
         .module(true)
         .js(&js)
         .build()
         .expect("Failed to create parser");
-    let mut tokens = es_tokens::ESMOD.iter();
-    let mut i = 0;
-    while let Some(ref item) = p.next() {
-        if let Some(part) = tokens.next() {
-            let item = match item {
-                Ok(i) => i,
-                Err(e) => panic!("Error parsing {:?}\n{}", path, e),
-            };
-            if item != part {
-                let pos = p.next_position();
-                let _ = ::std::fs::write("parsed.out", format!("{:#?}", item));
-                let _ = ::std::fs::write("expected.out", format!("{:#?}", part));
-                panic!(
-                    "Error, part {} does't match from around {}:{}:{} \n{:?}\n{:?}\n",
-                    i, path, pos.start.line, pos.start.column, item, part,
-                )
-            }
-        }
-        i += 1;
-    }
+    let tokens = p.parse().unwrap();
+    insta::assert_debug_snapshot!(tokens);
     // only one default export is allowed so these must be run ad-hoc
     let js_list = vec![
         "export default function (){}",
@@ -116,11 +57,12 @@ fn es2015_module() {
             .js(export)
             .build()
             .expect("Failed to create parser");
-        let _res: Vec<_> = p
+        let res: Vec<_> = p
             .map(|i| match i {
                 Ok(i) => i,
                 Err(e) => panic!("Error parsing {}\n{}", export, e),
             })
             .collect();
+        insta::assert_debug_snapshot!(res)
     }
 }

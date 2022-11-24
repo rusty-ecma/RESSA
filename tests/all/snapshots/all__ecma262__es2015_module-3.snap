@@ -1,0 +1,29 @@
+---
+source: tests/all/ecma262.rs
+expression: res
+---
+[
+    Decl(
+        Export(
+            Default(
+                Decl(
+                    Func(
+                        Func {
+                            id: Some(
+                                Ident {
+                                    name: "i16",
+                                },
+                            ),
+                            params: [],
+                            body: FuncBody(
+                                [],
+                            ),
+                            generator: true,
+                            is_async: false,
+                        },
+                    ),
+                ),
+            ),
+        ),
+    ),
+]

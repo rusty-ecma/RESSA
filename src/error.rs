@@ -44,6 +44,7 @@ pub enum Error {
     ContinueOfNotIterationLabel(Position, String),
     Scanner(ress::error::Error),
     Other(Box<dyn ::std::error::Error>),
+    Misc(String),
 }
 
 impl Display for Error {
@@ -91,6 +92,7 @@ impl Display for Error {
             Error::ContinueOfNotIterationLabel(ref pos, ref token) => write!(f, "Label `{}` is does not label a loop, continue is invalid at {}", token, pos),
             Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
             Error::Other(ref e) => write!(f, "{}", e),
+            Error::Misc(ref e) => write!(f, "{}", e),
         }
     }
 }

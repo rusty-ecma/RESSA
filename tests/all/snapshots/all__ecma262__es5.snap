@@ -1,0 +1,5200 @@
+---
+source: tests/all/ecma262.rs
+expression: tokens
+---
+Script(
+    [
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "tab",
+                    },
+                    body: For(
+                        ForStmt {
+                            init: None,
+                            test: None,
+                            update: None,
+                            body: Break(
+                                Some(
+                                    Ident {
+                                        name: "tab",
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "verticalTab",
+                    },
+                    body: For(
+                        ForStmt {
+                            init: None,
+                            test: None,
+                            update: None,
+                            body: Break(
+                                Some(
+                                    Ident {
+                                        name: "verticalTab",
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "formFeed",
+                    },
+                    body: For(
+                        ForStmt {
+                            init: None,
+                            test: None,
+                            update: None,
+                            body: Break(
+                                Some(
+                                    Ident {
+                                        name: "formFeed",
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "space",
+                    },
+                    body: For(
+                        ForStmt {
+                            init: None,
+                            test: None,
+                            update: None,
+                            body: Break(
+                                Some(
+                                    Ident {
+                                        name: "space",
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "nbsp",
+                    },
+                    body: For(
+                        ForStmt {
+                            init: None,
+                            test: None,
+                            update: None,
+                            body: Break(
+                                Some(
+                                    Ident {
+                                        name: "nbsp",
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "bom",
+                    },
+                    body: For(
+                        ForStmt {
+                            init: None,
+                            test: None,
+                            update: None,
+                            body: Break(
+                                Some(
+                                    Ident {
+                                        name: "bom",
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "lineFeed",
+                    },
+                    body: Expr(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "carriageReturn",
+                    },
+                    body: Expr(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "carriageReturnLineFeed",
+                    },
+                    body: Expr(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "lineSeparator",
+                    },
+                    body: Expr(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "paragraphSeparator",
+                    },
+                    body: Expr(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0",
+                    ),
+                ),
+            ),
+        ),
+        Decl(
+            Var(
+                Var,
+                [
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "$",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "_",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "\\u0078",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x$",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x_",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x\\u0030",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "xa",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x0",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x0a",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x0123456789",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "qwertyuiopasdfghjklzxcvbnm",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "QWERTYUIOPASDFGHJKLZXCVBNM",
+                            },
+                        ),
+                        init: None,
+                    },
+                ],
+            ),
+        ),
+        Decl(
+            Var(
+                Var,
+                [
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "œ一",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "ǻ둘",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "ɤ〩",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "φ",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "ﬁⅷ",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "ユニコード",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x\u{200c}\u{200d}",
+                            },
+                        ),
+                        init: None,
+                    },
+                ],
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Null,
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Boolean(
+                        true,
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Boolean(
+                        false,
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "00",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "1234567890",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "01234567",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0.",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0.00",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "10.00",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        ".0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        ".00",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0e0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0E0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0.e0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0.00e+0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        ".00e-0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0x0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0X0",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "0x0123456789abcdefABCDEF",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    Number(
+                        "2e308",
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Double(
+                            "",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Double(
+                            "'",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Double(
+                            "\\'\\\"\\\\\\b\\f\\n\\r\\t\\v\\0",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Double(
+                            "\\1\\00\\400\\000",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Double(
+                            "\\x01\\x23\\x45\\x67\\x89\\xAB\\xCD\\xEF",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Double(
+                            "\\u0123\\u4567\\u89AB\\uCDEF",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Double(
+                            "\\\n",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Single(
+                            "",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Single(
+                            "\"",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Single(
+                            "\\'\\\"\\\\\\b\\f\\n\\r\\t\\v\\0",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Single(
+                            "\\1\\00\\400\\000",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Single(
+                            "\\x01\\x23\\x45\\x67\\x89\\xAB\\xCD\\xEF",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Single(
+                            "\\u0123\\u4567\\u89AB\\uCDEF",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    String(
+                        Single(
+                            "\\\n",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "x",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "|",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "|||",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "^$\\b\\B",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "(?=(?!(?:(.))))",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "a.\\f\\n\\r\\t\\v\\0\\[\\-\\/\\\\\\x00\\u0000",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "\\d\\D\\s\\S\\w\\W",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "\\ca\\cb\\cc\\cd\\ce\\cf\\cg\\ch\\ci\\cj\\ck\\cl\\cm\\cn\\co\\cp\\cq\\cr\\cs\\ct\\cu\\cv\\cw\\cx\\cy\\cz",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "\\cA\\cB\\cC\\cD\\cE\\cF\\cG\\cH\\cI\\cJ\\cK\\cL\\cM\\cN\\cO\\cP\\cQ\\cR\\cS\\cT\\cU\\cV\\cW\\cX\\cY\\cZ",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "[a-z-]",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "[^\\b\\-^]",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: "[/\\]\\\\]",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".",
+                            flags: "i",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".",
+                            flags: "g",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".",
+                            flags: "m",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".",
+                            flags: "igm",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".*",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".*?",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".+",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".+?",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".?",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".??",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".{0}",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".{0,}",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Lit(
+                    RegEx(
+                        RegEx {
+                            pattern: ".{0,0}",
+                            flags: "",
+                        },
+                    ),
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                This,
+            ),
+        ),
+        Stmt(
+            Expr(
+                Ident(
+                    Ident {
+                        name: "x",
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Array(
+                    [],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Array(
+                    [
+                        None,
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Array(
+                    [
+                        Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Array(
+                    [
+                        Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Array(
+                    [
+                        None,
+                        Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Array(
+                    [
+                        Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                        Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Array(
+                    [
+                        Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                        Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Array(
+                    [
+                        Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                        None,
+                        Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Array(
+                    [
+                        None,
+                        None,
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [
+                        Prop(
+                            Prop {
+                                key: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "x",
+                                        },
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [
+                        Prop(
+                            Prop {
+                                key: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "x",
+                                        },
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                        Prop(
+                            Prop {
+                                key: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "y",
+                                        },
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [
+                        Prop(
+                            Prop {
+                                key: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "x",
+                                        },
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    String(
+                                        Single(
+                                            "x",
+                                        ),
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    String(
+                                        Double(
+                                            "y",
+                                        ),
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                        Prop(
+                            Prop {
+                                key: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "var",
+                                        },
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    Number(
+                                        "0.",
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    Number(
+                                        "0.0",
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    Number(
+                                        ".0",
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    Number(
+                                        "0e0",
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    Number(
+                                        "0x0",
+                                    ),
+                                ),
+                                value: Expr(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                                kind: Init,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Obj(
+                    [
+                        Prop(
+                            Prop {
+                                key: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "x",
+                                        },
+                                    ),
+                                ),
+                                value: Expr(
+                                    Func(
+                                        Func {
+                                            id: None,
+                                            params: [],
+                                            body: FuncBody(
+                                                [],
+                                            ),
+                                            generator: false,
+                                            is_async: false,
+                                        },
+                                    ),
+                                ),
+                                kind: Get,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                        Prop(
+                            Prop {
+                                key: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "x",
+                                        },
+                                    ),
+                                ),
+                                value: Expr(
+                                    Func(
+                                        Func {
+                                            id: None,
+                                            params: [
+                                                Pat(
+                                                    Ident(
+                                                        Ident {
+                                                            name: "a",
+                                                        },
+                                                    ),
+                                                ),
+                                            ],
+                                            body: FuncBody(
+                                                [],
+                                            ),
+                                            generator: false,
+                                            is_async: false,
+                                        },
+                                    ),
+                                ),
+                                kind: Set,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    String(
+                                        Single(
+                                            "y",
+                                        ),
+                                    ),
+                                ),
+                                value: Expr(
+                                    Func(
+                                        Func {
+                                            id: None,
+                                            params: [],
+                                            body: FuncBody(
+                                                [],
+                                            ),
+                                            generator: false,
+                                            is_async: false,
+                                        },
+                                    ),
+                                ),
+                                kind: Get,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    String(
+                                        Double(
+                                            "y",
+                                        ),
+                                    ),
+                                ),
+                                value: Expr(
+                                    Func(
+                                        Func {
+                                            id: None,
+                                            params: [
+                                                Pat(
+                                                    Ident(
+                                                        Ident {
+                                                            name: "a",
+                                                        },
+                                                    ),
+                                                ),
+                                            ],
+                                            body: FuncBody(
+                                                [],
+                                            ),
+                                            generator: false,
+                                            is_async: false,
+                                        },
+                                    ),
+                                ),
+                                kind: Set,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                                value: Expr(
+                                    Func(
+                                        Func {
+                                            id: None,
+                                            params: [],
+                                            body: FuncBody(
+                                                [],
+                                            ),
+                                            generator: false,
+                                            is_async: false,
+                                        },
+                                    ),
+                                ),
+                                kind: Get,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                        Prop(
+                            Prop {
+                                key: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                                value: Expr(
+                                    Func(
+                                        Func {
+                                            id: None,
+                                            params: [
+                                                Pat(
+                                                    Ident(
+                                                        Ident {
+                                                            name: "a",
+                                                        },
+                                                    ),
+                                                ),
+                                            ],
+                                            body: FuncBody(
+                                                [],
+                                            ),
+                                            generator: false,
+                                            is_async: false,
+                                        },
+                                    ),
+                                ),
+                                kind: Set,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                        Prop(
+                            Prop {
+                                key: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "var",
+                                        },
+                                    ),
+                                ),
+                                value: Expr(
+                                    Func(
+                                        Func {
+                                            id: None,
+                                            params: [],
+                                            body: FuncBody(
+                                                [],
+                                            ),
+                                            generator: false,
+                                            is_async: false,
+                                        },
+                                    ),
+                                ),
+                                kind: Get,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                        Prop(
+                            Prop {
+                                key: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "var",
+                                        },
+                                    ),
+                                ),
+                                value: Expr(
+                                    Func(
+                                        Func {
+                                            id: None,
+                                            params: [
+                                                Pat(
+                                                    Ident(
+                                                        Ident {
+                                                            name: "x",
+                                                        },
+                                                    ),
+                                                ),
+                                            ],
+                                            body: FuncBody(
+                                                [],
+                                            ),
+                                            generator: false,
+                                            is_async: false,
+                                        },
+                                    ),
+                                ),
+                                kind: Set,
+                                method: false,
+                                computed: false,
+                                short_hand: false,
+                                is_static: false,
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Member(
+                    MemberExpr {
+                        object: Lit(
+                            Number(
+                                "0.",
+                            ),
+                        ),
+                        property: Ident(
+                            Ident {
+                                name: "a",
+                            },
+                        ),
+                        computed: false,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Member(
+                    MemberExpr {
+                        object: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        property: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        computed: true,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: Equal,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Func(
+                            Func {
+                                id: Some(
+                                    Ident {
+                                        name: "f",
+                                    },
+                                ),
+                                params: [],
+                                body: FuncBody(
+                                    [
+                                        Stmt(
+                                            Return(
+                                                Some(
+                                                    Ident(
+                                                        Ident {
+                                                            name: "f",
+                                                        },
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ],
+                                ),
+                                generator: false,
+                                is_async: false,
+                            },
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: Equal,
+                        left: Expr(
+                            Member(
+                                MemberExpr {
+                                    object: Ident(
+                                        Ident {
+                                            name: "x",
+                                        },
+                                    ),
+                                    property: Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                    computed: true,
+                                },
+                            ),
+                        ),
+                        right: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: Equal,
+                        left: Expr(
+                            Member(
+                                MemberExpr {
+                                    object: Ident(
+                                        Ident {
+                                            name: "x",
+                                        },
+                                    ),
+                                    property: Ident(
+                                        Ident {
+                                            name: "a",
+                                        },
+                                    ),
+                                    computed: false,
+                                },
+                            ),
+                        ),
+                        right: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                New(
+                    NewExpr {
+                        callee: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                New(
+                    NewExpr {
+                        callee: New(
+                            NewExpr {
+                                callee: Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                                arguments: [],
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                New(
+                    NewExpr {
+                        callee: Member(
+                            MemberExpr {
+                                object: Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                                property: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                                computed: true,
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                New(
+                    NewExpr {
+                        callee: Member(
+                            MemberExpr {
+                                object: Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                                property: Ident(
+                                    Ident {
+                                        name: "a",
+                                    },
+                                ),
+                                computed: false,
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                New(
+                    NewExpr {
+                        callee: Member(
+                            MemberExpr {
+                                object: Member(
+                                    MemberExpr {
+                                        object: Ident(
+                                            Ident {
+                                                name: "x",
+                                            },
+                                        ),
+                                        property: Lit(
+                                            Number(
+                                                "0",
+                                            ),
+                                        ),
+                                        computed: true,
+                                    },
+                                ),
+                                property: Ident(
+                                    Ident {
+                                        name: "a",
+                                    },
+                                ),
+                                computed: false,
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                New(
+                    NewExpr {
+                        callee: Member(
+                            MemberExpr {
+                                object: Member(
+                                    MemberExpr {
+                                        object: Ident(
+                                            Ident {
+                                                name: "x",
+                                            },
+                                        ),
+                                        property: Ident(
+                                            Ident {
+                                                name: "a",
+                                            },
+                                        ),
+                                        computed: false,
+                                    },
+                                ),
+                                property: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                                computed: true,
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                New(
+                    NewExpr {
+                        callee: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                New(
+                    NewExpr {
+                        callee: New(
+                            NewExpr {
+                                callee: Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                                arguments: [],
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                New(
+                    NewExpr {
+                        callee: New(
+                            NewExpr {
+                                callee: Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                                arguments: [],
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                New(
+                    NewExpr {
+                        callee: Member(
+                            MemberExpr {
+                                object: New(
+                                    NewExpr {
+                                        callee: Ident(
+                                            Ident {
+                                                name: "x",
+                                            },
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                property: Ident(
+                                    Ident {
+                                        name: "a",
+                                    },
+                                ),
+                                computed: false,
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                New(
+                    NewExpr {
+                        callee: Member(
+                            MemberExpr {
+                                object: New(
+                                    NewExpr {
+                                        callee: Ident(
+                                            Ident {
+                                                name: "x",
+                                            },
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                property: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                                computed: true,
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Call(
+                    CallExpr {
+                        callee: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Call(
+                    CallExpr {
+                        callee: Call(
+                            CallExpr {
+                                callee: Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                                arguments: [],
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Call(
+                    CallExpr {
+                        callee: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        arguments: [
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Call(
+                    CallExpr {
+                        callee: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        arguments: [
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Call(
+                    CallExpr {
+                        callee: Member(
+                            MemberExpr {
+                                object: Call(
+                                    CallExpr {
+                                        callee: Member(
+                                            MemberExpr {
+                                                object: Ident(
+                                                    Ident {
+                                                        name: "x",
+                                                    },
+                                                ),
+                                                property: Ident(
+                                                    Ident {
+                                                        name: "a",
+                                                    },
+                                                ),
+                                                computed: false,
+                                            },
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                property: Ident(
+                                    Ident {
+                                        name: "a",
+                                    },
+                                ),
+                                computed: false,
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Call(
+                    CallExpr {
+                        callee: Member(
+                            MemberExpr {
+                                object: Call(
+                                    CallExpr {
+                                        callee: Member(
+                                            MemberExpr {
+                                                object: Ident(
+                                                    Ident {
+                                                        name: "x",
+                                                    },
+                                                ),
+                                                property: Lit(
+                                                    Number(
+                                                        "0",
+                                                    ),
+                                                ),
+                                                computed: true,
+                                            },
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                property: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                                computed: true,
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Call(
+                    CallExpr {
+                        callee: Member(
+                            MemberExpr {
+                                object: Member(
+                                    MemberExpr {
+                                        object: Call(
+                                            CallExpr {
+                                                callee: Ident(
+                                                    Ident {
+                                                        name: "x",
+                                                    },
+                                                ),
+                                                arguments: [],
+                                            },
+                                        ),
+                                        property: Ident(
+                                            Ident {
+                                                name: "a",
+                                            },
+                                        ),
+                                        computed: false,
+                                    },
+                                ),
+                                property: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                                computed: true,
+                            },
+                        ),
+                        arguments: [],
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Update(
+                    UpdateExpr {
+                        operator: Increment,
+                        argument: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        prefix: false,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Update(
+                    UpdateExpr {
+                        operator: Decrement,
+                        argument: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        prefix: false,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Unary(
+                    UnaryExpr {
+                        operator: Delete,
+                        prefix: true,
+                        argument: Unary(
+                            UnaryExpr {
+                                operator: Void,
+                                prefix: true,
+                                argument: Unary(
+                                    UnaryExpr {
+                                        operator: TypeOf,
+                                        prefix: true,
+                                        argument: Unary(
+                                            UnaryExpr {
+                                                operator: Plus,
+                                                prefix: true,
+                                                argument: Unary(
+                                                    UnaryExpr {
+                                                        operator: Minus,
+                                                        prefix: true,
+                                                        argument: Unary(
+                                                            UnaryExpr {
+                                                                operator: Tilde,
+                                                                prefix: true,
+                                                                argument: Unary(
+                                                                    UnaryExpr {
+                                                                        operator: Not,
+                                                                        prefix: true,
+                                                                        argument: Ident(
+                                                                            Ident {
+                                                                                name: "x",
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Update(
+                    UpdateExpr {
+                        operator: Increment,
+                        argument: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        prefix: true,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Update(
+                    UpdateExpr {
+                        operator: Decrement,
+                        argument: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        prefix: true,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: Times,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: Over,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: Mod,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: Plus,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: Minus,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: LeftShift,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: RightShift,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: UnsignedRightShift,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: LessThan,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: GreaterThan,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: LessThanEqual,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: GreaterThanEqual,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: InstanceOf,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Func(
+                            Func {
+                                id: None,
+                                params: [],
+                                body: FuncBody(
+                                    [],
+                                ),
+                                generator: false,
+                                is_async: false,
+                            },
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: In,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Obj(
+                            [],
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: Equal,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: NotEqual,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: StrictEqual,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: StrictNotEqual,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: And,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: XOr,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Binary(
+                    BinaryExpr {
+                        operator: Or,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Logical(
+                    LogicalExpr {
+                        operator: And,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Logical(
+                    LogicalExpr {
+                        operator: Or,
+                        left: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Conditional(
+                    ConditionalExpr {
+                        test: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        alternate: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        consequent: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Conditional(
+                    ConditionalExpr {
+                        test: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        alternate: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        consequent: Conditional(
+                            ConditionalExpr {
+                                test: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                                alternate: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                                consequent: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Conditional(
+                    ConditionalExpr {
+                        test: Logical(
+                            LogicalExpr {
+                                operator: Or,
+                                left: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                                right: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            },
+                        ),
+                        alternate: Assign(
+                            AssignExpr {
+                                operator: Equal,
+                                left: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "x",
+                                        },
+                                    ),
+                                ),
+                                right: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            },
+                        ),
+                        consequent: Assign(
+                            AssignExpr {
+                                operator: Equal,
+                                left: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "x",
+                                        },
+                                    ),
+                                ),
+                                right: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: Equal,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: TimesEqual,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: DivEqual,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: ModEqual,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: PlusEqual,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: MinusEqual,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: LeftShiftEqual,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: RightShiftEqual,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: UnsignedRightShiftEqual,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: AndEqual,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: XOrEqual,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Assign(
+                    AssignExpr {
+                        operator: OrEqual,
+                        left: Expr(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        right: Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Sequence(
+                    [
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Sequence(
+                    [
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Sequence(
+                    [
+                        Assign(
+                            AssignExpr {
+                                operator: Equal,
+                                left: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "x",
+                                        },
+                                    ),
+                                ),
+                                right: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            },
+                        ),
+                        Assign(
+                            AssignExpr {
+                                operator: Equal,
+                                left: Expr(
+                                    Ident(
+                                        Ident {
+                                            name: "x",
+                                        },
+                                    ),
+                                ),
+                                right: Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Block(
+                BlockStmt(
+                    [],
+                ),
+            ),
+        ),
+        Stmt(
+            Block(
+                BlockStmt(
+                    [
+                        Stmt(
+                            Empty,
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Block(
+                BlockStmt(
+                    [
+                        Stmt(
+                            Expr(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Block(
+                BlockStmt(
+                    [
+                        Stmt(
+                            Expr(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Block(
+                BlockStmt(
+                    [
+                        Stmt(
+                            Expr(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                        ),
+                        Stmt(
+                            Expr(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Stmt(
+            Block(
+                BlockStmt(
+                    [
+                        Stmt(
+                            Expr(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                        ),
+                        Stmt(
+                            Expr(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        Decl(
+            Var(
+                Var,
+                [
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        init: None,
+                    },
+                ],
+            ),
+        ),
+        Decl(
+            Var(
+                Var,
+                [
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "y",
+                            },
+                        ),
+                        init: None,
+                    },
+                ],
+            ),
+        ),
+        Decl(
+            Var(
+                Var,
+                [
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "y",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "z",
+                            },
+                        ),
+                        init: None,
+                    },
+                ],
+            ),
+        ),
+        Decl(
+            Var(
+                Var,
+                [
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        init: Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    },
+                ],
+            ),
+        ),
+        Decl(
+            Var(
+                Var,
+                [
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        init: Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "y",
+                            },
+                        ),
+                        init: None,
+                    },
+                ],
+            ),
+        ),
+        Decl(
+            Var(
+                Var,
+                [
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        init: None,
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "y",
+                            },
+                        ),
+                        init: Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    },
+                ],
+            ),
+        ),
+        Decl(
+            Var(
+                Var,
+                [
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                        init: Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    },
+                    VarDecl {
+                        id: Ident(
+                            Ident {
+                                name: "y",
+                            },
+                        ),
+                        init: Some(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    },
+                ],
+            ),
+        ),
+        Stmt(
+            Empty,
+        ),
+        Stmt(
+            If(
+                IfStmt {
+                    test: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    consequent: Empty,
+                    alternate: None,
+                },
+            ),
+        ),
+        Stmt(
+            If(
+                IfStmt {
+                    test: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    consequent: Empty,
+                    alternate: Some(
+                        Empty,
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            DoWhile(
+                DoWhileStmt {
+                    test: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            While(
+                WhileStmt {
+                    test: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            For(
+                ForStmt {
+                    init: None,
+                    test: None,
+                    update: None,
+                    body: Break(
+                        None,
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            For(
+                ForStmt {
+                    init: Some(
+                        Expr(
+                            Lit(
+                                Number(
+                                    "0",
+                                ),
+                            ),
+                        ),
+                    ),
+                    test: Some(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                    update: Some(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            For(
+                ForStmt {
+                    init: Some(
+                        Expr(
+                            Binary(
+                                BinaryExpr {
+                                    operator: In,
+                                    left: Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                    right: Array(
+                                        [],
+                                    ),
+                                },
+                            ),
+                        ),
+                    ),
+                    test: Some(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                    update: None,
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            For(
+                ForStmt {
+                    init: Some(
+                        Variable(
+                            Var,
+                            [
+                                VarDecl {
+                                    id: Ident(
+                                        Ident {
+                                            name: "a",
+                                        },
+                                    ),
+                                    init: None,
+                                },
+                            ],
+                        ),
+                    ),
+                    test: None,
+                    update: None,
+                    body: Break(
+                        None,
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            For(
+                ForStmt {
+                    init: Some(
+                        Variable(
+                            Var,
+                            [
+                                VarDecl {
+                                    id: Ident(
+                                        Ident {
+                                            name: "a",
+                                        },
+                                    ),
+                                    init: None,
+                                },
+                                VarDecl {
+                                    id: Ident(
+                                        Ident {
+                                            name: "b",
+                                        },
+                                    ),
+                                    init: None,
+                                },
+                            ],
+                        ),
+                    ),
+                    test: Some(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                    update: Some(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            For(
+                ForStmt {
+                    init: Some(
+                        Variable(
+                            Var,
+                            [
+                                VarDecl {
+                                    id: Ident(
+                                        Ident {
+                                            name: "a",
+                                        },
+                                    ),
+                                    init: Some(
+                                        Lit(
+                                            Number(
+                                                "0",
+                                            ),
+                                        ),
+                                    ),
+                                },
+                            ],
+                        ),
+                    ),
+                    test: None,
+                    update: None,
+                    body: Break(
+                        None,
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            For(
+                ForStmt {
+                    init: Some(
+                        Variable(
+                            Var,
+                            [
+                                VarDecl {
+                                    id: Ident(
+                                        Ident {
+                                            name: "a",
+                                        },
+                                    ),
+                                    init: Some(
+                                        Binary(
+                                            BinaryExpr {
+                                                operator: In,
+                                                left: Lit(
+                                                    Number(
+                                                        "0",
+                                                    ),
+                                                ),
+                                                right: Array(
+                                                    [],
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ],
+                        ),
+                    ),
+                    test: Some(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                    update: None,
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            ForIn(
+                ForInStmt {
+                    left: Expr(
+                        Ident(
+                            Ident {
+                                name: "x",
+                            },
+                        ),
+                    ),
+                    right: Obj(
+                        [],
+                    ),
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            ForIn(
+                ForInStmt {
+                    left: Variable(
+                        Var,
+                        VarDecl {
+                            id: Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                            init: None,
+                        },
+                    ),
+                    right: Obj(
+                        [],
+                    ),
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            ForIn(
+                ForInStmt {
+                    left: Variable(
+                        Var,
+                        VarDecl {
+                            id: Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                            init: Some(
+                                Array(
+                                    [],
+                                ),
+                            ),
+                        },
+                    ),
+                    right: Obj(
+                        [],
+                    ),
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            ForIn(
+                ForInStmt {
+                    left: Variable(
+                        Var,
+                        VarDecl {
+                            id: Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                            init: Some(
+                                Binary(
+                                    BinaryExpr {
+                                        operator: In,
+                                        left: Lit(
+                                            Number(
+                                                "0",
+                                            ),
+                                        ),
+                                        right: Array(
+                                            [],
+                                        ),
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                    right: Obj(
+                        [],
+                    ),
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            For(
+                ForStmt {
+                    init: None,
+                    test: Some(
+                        Lit(
+                            Number(
+                                "0",
+                            ),
+                        ),
+                    ),
+                    update: None,
+                    body: Continue(
+                        None,
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "x",
+                    },
+                    body: For(
+                        ForStmt {
+                            init: None,
+                            test: Some(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                            update: None,
+                            body: Continue(
+                                Some(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            For(
+                ForStmt {
+                    init: None,
+                    test: None,
+                    update: None,
+                    body: Break(
+                        None,
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "x",
+                    },
+                    body: For(
+                        ForStmt {
+                            init: None,
+                            test: None,
+                            update: None,
+                            body: Break(
+                                Some(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Switch(
+                SwitchStmt {
+                    discriminant: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    cases: [
+                        SwitchCase {
+                            test: Some(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                            consequent: [
+                                Stmt(
+                                    Break(
+                                        None,
+                                    ),
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [],
+                    body: FuncBody(
+                        [
+                            Stmt(
+                                Return(
+                                    None,
+                                ),
+                            ),
+                        ],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [],
+                    body: FuncBody(
+                        [
+                            Stmt(
+                                Return(
+                                    Some(
+                                        Lit(
+                                            Number(
+                                                "0",
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Stmt(
+            With(
+                WithStmt {
+                    object: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            Switch(
+                SwitchStmt {
+                    discriminant: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    cases: [],
+                },
+            ),
+        ),
+        Stmt(
+            Switch(
+                SwitchStmt {
+                    discriminant: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    cases: [
+                        SwitchCase {
+                            test: Some(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                            consequent: [],
+                        },
+                    ],
+                },
+            ),
+        ),
+        Stmt(
+            Switch(
+                SwitchStmt {
+                    discriminant: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    cases: [
+                        SwitchCase {
+                            test: Some(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                            consequent: [],
+                        },
+                        SwitchCase {
+                            test: Some(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                            consequent: [],
+                        },
+                    ],
+                },
+            ),
+        ),
+        Stmt(
+            Switch(
+                SwitchStmt {
+                    discriminant: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    cases: [
+                        SwitchCase {
+                            test: None,
+                            consequent: [],
+                        },
+                    ],
+                },
+            ),
+        ),
+        Stmt(
+            Switch(
+                SwitchStmt {
+                    discriminant: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    cases: [
+                        SwitchCase {
+                            test: Some(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                            consequent: [],
+                        },
+                        SwitchCase {
+                            test: None,
+                            consequent: [],
+                        },
+                        SwitchCase {
+                            test: Some(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                            consequent: [],
+                        },
+                    ],
+                },
+            ),
+        ),
+        Stmt(
+            Switch(
+                SwitchStmt {
+                    discriminant: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    cases: [
+                        SwitchCase {
+                            test: Some(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                            consequent: [
+                                Stmt(
+                                    Empty,
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ),
+        Stmt(
+            Switch(
+                SwitchStmt {
+                    discriminant: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    cases: [
+                        SwitchCase {
+                            test: Some(
+                                Lit(
+                                    Number(
+                                        "0",
+                                    ),
+                                ),
+                            ),
+                            consequent: [
+                                Stmt(
+                                    Empty,
+                                ),
+                                Stmt(
+                                    Empty,
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ),
+        Stmt(
+            Switch(
+                SwitchStmt {
+                    discriminant: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    cases: [
+                        SwitchCase {
+                            test: None,
+                            consequent: [
+                                Stmt(
+                                    Empty,
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ),
+        Stmt(
+            Switch(
+                SwitchStmt {
+                    discriminant: Lit(
+                        Number(
+                            "0",
+                        ),
+                    ),
+                    cases: [
+                        SwitchCase {
+                            test: None,
+                            consequent: [
+                                Stmt(
+                                    Empty,
+                                ),
+                                Stmt(
+                                    Empty,
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "x",
+                    },
+                    body: Empty,
+                },
+            ),
+        ),
+        Stmt(
+            Labeled(
+                LabeledStmt {
+                    label: Ident {
+                        name: "x",
+                    },
+                    body: Labeled(
+                        LabeledStmt {
+                            label: Ident {
+                                name: "y",
+                            },
+                            body: Empty,
+                        },
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Try(
+                TryStmt {
+                    block: BlockStmt(
+                        [
+                            Stmt(
+                                Throw(
+                                    Lit(
+                                        Number(
+                                            "0",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ],
+                    ),
+                    handler: Some(
+                        CatchClause {
+                            param: Some(
+                                Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                            ),
+                            body: BlockStmt(
+                                [],
+                            ),
+                        },
+                    ),
+                    finalizer: None,
+                },
+            ),
+        ),
+        Stmt(
+            Try(
+                TryStmt {
+                    block: BlockStmt(
+                        [],
+                    ),
+                    handler: Some(
+                        CatchClause {
+                            param: Some(
+                                Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                            ),
+                            body: BlockStmt(
+                                [],
+                            ),
+                        },
+                    ),
+                    finalizer: None,
+                },
+            ),
+        ),
+        Stmt(
+            Try(
+                TryStmt {
+                    block: BlockStmt(
+                        [],
+                    ),
+                    handler: None,
+                    finalizer: Some(
+                        BlockStmt(
+                            [],
+                        ),
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Try(
+                TryStmt {
+                    block: BlockStmt(
+                        [],
+                    ),
+                    handler: Some(
+                        CatchClause {
+                            param: Some(
+                                Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                            ),
+                            body: BlockStmt(
+                                [],
+                            ),
+                        },
+                    ),
+                    finalizer: Some(
+                        BlockStmt(
+                            [],
+                        ),
+                    ),
+                },
+            ),
+        ),
+        Stmt(
+            Debugger,
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [],
+                    body: FuncBody(
+                        [],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [
+                        Pat(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                    ],
+                    body: FuncBody(
+                        [],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [
+                        Pat(
+                            Ident(
+                                Ident {
+                                    name: "x",
+                                },
+                            ),
+                        ),
+                        Pat(
+                            Ident(
+                                Ident {
+                                    name: "y",
+                                },
+                            ),
+                        ),
+                    ],
+                    body: FuncBody(
+                        [],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [],
+                    body: FuncBody(
+                        [
+                            Decl(
+                                Func(
+                                    Func {
+                                        id: Some(
+                                            Ident {
+                                                name: "f",
+                                            },
+                                        ),
+                                        params: [],
+                                        body: FuncBody(
+                                            [],
+                                        ),
+                                        generator: false,
+                                        is_async: false,
+                                    },
+                                ),
+                            ),
+                        ],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [],
+                    body: FuncBody(
+                        [
+                            Dir(
+                                Dir {
+                                    expr: String(
+                                        Double(
+                                            "use strict",
+                                        ),
+                                    ),
+                                    dir: "use strict",
+                                },
+                            ),
+                        ],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [],
+                    body: FuncBody(
+                        [
+                            Dir(
+                                Dir {
+                                    expr: String(
+                                        Single(
+                                            "use strict",
+                                        ),
+                                    ),
+                                    dir: "use strict",
+                                },
+                            ),
+                        ],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [],
+                    body: FuncBody(
+                        [
+                            Dir(
+                                Dir {
+                                    expr: String(
+                                        Double(
+                                            "other directive",
+                                        ),
+                                    ),
+                                    dir: "other directive",
+                                },
+                            ),
+                        ],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [],
+                    body: FuncBody(
+                        [
+                            Dir(
+                                Dir {
+                                    expr: String(
+                                        Single(
+                                            "other directive",
+                                        ),
+                                    ),
+                                    dir: "other directive",
+                                },
+                            ),
+                        ],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [],
+                    body: FuncBody(
+                        [
+                            Stmt(
+                                Expr(
+                                    Lit(
+                                        String(
+                                            Double(
+                                                "string",
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [],
+                    body: FuncBody(
+                        [
+                            Stmt(
+                                Expr(
+                                    Lit(
+                                        String(
+                                            Single(
+                                                "string",
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Decl(
+            Func(
+                Func {
+                    id: Some(
+                        Ident {
+                            name: "f",
+                        },
+                    ),
+                    params: [],
+                    body: FuncBody(
+                        [
+                            Stmt(
+                                Expr(
+                                    Binary(
+                                        BinaryExpr {
+                                            operator: Plus,
+                                            left: Lit(
+                                                String(
+                                                    Single(
+                                                        "string",
+                                                    ),
+                                                ),
+                                            ),
+                                            right: Lit(
+                                                Number(
+                                                    "0",
+                                                ),
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            ),
+                        ],
+                    ),
+                    generator: false,
+                    is_async: false,
+                },
+            ),
+        ),
+        Stmt(
+            Expr(
+                Func(
+                    Func {
+                        id: None,
+                        params: [],
+                        body: FuncBody(
+                            [],
+                        ),
+                        generator: false,
+                        is_async: false,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Func(
+                    Func {
+                        id: None,
+                        params: [
+                            Pat(
+                                Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                            ),
+                        ],
+                        body: FuncBody(
+                            [],
+                        ),
+                        generator: false,
+                        is_async: false,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Func(
+                    Func {
+                        id: None,
+                        params: [
+                            Pat(
+                                Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                            ),
+                            Pat(
+                                Ident(
+                                    Ident {
+                                        name: "y",
+                                    },
+                                ),
+                            ),
+                        ],
+                        body: FuncBody(
+                            [],
+                        ),
+                        generator: false,
+                        is_async: false,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Func(
+                    Func {
+                        id: None,
+                        params: [],
+                        body: FuncBody(
+                            [
+                                Decl(
+                                    Func(
+                                        Func {
+                                            id: Some(
+                                                Ident {
+                                                    name: "f",
+                                                },
+                                            ),
+                                            params: [],
+                                            body: FuncBody(
+                                                [],
+                                            ),
+                                            generator: false,
+                                            is_async: false,
+                                        },
+                                    ),
+                                ),
+                            ],
+                        ),
+                        generator: false,
+                        is_async: false,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Func(
+                    Func {
+                        id: Some(
+                            Ident {
+                                name: "f",
+                            },
+                        ),
+                        params: [],
+                        body: FuncBody(
+                            [],
+                        ),
+                        generator: false,
+                        is_async: false,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Func(
+                    Func {
+                        id: Some(
+                            Ident {
+                                name: "f",
+                            },
+                        ),
+                        params: [
+                            Pat(
+                                Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                            ),
+                        ],
+                        body: FuncBody(
+                            [],
+                        ),
+                        generator: false,
+                        is_async: false,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Func(
+                    Func {
+                        id: Some(
+                            Ident {
+                                name: "f",
+                            },
+                        ),
+                        params: [
+                            Pat(
+                                Ident(
+                                    Ident {
+                                        name: "x",
+                                    },
+                                ),
+                            ),
+                            Pat(
+                                Ident(
+                                    Ident {
+                                        name: "y",
+                                    },
+                                ),
+                            ),
+                        ],
+                        body: FuncBody(
+                            [],
+                        ),
+                        generator: false,
+                        is_async: false,
+                    },
+                ),
+            ),
+        ),
+        Stmt(
+            Expr(
+                Func(
+                    Func {
+                        id: Some(
+                            Ident {
+                                name: "f",
+                            },
+                        ),
+                        params: [],
+                        body: FuncBody(
+                            [
+                                Decl(
+                                    Func(
+                                        Func {
+                                            id: Some(
+                                                Ident {
+                                                    name: "f",
+                                                },
+                                            ),
+                                            params: [],
+                                            body: FuncBody(
+                                                [],
+                                            ),
+                                            generator: false,
+                                            is_async: false,
+                                        },
+                                    ),
+                                ),
+                            ],
+                        ),
+                        generator: false,
+                        is_async: false,
+                    },
+                ),
+            ),
+        ),
+    ],
+)

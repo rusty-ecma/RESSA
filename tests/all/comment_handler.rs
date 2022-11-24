@@ -120,16 +120,16 @@ function trimString(s) {
         .with_comment_handler(ch)
         .expect("failed to create parser");
     let _res = p.parse().expect("failed to parse js");
-    assert_eq!(p.comment_handler.comments.len(), 2);
+    assert_eq!(p.comment_handler().comments.len(), 2);
     assert_eq!(
-        p.comment_handler.comments[0].1,
+        p.comment_handler().comments[0].1,
         "/**
  * @param s {string} The string to trim
  * @returns {string}
  */"
     );
     assert_eq!(
-        p.comment_handler.comments[1].1,
+        p.comment_handler().comments[1].1,
         "/**
      * @param s {string} The string to trim
      * @returns {string}

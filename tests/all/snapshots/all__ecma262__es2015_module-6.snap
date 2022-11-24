@@ -1,0 +1,33 @@
+---
+source: tests/all/ecma262.rs
+expression: res
+---
+[
+    Decl(
+        Export(
+            Default(
+                Decl(
+                    Class(
+                        Class {
+                            id: Some(
+                                Ident {
+                                    name: "i18",
+                                },
+                            ),
+                            super_class: Some(
+                                Ident(
+                                    Ident {
+                                        name: "i19",
+                                    },
+                                ),
+                            ),
+                            body: ClassBody(
+                                [],
+                            ),
+                        },
+                    ),
+                ),
+            ),
+        ),
+    ),
+]
