@@ -19,8 +19,6 @@ jobs:
       run: curl https://hg.mozilla.org/mozilla-central/archive/tip.zip/js/src/jit-test/tests/ --output moz-central.zip
     - name: unzip moz-central
       run: unzip -qq moz-central.zip -d moz-central
-    # - name: clone Test262
-    #   run: git clone https://github.com/tc39/test262 ./test262_full && mv ./test262_full/test ./test262
     - name: Run tests
       run: cargo test --release --features=moz_central
       env:
