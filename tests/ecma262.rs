@@ -1,12 +1,12 @@
-#![cfg(test)]
-use super::{get_js_file, EverythingVersion, Lib};
+mod libs_common;
 use env_logger;
+use libs_common::{get_js_file, EverythingVersion, Lib};
 
 use ressa::Parser;
 #[test]
 fn es5() {
     let _ = env_logger::builder().is_test(true).try_init().ok();
-    info!("ES5");
+    log::info!("ES5");
     let path = Lib::Everything(EverythingVersion::Es5).path();
     log::debug!("path: {:?}", path);
     let js = get_js_file(&path).unwrap_or_else(|e| panic!("Faield to get {:?}\n{}", path, e));
@@ -18,7 +18,7 @@ fn es5() {
 #[test]
 fn es2015_script() {
     let _ = env_logger::builder().is_test(true).try_init().ok();
-    info!("ES2015 Script");
+    log::info!("ES2015 Script");
     let path = Lib::Everything(EverythingVersion::Es2015Script).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
     let mut p = Parser::new(&js).expect("Failed to create parser");
@@ -28,7 +28,7 @@ fn es2015_script() {
 
 #[test]
 fn es2015_module() {
-    info!("ES2015 Module");
+    log::info!("ES2015 Module");
     let _ = env_logger::builder().is_test(true).try_init().ok();
     let path = Lib::Everything(EverythingVersion::Es2015Module).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
