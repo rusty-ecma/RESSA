@@ -106,7 +106,7 @@ impl<'a> DuplicateNameDetector<'a> {
             }
             DeclKind::Var(is_module) => {
                 for (idx, scope) in self.states.iter().enumerate().rev() {
-                    trace!("checking scope {}", idx);
+                    log::trace!("checking scope {}", idx);
                     let error = if self.lex.has_at(idx, &i) && !scope.is_simple_catch() {
                         if let Some(Some(lex)) = self.first_lexes.get(idx) {
                             &i != lex
@@ -114,7 +114,7 @@ impl<'a> DuplicateNameDetector<'a> {
                             true
                         }
                     } else {
-                        trace!(
+                        log::trace!(
                             "looking for dupe in {} funcs_as_var: {}, funcs_has {}",
                             idx,
                             scope.funcs_as_var(is_module),
@@ -144,15 +144,15 @@ impl<'a> DuplicateNameDetector<'a> {
             }
             DeclKind::Func(is_module) => {
                 let state = if let Some(state) = self.states.last() {
-                    trace!("last state found {:?}", state);
+                    log::trace!("last state found {:?}", state);
                     *state
                 } else {
                     Scope::default()
                 };
                 self.check_lex(i.clone(), pos)?;
-                trace!("not in lexical decls");
+                log::trace!("not in lexical decls");
                 if !state.funcs_as_var(is_module) {
-                    trace!("state does not indicate functions should be treated as vars");
+                    log::trace!("state does not indicate functions should be treated as vars");
                     self.check_var(i.clone(), pos)?;
                 }
                 self.add_func(i, pos)
@@ -327,7 +327,7 @@ impl<'a> DuplicateNameDetector<'a> {
     }
 
     pub fn undefined_module_export_guard(&mut self, id: Cow<'a, str>) {
-        trace!("add_module_export: {}", id);
+        log::trace!("add_module_export: {}", id);
         if !self.var.has_at(0, &id) && !self.lex.has_at(0, &id) {
             self.undefined_module_exports.insert(id);
         }
@@ -348,7 +348,7 @@ impl<'a> DuplicateNameDetector<'a> {
 /// check the last tier in the chain map for an identifier
 fn check<'a>(map: &mut LexMap<'a>, i: Cow<'a, str>, pos: Position) -> Res<()> {
     log::trace!("check {:?} {:?} {:?}", map, i, pos);
-    trace!("checking for {}", i);
+    log::trace!("checking for {}", i);
     if map.last_has(&i) {
         if let Some(old_pos) = map.get(&i) {
             if *old_pos < pos {

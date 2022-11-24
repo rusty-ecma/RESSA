@@ -8,7 +8,7 @@ fn es5() {
     let _ = env_logger::builder().is_test(true).try_init().ok();
     info!("ES5");
     let path = Lib::Everything(EverythingVersion::Es5).path();
-    debug!("path: {:?}", path);
+    log::debug!("path: {:?}", path);
     let js = get_js_file(&path).unwrap_or_else(|e| panic!("Faield to get {:?}\n{}", path, e));
     let mut p = Parser::new(&js).expect("Failed to create parser");
     let tokens = p.parse().unwrap();

@@ -351,9 +351,10 @@ where
     /// ```
     #[tracing::instrument(level = "trace", skip(self))]
     pub fn parse(&mut self) -> Res<Program> {
-        debug!(
+        log::debug!(
             "{}: parse_script {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if self.context.is_module {
             self.context.strict = true;
@@ -369,9 +370,10 @@ where
     /// Parse all of the directives into a single prologue
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_directive_prologues(&mut self) -> Res<Vec<ProgramPart<'b>>> {
-        debug!(
+        log::debug!(
             "{}: parse_directive_prologues {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let mut ret = Vec::new();
         loop {
@@ -386,9 +388,10 @@ where
     /// Parse a single directive
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_directive(&mut self) -> Res<ProgramPart<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_directive {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let orig = self.look_ahead.clone();
         let expr = self.parse_expression()?;
@@ -405,9 +408,10 @@ where
                     self.context.found_directive_octal_escape =
                         self.context.found_directive_octal_escape || oct;
                 }
-                debug!(
+                log::debug!(
                     "updated context.strict to {}, allowed?: {}",
-                    self.context.strict, self.context.allow_strict_directive
+                    self.context.strict,
+                    self.context.allow_strict_directive
                 );
                 if !self.context.allow_strict_directive && self.context.strict {
                     return self.unexpected_token_error(&orig, "use strict in an invalid location");
@@ -439,7 +443,7 @@ where
     /// otherwise we move on to `Parser::parse_statement`
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_statement_list_item(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<ProgramPart<'b>> {
-        debug!("{}: parse_statement_list_item", self.look_ahead.span.start);
+        log::debug!("{}: parse_statement_list_item", self.look_ahead.span.start);
         self.context.set_is_assignment_target(true);
         self.context.set_is_binding_element(true);
         let tok = self.look_ahead.token.clone();
@@ -706,10 +710,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_export_decl(&mut self) -> Res<(ModExport<'b>, Option<Slice<'b>>)> {
-        debug!("{} parse_export_decl", self.look_ahead_position);
+        log::debug!("{} parse_export_decl", self.look_ahead_position);
         let mut semi = None;
         if let Some(scope) = self.context.lexical_names.last_scope() {
-            trace!("scope: {:?}", self.context.lexical_names.states);
+            log::trace!("scope: {:?}", self.context.lexical_names.states);
             if !scope.is_top() {
                 return Err(Error::InvalidExportError(self.current_position));
             }
@@ -968,9 +972,10 @@ where
     }
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_statement(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<Stmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_statement {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let lh = self.look_ahead.token.clone();
         let stmt = match lh {
@@ -1110,9 +1115,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_with_stmt(&mut self) -> Res<WithStmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_with_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if self.context.strict {
             self.tolerate_error(Error::NonStrictFeatureInStrictContext(
@@ -1157,9 +1163,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_while_stmt(&mut self) -> Res<WhileStmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_while_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword = self.expect_keyword(Keyword::While(()))?;
         let open_paren = self.expect_punct(Punct::OpenParen)?;
@@ -1194,9 +1201,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_var_stmt(&mut self) -> Res<Stmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_var_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword = self.expect_keyword(Keyword::Var(()))?;
         let decls = self.parse_var_decl_list(false)?;
@@ -1213,9 +1221,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_var_decl_list(&mut self, in_for: bool) -> Res<Vec<ListEntry<'b, VarDecl<'b>>>> {
-        debug!(
+        log::debug!(
             "{} parse_var_decl_list {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start = self.look_ahead_position;
         let first = self.parse_var_decl(in_for)?;
@@ -1245,9 +1254,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_var_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
-        debug!(
+        log::debug!(
             "{} parse_variable_decl_list in_for: {}",
-            self.look_ahead.span.start, in_for
+            self.look_ahead.span.start,
+            in_for
         );
         let (_, patt) = self.parse_pattern(true, &mut Vec::new())?;
         if self.context.strict && Self::is_restricted(&patt) {
@@ -1276,9 +1286,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_try_stmt(&mut self) -> Res<TryStmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_try_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword = self.expect_keyword(Keyword::Try(()))?;
         let block = self.parse_block(true)?;
@@ -1321,9 +1332,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_catch_clause(&mut self) -> Res<CatchClause<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_catch_clause {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword = self.expect_keyword(Keyword::Catch(()))?;
         let mut param_pos = self.look_ahead_position;
@@ -1388,9 +1400,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_finally_clause(&mut self) -> Res<FinallyClause<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_finally_clause {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword = self.expect_keyword(Keyword::Finally(()))?;
         let body = self.parse_block(true)?;
@@ -1399,9 +1412,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_throw_stmt(&mut self) -> Res<(Slice<'b>, Expr<'b>, Option<Slice<'b>>)> {
-        debug!(
+        log::debug!(
             "{}: parse_throw_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword = self.expect_keyword(Keyword::Throw(()))?;
         if self.context.has_line_term || self.at_punct(Punct::SemiColon) {
@@ -1414,9 +1428,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_switch_stmt(&mut self) -> Res<SwitchStmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_switch_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword = self.expect_keyword(Keyword::Switch(()))?;
         let open_paren = self.expect_punct(Punct::OpenParen)?;
@@ -1457,9 +1472,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_switch_case(&mut self) -> Res<SwitchCase<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_switch_case {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let (keyword, test) = if self.at_keyword(Keyword::Default(())) {
             (self.expect_keyword(Keyword::Default(()))?, None)
@@ -1490,9 +1506,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_return_stmt(&mut self) -> Res<(Slice<'b>, Option<Expr<'b>>, Option<Slice<'b>>)> {
-        debug!(
+        log::debug!(
             "{}: parse_return_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if !self.context.in_function_body {
             return self
@@ -1509,16 +1526,17 @@ where
         } else {
             None
         };
-        debug!("return statement: {:?} {}", ret, self.context.allow_yield);
+        log::debug!("return statement: {:?} {}", ret, self.context.allow_yield);
         let semi_colon = self.consume_semicolon()?;
         Ok((keyword, ret, semi_colon))
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_if_stmt(&mut self) -> Res<IfStmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_if_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
 
         let keyword = self.expect_keyword(Keyword::If(()))?;
@@ -1565,9 +1583,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_if_clause(&mut self) -> Res<Stmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_if_clause {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if self.context.strict && self.at_keyword(Keyword::Function(())) && !self.config.tolerant {
             return self.unexpected_token_error(&self.look_ahead, "");
@@ -1576,9 +1595,11 @@ where
     }
 
     fn parse_fn_stmt(&mut self, decl_pos: bool) -> Res<Func<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_fn_stmt {:?} {}",
-            self.look_ahead.span.start, self.look_ahead.token, decl_pos,
+            self.look_ahead.span.start,
+            self.look_ahead.token,
+            decl_pos,
         );
         let async_keyword = if self.at_contextual_keyword("async") {
             let keyword = self.next_item()?;
@@ -1593,9 +1614,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_for_stmt(&mut self) -> Res<Stmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_for_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword_for = self.expect_keyword(Keyword::For(()))?;
         let is_await = if self.at_keyword(Keyword::Await(())) {
@@ -1715,7 +1737,7 @@ where
                 let prev_in = self.context.allow_in;
                 self.context.allow_in = false;
                 let mut decls = self.parse_binding_list(&var_kind, true)?;
-                debug!("{:?}", decls);
+                log::debug!("{:?}", decls);
                 self.context.allow_in = prev_in;
                 if decls.len() == 1 {
                     let decl = if let Some(d) = decls.pop() {
@@ -1865,9 +1887,10 @@ where
         for_keyword: Slice<'b>,
         open_paren: Slice<'b>,
     ) -> Res<ForStmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_for_loop {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let init = if self.at_punct(Punct::SemiColon) {
             None
@@ -1884,9 +1907,10 @@ where
         keyword_for: Slice<'b>,
         open_paren: Slice<'b>,
     ) -> Res<ForStmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_for_loop_cont {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let semi1 = self.expect_punct(Punct::SemiColon)?;
         let test = if self.at_punct(Punct::SemiColon) {
@@ -1925,9 +1949,10 @@ where
         keyword_for: Slice<'b>,
         open_paren: Slice<'b>,
     ) -> Res<ForInStmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_for_in_loop {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if let LoopLeft::Variable(
             ref kind,
@@ -1986,9 +2011,10 @@ where
         keyword_for: Slice<'b>,
         open_paren: Slice<'b>,
     ) -> Res<ForOfStmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_for_of_loop {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if let LoopLeft::Variable(_, VarDecl { init: Some(_), .. }) = left {
             return Err(Error::ForOfInAssign(
@@ -2024,9 +2050,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_loop_body(&mut self) -> Res<Stmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_loop_body {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let prev_iter = self.context.in_iteration;
         self.context.in_iteration = true;
@@ -2037,9 +2064,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_do_while_stmt(&mut self) -> Res<DoWhileStmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_do_while_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start_pos = self.look_ahead_position;
         let keyword_do = self.expect_keyword(Keyword::Do(()))?;
@@ -2072,18 +2100,20 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_break_stmt(&mut self) -> Res<(Slice<'b>, Option<Ident<'b>>, Option<Slice<'b>>)> {
-        debug!(
+        log::debug!(
             "{}: parse_break_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         self.parse_optionally_labeled_statement(Keyword::Break(()))
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_continue_stmt(&mut self) -> Res<(Slice<'b>, Option<Ident<'b>>, Option<Slice<'b>>)> {
-        debug!(
+        log::debug!(
             "{}: parse_continue_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         self.parse_optionally_labeled_statement(Keyword::Continue(()))
     }
@@ -2092,7 +2122,7 @@ where
         &mut self,
         k: Keyword<()>,
     ) -> Res<(Slice<'b>, Option<Ident<'b>>, Option<Slice<'b>>)> {
-        debug!(
+        log::debug!(
             "{}: parse_optionally_labeled_statement",
             self.look_ahead.span.start
         );
@@ -2131,9 +2161,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_debugger_stmt(&mut self) -> Res<Stmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_debugger_stmt {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword = self.expect_keyword(Keyword::Debugger(()))?;
         let semi_colon = self.consume_semicolon()?;
@@ -2145,7 +2176,7 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_labelled_statement(&mut self) -> Res<Stmt<'b>> {
-        debug!("parse_labelled_statement, {:?}", self.look_ahead.token);
+        log::debug!("parse_labelled_statement, {:?}", self.look_ahead.token);
         let start = self.look_ahead.span;
         let pos = self.look_ahead_position;
         let expr = self.parse_expression()?;
@@ -2221,9 +2252,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_expression_statement(&mut self) -> Res<(Expr<'b>, Option<Slice<'b>>)> {
-        debug!(
+        log::debug!(
             "{}: parse_expression_statement {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         self.expr_stmt_guard()?;
         let ret = self.parse_expression()?;
@@ -2275,9 +2307,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_expression(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_expression {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let ret = isolate_cover_grammar!(self, parse_assignment_expr)?;
         if self.at_punct(Punct::Comma) {
@@ -2299,9 +2332,10 @@ where
     }
 
     fn parse_block(&mut self, new_scope: bool) -> Res<BlockStmt<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_block {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let open_brace = self.expect_punct(Punct::OpenBrace)?;
         if new_scope {
@@ -2338,9 +2372,10 @@ where
     }
 
     fn parse_lexical_decl(&mut self, in_for: bool) -> Res<Decl<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_lexical_decl {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let next = self.next_item()?;
         let kind = match next.token {
@@ -2365,9 +2400,10 @@ where
         kind: &VarKind,
         in_for: bool,
     ) -> Res<Vec<ListEntry<'b, VarDecl<'b>>>> {
-        debug!(
+        log::debug!(
             "{}: parse_binding_list {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let k = if matches!(kind, VarKind::Var(_)) {
             lexical_names::DeclKind::Var(self.context.is_module)
@@ -2394,9 +2430,10 @@ where
     }
 
     fn parse_variable_decl_list(&mut self, in_for: bool) -> Res<Vec<ListEntry<'b, VarDecl<'b>>>> {
-        debug!(
+        log::debug!(
             "{} parse_variable_decl_list in_for: {}",
-            self.look_ahead.span.start, in_for
+            self.look_ahead.span.start,
+            in_for
         );
         let first = self.parse_var_decl(in_for)?;
         let mut ret = vec![ListEntry::no_comma(first)];
@@ -2419,9 +2456,10 @@ where
     }
 
     fn parse_lexical_binding(&mut self, kind: &VarKind, in_for: bool) -> Res<VarDecl<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_lexical_binding {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start = self.look_ahead.clone();
         let (_, id) = self.parse_pattern(matches!(kind, VarKind::Var(_)), &mut Vec::new())?;
@@ -2461,9 +2499,10 @@ where
     }
 
     fn parse_function_decl(&mut self, opt_ident: bool) -> Res<Func<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_function_decl {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start_pos = self.look_ahead_position;
         let keyword_async = if self.at_contextual_keyword("async") {
@@ -2505,7 +2544,7 @@ where
         let prev_super = self.context.allow_super;
         self.context.allow_await = keyword_async.is_none();
         self.context.allow_yield = star.is_none();
-        debug!("setting allow_super to {}", false);
+        log::debug!("setting allow_super to {}", false);
         self.context.set_allow_super(false);
         let param_start = self.look_ahead_position;
         self.add_scope(lexical_names::Scope::FuncTop);
@@ -2550,7 +2589,7 @@ where
         self.context.allow_strict_directive = prev_allow_strict;
         self.context.allow_await = prev_await;
         self.context.allow_yield = prev_yield;
-        debug!("setting allow_super to {}", prev_super);
+        log::debug!("setting allow_super to {}", prev_super);
         self.context.set_allow_super(prev_super);
         self.remove_scope();
         Ok(Func {
@@ -2573,9 +2612,12 @@ where
         is_hanging: bool,
         keyword_async: Option<Slice<'b>>,
     ) -> Res<Func<'b>> {
-        debug!(
+        log::debug!(
             "{} parse_func( is_stmt: {}, opt_id: {}, is_hanging: {}",
-            self.look_ahead.span.start, is_stmt, opt_id, is_hanging
+            self.look_ahead.span.start,
+            is_stmt,
+            opt_id,
+            is_hanging
         );
         let star = if self.at_punct(Punct::Asterisk) {
             let star = self.next_item()?;
@@ -2596,13 +2638,13 @@ where
                 }
                 let id = self.parse_var_ident(false)?;
                 if !is_hanging {
-                    trace!(
+                    log::trace!(
                         "function not hanging, strict: {}, generator: {}, async: {}",
                         self.context.strict,
                         star.is_some(),
                         keyword_async.is_some()
                     );
-                    trace!(
+                    log::trace!(
                         "last scope: {:?}\n{:?}",
                         self.context.lexical_names.last_scope(),
                         self.context.lexical_names.states
@@ -2641,9 +2683,10 @@ where
         let param_start = self.look_ahead_position;
         self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_func_params()?;
-        debug!(
+        log::debug!(
             "any params restricted? {}, {}",
-            params.found_restricted, params.strict
+            params.found_restricted,
+            params.strict
         );
         let prev_strict = self.context.strict;
         let prev_oct = self.context.found_directive_octal_escape;
@@ -2687,17 +2730,19 @@ where
     }
     #[tracing::instrument(level = "trace", skip(self))]
     fn remove_scope(&mut self) {
-        trace!("{} remove_scope", self.look_ahead.span.start);
+        log::trace!("{} remove_scope", self.look_ahead.span.start);
         self.context.lexical_names.remove_child();
     }
     fn add_scope(&mut self, scope: lexical_names::Scope) {
-        trace!("{} add_scope {:?}", self.look_ahead.span.start, scope);
+        log::trace!("{} add_scope {:?}", self.look_ahead.span.start, scope);
         self.context.lexical_names.new_child(scope);
     }
     fn declare_pat(&mut self, pat: &Pat<'b>, kind: DeclKind, pos: Position) -> Res<()> {
-        info!(
+        log::info!(
             "{} declare_pat {:?} {:?}",
-            self.look_ahead.span.start, pat, pos
+            self.look_ahead.span.start,
+            pat,
+            pos
         );
         self.context.lexical_names.declare_pat(pat, kind, pos)
     }
@@ -2722,9 +2767,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_function_source_el(&mut self) -> Res<FuncBody<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_function_source_el {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let open_brace = self.expect_punct(Punct::OpenBrace)?;
         let mut body = self.parse_directive_prologues()?;
@@ -2755,9 +2801,10 @@ where
     }
 
     fn parse_class_decl(&mut self, opt_ident: bool, check_id: bool) -> Res<Class<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_class_decl {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let prev_strict = self.context.strict;
         let prev_oct = self.context.found_directive_octal_escape;
@@ -2822,9 +2869,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_class_body(&mut self) -> Res<ClassBody<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_class_body {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let mut props = Vec::new();
         let mut has_ctor = false;
@@ -2850,9 +2898,10 @@ where
     /// and (false, Prop) otherwise
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_class_el(&mut self, has_ctor: bool) -> Res<Prop<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_class_el {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start = self.look_ahead_position;
         let keyword_static = if self.at_contextual_keyword("static") {
@@ -2887,7 +2936,7 @@ where
         };
 
         let star = if self.at_punct(Punct::Asterisk) {
-            debug!("found leading asterisk");
+            log::debug!("found leading asterisk");
             let star = self.next_item()?;
             self.slice_from(&star)
         } else {
@@ -2967,9 +3016,10 @@ where
         keyword_static: Option<Slice<'b>>,
         mut star: Option<Slice<'b>>,
     ) -> Res<Prop<'b>> {
-        debug!(
+        log::debug!(
             "{}: method_def {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let mut keyword_async = None;
         let id = if self.at_contextual_keyword("get") {
@@ -3019,9 +3069,10 @@ where
         keyword_static: Option<Slice<'b>>,
         item_get: Item<&'b str>,
     ) -> Res<PropGet<'b>> {
-        debug!(
+        log::debug!(
             "{}: get_method_def {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword_get = self.get_slice(&item_get)?;
         let id = self.parse_object_property_key()?;
@@ -3044,9 +3095,10 @@ where
         keyword_static: Option<Slice<'b>>,
         item_set: Item<&'b str>,
     ) -> Res<PropSet<'b>> {
-        debug!(
+        log::debug!(
             "{}: set_method_def {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword_set = self.get_slice(&item_set)?;
         let id = self.parse_object_property_key()?;
@@ -3083,9 +3135,10 @@ where
         star: Option<Slice<'b>>,
         id: PropInitKey<'b>,
     ) -> Res<Prop<'b>> {
-        debug!(
+        log::debug!(
             "{}: method_def_cont {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
@@ -3129,9 +3182,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_class_ctor(&mut self, id: PropInitKey<'b>) -> Res<Prop<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_class_ctor {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let prev_allow_super_call = self.context.allow_super_call;
         self.context.allow_super_call = self.context.allow_super;
@@ -3153,7 +3207,7 @@ where
     /// different shapes that `key` could be, including
     /// identifiers and literals
     fn is_key(key: &PropKey, other: &str) -> bool {
-        trace!("is_key: {:?} <-> {}", key, other);
+        log::trace!("is_key: {:?} <-> {}", key, other);
         match key {
             PropKey::Lit(ref l) => match l {
                 Lit::String(ref s) => s.content.source == other,
@@ -3176,7 +3230,7 @@ where
         keyword_async: Slice<'b>,
         id: PropInitKey<'b>,
     ) -> Res<PropMethod<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_property_method_async_fn",
             self.look_ahead.span.start
         );
@@ -3210,9 +3264,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_property_method(&mut self, id: PropInitKey<'b>) -> Res<PropMethod<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_property_method {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
@@ -3249,9 +3304,10 @@ where
         keyword_static: Option<Slice<'b>>,
         keyword_get: Slice<'b>,
     ) -> Res<Prop<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_getter_method {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start = self.look_ahead_position;
         let prev_yield = self.context.allow_yield;
@@ -3282,9 +3338,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<FuncBody<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_method_body {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         self.context.set_is_assignment_target(false);
         self.context.set_is_binding_element(false);
@@ -3310,9 +3367,10 @@ where
         keyword_set: Slice<'b>,
         key: PropInitKey<'b>,
     ) -> Res<Prop<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_setter_method {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start = self.look_ahead_position;
         let prev_allow = self.context.allow_yield;
@@ -3362,9 +3420,10 @@ where
         simple: bool,
         found_restricted: bool,
     ) -> Res<FuncBody<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_property_method_fn {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         self.context.set_is_assignment_target(false);
         self.context.set_is_binding_element(false);
@@ -3388,7 +3447,7 @@ where
     }
 
     fn qualified_prop_name(tok: &Token<&str>) -> bool {
-        debug!("qualified_prop_name",);
+        log::debug!("qualified_prop_name",);
         tok.is_ident()
             || tok.is_keyword()
             || tok.is_literal()
@@ -3397,9 +3456,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_object_property_key(&mut self) -> Res<PropInitKey<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_object_property_key {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let item = self.next_item()?;
         if matches!(item.token, Token::String(_) | Token::Number(_)) {
@@ -3527,9 +3587,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_primary_expression(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_primary_expression {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if self.context.strict && self.look_ahead.token.is_strict_reserved() {
             return Err(Error::NonStrictFeatureInStrictContext(
@@ -3676,9 +3737,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_group_expr(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_group_expr {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let open_paren = self.expect_punct(Punct::OpenParen)?;
         if self.at_punct(Punct::CloseParen) {
@@ -3898,9 +3960,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_array_init(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_array_init {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let open_bracket = self.expect_punct(Punct::OpenBracket)?;
         let mut elements = Vec::new();
@@ -3950,9 +4013,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_obj_init(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_obj_init {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start_pos = self.look_ahead_position;
         let open_brace = self.expect_punct(Punct::OpenBrace)?;
@@ -3968,7 +4032,7 @@ where
                 let (found_proto, prop) = self.parse_obj_prop()?;
                 if found_proto {
                     proto_ct += 1;
-                    debug!("found proto: {}", proto_ct);
+                    log::debug!("found proto: {}", proto_ct);
                 }
                 prop
             };
@@ -3997,9 +4061,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_obj_prop(&mut self) -> Res<(bool, ObjProp<'b>)> {
-        debug!(
+        log::debug!(
             "{}: parse_obj_prop {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start = self.look_ahead.clone();
         let mut is_proto = false;
@@ -4143,7 +4208,7 @@ where
     }
 
     fn is_proto_(key: &PropKey) -> bool {
-        trace!("is_proto {:?}", key);
+        log::trace!("is_proto {:?}", key);
         match key {
             PropKey::Lit(ref l) => match l {
                 Lit::String(ref s) => s.content.source == "__proto__",
@@ -4169,9 +4234,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_template_lit(&mut self, is_tagged: bool) -> Res<TemplateLit<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_template_Lit {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if !self.look_ahead.token.is_template_head() {
             return self
@@ -4196,9 +4262,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_template_element(&mut self, is_tagged: bool) -> Res<TemplateElement<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_template_element {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         use resast::spanned::{Position, SourceLocation};
         let item = self.next_item()?;
@@ -4247,9 +4314,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_function_expr(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_function_expr {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start_pos = self.look_ahead_position;
         let is_async = self.at_contextual_keyword("async");
@@ -4269,9 +4337,9 @@ where
         let prev_await = self.context.allow_await;
         let prev_yield = self.context.allow_yield;
         let prev_super = self.context.allow_super;
-        debug!("setting allow_super to {}", false);
+        log::debug!("setting allow_super to {}", false);
         self.context.set_allow_super(false);
-        debug!("setting allow_await to {}", is_async);
+        log::debug!("setting allow_await to {}", is_async);
         self.context.allow_await = keyword_async.is_none();
         self.context.allow_yield = star.is_none();
         let mut found_restricted = false;
@@ -4335,7 +4403,7 @@ where
         self.context.allow_strict_directive = prev_allow_strict_directive;
         self.context.allow_yield = prev_yield;
         self.context.allow_await = prev_await;
-        debug!("setting allow_super to {}", prev_super);
+        log::debug!("setting allow_super to {}", prev_super);
         self.context.set_allow_super(prev_super);
         self.remove_scope();
         let func = Func {
@@ -4353,9 +4421,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_fn_name(&mut self, is_gen: bool) -> Res<resast::spanned::Ident<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_fn_name {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if self.context.strict && !is_gen && self.at_keyword(Keyword::Yield(())) {
             self.parse_ident_name()
@@ -4366,9 +4435,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_ident_name(&mut self) -> Res<resast::spanned::Ident<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_ident_name {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let ident = self.next_item()?;
         match &ident.token {
@@ -4382,9 +4452,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_var_ident(&mut self, is_var: bool) -> Res<resast::spanned::Ident<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_var_ident {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let ident = self.next_item()?;
         if ident.token.matches_keyword(Keyword::Yield(()))
@@ -4406,7 +4477,7 @@ where
                     && !ident.token.matches_keyword(Keyword::Await(())))
                 || !is_var
             {
-                debug!("strict: {}\nis_strict_reserved: {}, matches_let: {}, matches_await: {}, is_var: {}",
+                log::debug!("strict: {}\nis_strict_reserved: {}, matches_let: {}, matches_await: {}, is_var: {}",
                     self.context.strict,
                     ident.token.is_strict_reserved(),
                     ident.token.matches_keyword(Keyword::Let(())),
@@ -4418,9 +4489,10 @@ where
         } else if (self.context.is_module || !self.context.allow_await)
             && &self.original[ident.span.start..ident.span.end] == "await"
         {
-            debug!(
+            log::debug!(
                 "invalid await await: {}, module: {}",
-                self.context.allow_await, self.context.is_module
+                self.context.allow_await,
+                self.context.is_module
             );
             return self.expected_token_error(&ident, &["not `await`"]);
         }
@@ -4447,9 +4519,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_formal_params(&mut self) -> Res<FormalParams<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_formal_params {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let open_paren = self.expect_punct(Punct::OpenParen)?;
         let mut args = Vec::new();
@@ -4487,9 +4560,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_formal_param(&mut self, simple: bool) -> Res<(bool, bool, FuncArg<'b>)> {
-        debug!(
+        log::debug!(
             "{}: parse_formal_param {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start = self.look_ahead_position;
         let mut params: Vec<Item<&'b str>> = Vec::new();
@@ -4508,9 +4582,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_rest_element(&mut self, params: &mut Vec<Item<&'b str>>) -> Res<(bool, RestPat<'b>)> {
-        debug!(
+        log::debug!(
             "{}: parse_rest_element {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let dots = self.expect_punct(Punct::Ellipsis)?;
         let (restricted, pat) = self.parse_pattern(false, params)?;
@@ -4526,9 +4601,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_binding_rest_el(&mut self, params: &mut Vec<Item<&'b str>>) -> Res<RestPat<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_binding_rest_el {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let dots = self.expect_punct(Punct::Ellipsis)?;
         let (_b, pat) = self.parse_pattern(false, params)?;
@@ -4540,9 +4616,10 @@ where
         &mut self,
         params: &mut Vec<Item<&'b str>>,
     ) -> Res<(bool, Pat<'b>)> {
-        debug!(
+        log::debug!(
             "{}: parse_pattern_with_default {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let (is_restricted, ret) = self.parse_pattern(true, params)?;
         if self.at_punct(Punct::Equal) {
@@ -4569,9 +4646,10 @@ where
         is_var: bool,
         params: &mut Vec<Item<&'b str>>,
     ) -> Res<(bool, Pat<'b>)> {
-        debug!(
+        log::debug!(
             "{}: parse_pattern {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if self.at_punct(Punct::OpenBracket) {
             self.parse_array_pattern(params)
@@ -4590,9 +4668,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_array_pattern(&mut self, params: &mut Vec<Item<&'b str>>) -> Res<(bool, Pat<'b>)> {
-        debug!(
+        log::debug!(
             "{}: parse_array_pattern {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let open_bracket = self.expect_punct(Punct::OpenBracket)?;
         let mut elements = Vec::new();
@@ -4644,9 +4723,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_object_pattern(&mut self) -> Res<(bool, Pat<'b>)> {
-        debug!(
+        log::debug!(
             "{}: parse_object_pattern {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let open_brace = self.expect_punct(Punct::OpenBrace)?;
         let mut body = Vec::new();
@@ -4674,9 +4754,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_rest_prop(&mut self) -> Res<ObjPatPart<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_rest_prop {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let dots = self.expect_punct(Punct::Ellipsis)?;
         let (_, arg) = self.parse_pattern(false, &mut Vec::new())?;
@@ -4693,9 +4774,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_property_pattern(&mut self) -> Res<ObjPatPart<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_property_pattern {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let (key, colon, value) = if self.look_ahead.token.is_ident() {
             let ident = self.parse_var_ident(false)?;
@@ -4737,9 +4819,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_assignment_expr(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_assignment_expr {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if !self.context.allow_yield && self.at_keyword(Keyword::Yield(())) {
             self.parse_yield_expr()
@@ -4778,9 +4861,10 @@ where
                 };
                 current = Expr::ArrowParamPlaceHolder(inner);
             }
-            debug!(
+            log::debug!(
                 "current expression: {:?} {}",
-                current, self.context.allow_yield
+                current,
+                self.context.allow_yield
             );
             if self.at_punct(Punct::EqualGreaterThan) {
                 self.context.set_is_assignment_target(false);
@@ -5221,9 +5305,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn reinterpret_expr_as_pat(&self, ex: Expr<'b>) -> Res<Pat<'b>> {
-        debug!(
+        log::debug!(
             "{}: reinterpret_expr_as_pat {:?}",
-            self.look_ahead.span.start, ex
+            self.look_ahead.span.start,
+            ex
         );
         match ex {
             Expr::Array(a) => {
@@ -5300,9 +5385,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn reinterpret_array_pat_part(&self, part: Expr<'b>) -> Res<ArrayPatPart<'b>> {
-        debug!(
+        log::debug!(
             "{}: reinterpret_array_pat_part {:?}",
-            self.look_ahead.span.start, part
+            self.look_ahead.span.start,
+            part
         );
         let ret = if let Expr::Spread(spread) = part {
             if Self::is_reinterpret_target(&spread.expr) {
@@ -5377,9 +5463,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_yield_expr(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_yield_expr {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let keyword = self.expect_keyword(Keyword::Yield(()))?;
         let mut argument: Option<Box<Expr>> = None;
@@ -5406,9 +5493,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_conditional_expr(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_conditional_expr {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let expr = inherit_cover_grammar!(self, parse_binary_expression)?;
         if self.at_punct(Punct::QuestionMark) {
@@ -5437,9 +5525,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_binary_expression(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_binary_expression {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let mut current = inherit_cover_grammar!(self, parse_exponentiation_expression)?;
         let token = self.look_ahead.clone();
@@ -5462,7 +5551,7 @@ where
                     right = stack.pop().ok_or_else(|| {
                         self.op_error("invalid binary operation, no right expr in stack")
                     })?;
-                    debug!("right: {:#?} {}", right, self.context.allow_yield);
+                    log::debug!("right: {:#?} {}", right, self.context.allow_yield);
                     let op = ops.pop().ok_or_else(|| {
                         self.op_error("invalid binary operation, too few operators")
                     })?;
@@ -5470,7 +5559,7 @@ where
                     left = stack.pop().ok_or_else(|| {
                         self.op_error("invalid binary operation, no left expr in stack")
                     })?;
-                    debug!("left: {:#?} {}", left, self.context.allow_yield);
+                    log::debug!("left: {:#?} {}", left, self.context.allow_yield);
                     if op.token.matches_punct(Punct::DoubleAmpersand)
                         || op.token.matches_punct(Punct::DoublePipe)
                     {
@@ -5537,7 +5626,7 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_exponentiation_expression(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_exponentiation_expression",
             self.look_ahead.span.start
         );
@@ -5568,9 +5657,11 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_unary_expression(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_unary_expression {:?} allow_await: {}",
-            self.look_ahead.span.start, self.look_ahead.token, self.context.allow_await
+            self.look_ahead.span.start,
+            self.look_ahead.token,
+            self.context.allow_await
         );
         if self.at_punct(Punct::Plus)
             || self.at_punct(Punct::Dash)
@@ -5600,7 +5691,7 @@ where
             };
             Ok(Expr::Unary(unary))
         } else if !self.context.allow_await && self.at_keyword(Keyword::Await(())) {
-            debug!("parsing await expr");
+            log::debug!("parsing await expr");
             self.parse_await_expr()
         } else {
             self.parse_update_expr()
@@ -5676,9 +5767,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_await_expr(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_await_expr {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if self.context.allow_await {
             self.unexpected_token_error(&self.look_ahead, "await is not valid in this context")?;
@@ -5692,9 +5784,10 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_update_expr(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_update_expr {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let start = self.look_ahead.clone();
         if self.at_punct(Punct::DoublePlus) || self.at_punct(Punct::DoubleDash) {
@@ -5825,7 +5918,7 @@ where
                     object: Box::new(expr),
                     property: Box::new(prop),
                 };
-                debug!(target: "look_ahead", "{:?}", member);
+                log::debug!(target: "look_ahead", "{:?}", member);
                 expr = Expr::Member(member);
             } else if self.at_punct(Punct::Period) {
                 self.context.set_is_binding_element(false);
@@ -5879,7 +5972,7 @@ where
 
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_left_hand_side_expr_allow_call(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_left_hand_side_expr_allow_call",
             self.look_ahead.span.start
         );
@@ -5910,7 +6003,7 @@ where
                     property: Box::new(prop),
                     indexer,
                 });
-                debug!(target: "look_ahead", "1 {:?}", expr);
+                log::debug!(target: "look_ahead", "1 {:?}", expr);
             } else if self.at_punct(Punct::OpenParen) {
                 let current_pos = self.look_ahead_position;
                 let async_arrow = is_async && start_pos.line == current_pos.line;
@@ -5964,7 +6057,7 @@ where
                     indexer,
                     property: Box::new(prop),
                 };
-                debug!(target: "look_ahead", "{:?}", member);
+                log::debug!(target: "look_ahead", "{:?}", member);
                 expr = Expr::Member(member);
             } else if self.look_ahead.token.is_template_head() {
                 let quasi = self.parse_template_lit(true)?;
@@ -5983,9 +6076,10 @@ where
     /// Parse the arguments of an async function
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_async_args(&mut self) -> Res<(Slice<'b>, Vec<ListEntry<'b, Expr<'b>>>, Slice<'b>)> {
-        debug!(
+        log::debug!(
             "{}: parse_async_args {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let open_paren = self.expect_punct(Punct::OpenParen)?;
         let prev_await = self.context.allow_await;
@@ -6030,9 +6124,10 @@ where
     /// note: not sure this is needed
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_async_arg(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_async_arg {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let expr = self.parse_assignment_expr()?;
         self.context.first_covert_initialized_name_error = None;
@@ -6043,9 +6138,10 @@ where
     /// a non-existent comma
     #[tracing::instrument(level = "trace", skip(self))]
     fn expect_comma_sep(&mut self) -> Res<Slice<'b>> {
-        debug!(
+        log::debug!(
             "{}: expect_comma_sep {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         self.expect_punct(Punct::Comma)
     }
@@ -6053,9 +6149,10 @@ where
     /// Parse an expression preceded by the `...` operator
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_spread_element(&mut self) -> Res<SpreadExpr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_spread_element {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let dots = self.expect_punct(Punct::Ellipsis)?;
         let expr = inherit_cover_grammar!(self, parse_assignment_expr)?;
@@ -6065,9 +6162,10 @@ where
     /// Parse function arguments, expecting to open with `(` and close with `)`
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_args(&mut self) -> Res<(Slice<'b>, Vec<ListEntry<'b, Expr<'b>>>, Slice<'b>)> {
-        debug!(
+        log::debug!(
             "{}: parse_args {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let open_paren = self.expect_punct(Punct::OpenParen)?;
         let mut args = Vec::new();
@@ -6101,9 +6199,10 @@ where
     /// body
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_new_expr(&mut self) -> Res<Expr<'b>> {
-        debug!(
+        log::debug!(
             "{}: parse_new_expr {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         let item = self.next_item()?;
         if let Token::Keyword(ref key) = &item.token {
@@ -6230,7 +6329,7 @@ where
     /// and return the last token
     #[tracing::instrument(level = "trace", skip(self))]
     fn next_item(&mut self) -> Res<Item<&'b str>> {
-        trace!("next_item {}", self.context.has_line_term);
+        log::trace!("next_item {}", self.context.has_line_term);
         let mut comment_line_term = false;
         loop {
             self.context.has_line_term = comment_line_term || self.scanner.has_pending_new_line();
@@ -6242,11 +6341,11 @@ where
                         look_ahead.token,
                         self.scanner.string_for(&look_ahead.span)
                     );
-                    debug!("look_ahead: {:?}", self._look_ahead);
+                    log::debug!("look_ahead: {:?}", self._look_ahead);
                 }
                 self.look_ahead_position = look_ahead.location.start;
                 if look_ahead.token.is_comment() {
-                    trace!(
+                    log::trace!(
                         "next_item comment {} {:?}",
                         self.context.has_line_term,
                         look_ahead.token
@@ -6361,9 +6460,10 @@ where
     }
     #[tracing::instrument(level = "trace", skip(self))]
     fn at_import_call(&mut self) -> Res<bool> {
-        debug!(
+        log::debug!(
             "{}: at_import_call {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if self.at_keyword(Keyword::Import(())) {
             let state = self.scanner.get_state();
@@ -6474,9 +6574,10 @@ where
     /// next token would need to be on the same line
     #[tracing::instrument(level = "trace", skip(self))]
     fn at_async_function(&mut self) -> bool {
-        debug!(
+        log::debug!(
             "{}: at_async_function {:?}",
-            self.look_ahead.span.start, self.look_ahead.token
+            self.look_ahead.span.start,
+            self.look_ahead.token
         );
         if self.at_contextual_keyword("async") {
             !self.scanner.has_pending_new_line()
@@ -6499,7 +6600,7 @@ where
     /// EoF or a close brace
     #[tracing::instrument(level = "trace", skip(self))]
     fn consume_semicolon(&mut self) -> Res<Option<Slice<'b>>> {
-        trace!("consume_semicolon {}", self.context.has_line_term);
+        log::trace!("consume_semicolon {}", self.context.has_line_term);
         if self.at_punct(Punct::SemiColon) {
             let semi = self.next_item()?;
             return Ok(self.slice_from(&semi));
@@ -6514,7 +6615,7 @@ where
     /// Tests if a token matches an &str that might represent
     /// a contextual keyword like `async`
     fn at_contextual_keyword(&self, s: &str) -> bool {
-        debug!("at_contextual_keyword {:?}", s);
+        log::debug!("at_contextual_keyword {:?}", s);
         if let Ok(slice) = self.get_slice(&self.look_ahead) {
             slice.source == s
         } else {
@@ -6796,7 +6897,7 @@ where
     }
 
     pub(crate) fn next_part(&mut self) -> Res<ProgramPart<'b>> {
-        trace!(
+        log::trace!(
             "next_part past_prolog: {}, strict: {}",
             self.context.past_prolog,
             self.context.strict
