@@ -15,7 +15,10 @@ The two major pieces that users will interact with are the `Parser` struct and t
 
 The parser struct will be the main way to convert text into an `AST`.
 Conveniently `Parser` implements `Iterator` over `Result<ProgramPart, Error>`,
-this means that you can evaluate your JS in pieces from top to bottom. 
+this means that you can evaluate your JS in pieces from top to bottom.
+
+> Note: By default the `Parser` will not be able to handle js module features,
+> [see the module example](./examples/simple_module.rs) for details on how to parse js modules
 
 ### Iterator Example
 
