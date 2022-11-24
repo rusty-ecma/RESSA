@@ -50,14 +50,14 @@ fn arrow_func_args() {
 
 #[test]
 fn destructuring_default() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "[a = {y: 2}, a.x = 1] = [];";
     let mut parser = Parser::new(js).expect("failed to create parser");
     parser.parse().expect("failed to parser js");
 }
 #[test]
 fn destructuring_obj() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "0, [...{} [throwlhs()]] = iterable;";
     let mut parser = Parser::new(js).expect("failed to create parser");
     parser.parse().expect("failed to parser js");
@@ -65,7 +65,7 @@ fn destructuring_obj() {
 
 #[test]
 fn strict_global_yield() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "'use strict'
 yield;
 ";
@@ -96,7 +96,7 @@ fn new_line_in_fat_arrow() {
 
 #[test]
 fn arguments_as_param_arrow() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "'use strict';
 var x = arguments => arguments;";
     let mut parser = Parser::new(js).expect("failed to create parser");
@@ -110,7 +110,7 @@ var x = arguments => arguments;";
 
 #[test]
 fn duplicate_proto() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "({
 __proto__: Number,
 '__proto__': Number,
@@ -129,7 +129,7 @@ __proto__: Number,
 #[test]
 #[should_panic = "expected to fail on super call in function"]
 fn super_in_func() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "function() { super() }";
     let mut p = Parser::new(js).unwrap();
     p.parse()
@@ -138,7 +138,7 @@ fn super_in_func() {
 
 #[test]
 fn super_in_ctor() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "
 class A {}
 class B extends A {
@@ -152,7 +152,7 @@ class B extends A {
 
 #[test]
 fn super_in_method() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "
 class A {}
 class B extends A {
@@ -177,7 +177,7 @@ fn super_in_async_method() {
 #[test]
 #[should_panic = "super calls should only be allowed in ctors"]
 fn super_in_method_neg() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "
 class A {}
 class B {
@@ -192,14 +192,14 @@ class B {
 #[test]
 #[should_panic = "super is invalid in an arrow"]
 fn super_in_arrow_func() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "() => super();";
     let mut p = Parser::new(js).unwrap();
     p.parse().expect("super is invalid in an arrow");
 }
 #[test]
 fn super_in_lit_getter() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "({
 get a() { return super.stuff; }
 });";
@@ -210,7 +210,7 @@ get a() { return super.stuff; }
 #[test]
 #[should_panic = "assignment not allowed in `for in` lhs"]
 fn init_in_for_in_loop() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "for (a = 0 in {}) {}";
     let mut p = Parser::new(js).unwrap();
     p.parse().expect("assignment not allowed in `for in` lhs");
@@ -219,7 +219,7 @@ fn init_in_for_in_loop() {
 #[test]
 #[should_panic = "assignment not allowed in `for in` lhs"]
 fn var_init_in_for_in_loop_strict() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "'use strict';
 for (var a = 0 in {}) {}";
     let mut p = Parser::new(js).unwrap();
@@ -227,7 +227,7 @@ for (var a = 0 in {}) {}";
 }
 #[test]
 fn var_init_in_for_in_loop_not_strict() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "for (var a = 0 in {}) {}";
     let mut p = Parser::new(js).unwrap();
     p.parse().expect("assignment not allowed in `for in` lhs");
@@ -235,7 +235,7 @@ fn var_init_in_for_in_loop_not_strict() {
 #[test]
 #[should_panic = "use strict not allowed with fancy params"]
 fn arrow_funct_non_simple_args_use_strict_in_body() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "var x = (a = 0) => {
 'use strict';
 };";
@@ -279,7 +279,7 @@ fn nested_dupe_ident() {
 
 #[test]
 fn super_in_class_expr_ctor() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "new class extends Other {
     constructor() {
         super();
@@ -290,7 +290,7 @@ fn super_in_class_expr_ctor() {
 }
 #[test]
 fn line_term_comment() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "''/*
 */''";
     let mut parser = Parser::new(js).expect("failed to create parser");
@@ -313,7 +313,7 @@ fn await_as_ident_strict() {
 #[test]
 #[should_panic = "await is reserved in an async fn"]
 fn await_as_ident_async_fn() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let js = "async function() { var await = 0; }";
     let mut p = Parser::builder().js(js).module(true).build().unwrap();
     p.parse().expect("await is reserved in an async fn");
@@ -760,7 +760,7 @@ fn func_decl_tokens() {
 
 #[test]
 fn class_extended_by_call() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("class C extends D() {}")
         .build()
@@ -787,7 +787,7 @@ fn class_extended_by_call() {
 }
 #[test]
 fn class_anon_extended_by_call() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("let c = class extends D() {}")
         .build()
@@ -820,7 +820,7 @@ fn class_anon_extended_by_call() {
 }
 #[test]
 fn class_async_static_method() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("class C {
             static async m() {}
@@ -889,7 +889,7 @@ fn redecl_error_in_nested_funcs() {
 
 #[test]
 fn generator_prop() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder().js("({*g() {}})").build().unwrap();
     let tokens = p.parse().unwrap();
 
@@ -917,7 +917,7 @@ fn generator_prop() {
 
 #[test]
 fn super_tagged_template_in_ctor() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("class X {
             constructor() {
@@ -969,7 +969,7 @@ fn super_tagged_template_in_ctor() {
 
 #[test]
 fn super_in_new_class_expr() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("new class extends X { constructor(a = (()=>{ super() })()) { } }")
         .build()
@@ -1034,7 +1034,7 @@ fn super_in_new_class_expr() {
 
 #[test]
 fn static_get_method() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("class X {
             static get e() {}
@@ -1069,7 +1069,7 @@ fn static_get_method() {
 
 #[test]
 fn generator_method() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("class X {
             static *e() {}
@@ -1104,7 +1104,7 @@ fn generator_method() {
 
 #[test]
 fn export_all() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("export * from 'module';")
         .module(true)
@@ -1122,13 +1122,13 @@ fn export_all() {
 
 #[test]
 fn for_lhs() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     run_test("for(var x=(0 in[])in{});", false).unwrap();
 }
 
 #[test]
 fn import_default() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("import i from 'module'")
         .module(true)
@@ -1147,7 +1147,7 @@ fn import_default() {
 
 #[test]
 fn loop_yield() {
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()
         .js("var x = {
             *['y']() {
@@ -1205,7 +1205,7 @@ fn obj_expr_stmt() {
         Program, ProgramPart, Slice, SourceLocation,
     };
     use ressa::spanned::Parser;
-    env_logger::try_init().ok();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder().js("({});").build().unwrap();
     let tokens = p.parse().unwrap();
     let open_brace = Slice {
@@ -1268,7 +1268,7 @@ fn blow_the_stack() {
 #[ignore = "Diagnostic to see how badly our recursive decent is performing"]
 fn blow_the_stack_spanned() {
     use ressa::spanned::Parser;
-    init_tracing();
+    env_logger::builder().is_test(true).try_init().ok();
     fn do_it(ct: usize) {
         eprintln!("do_it {}", ct);
         let mut js = String::from("function x() {");
@@ -1288,21 +1288,8 @@ fn blow_the_stack_spanned() {
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
-    init_tracing();
+    env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
     p.parse()?;
     Ok(())
-}
-
-fn init_tracing() {
-    // let _ = env_logger::try_init();
-    let _subscriber = tracing_subscriber::fmt()
-        .compact()
-        .without_time()
-        .with_ansi(false)
-        .with_max_level(tracing::Level::TRACE)
-        .with_span_events(
-            tracing_subscriber::fmt::format::FmtSpan::ENTER
-            | tracing_subscriber::fmt::format::FmtSpan::EXIT
-        ).try_init().ok();
 }

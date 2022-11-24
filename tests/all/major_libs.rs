@@ -51,7 +51,7 @@ fn dexie() {
 }
 
 fn run_test(name: &str, normal: String, min: String) {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     println!("parsing: {} chars", min.len());
     let mut p = Parser::builder()
         .js(&normal)

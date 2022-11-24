@@ -5,7 +5,7 @@ use env_logger;
 use ressa::Parser;
 #[test]
 fn es5() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     info!("ES5");
     let path = Lib::Everything(EverythingVersion::Es5).path();
     debug!("path: {:?}", path);
@@ -17,7 +17,7 @@ fn es5() {
 
 #[test]
 fn es2015_script() {
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     info!("ES2015 Script");
     let path = Lib::Everything(EverythingVersion::Es2015Script).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
@@ -29,7 +29,7 @@ fn es2015_script() {
 #[test]
 fn es2015_module() {
     info!("ES2015 Module");
-    let _ = env_logger::try_init();
+    let _ = env_logger::builder().is_test(true).try_init().ok();
     let path = Lib::Everything(EverythingVersion::Es2015Module).path();
     let js = get_js_file(&path).expect(&format!("Failed to get {:?}", path));
     let mut p = ressa::spanned::Parser::builder()

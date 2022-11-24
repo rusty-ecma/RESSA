@@ -46,7 +46,6 @@ serde_yaml = "0.9"
 term = "0.6"
 term-painter = "0.2.4"
 walkdir = "2"
-tracing-subscriber = "0.3"
 
 [[bench]]
 name = "major_libs"
