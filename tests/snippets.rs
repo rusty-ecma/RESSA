@@ -866,6 +866,21 @@ fn class_method_export() {
 }
 
 #[test]
+fn export_then_assign_two_lines() {
+    run_spanned_test(
+        "export let a;
+    a = 0;",
+        true,
+    )
+    .unwrap();
+}
+
+#[test]
+fn export_then_assign_one_line() {
+    run_spanned_test("export let a; a = 0;", true).unwrap();
+}
+
+#[test]
 fn redecl_error_in_nested_arrow() {
     let js = r#"(() => {
         var a = [1];
@@ -1288,6 +1303,14 @@ fn blow_the_stack_spanned() {
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder().js(js).module(as_mod).build()?;
+    p.parse()?;
+    Ok(())
+}
+
+fn run_spanned_test<'a>(js: &'a str, as_mod: bool) -> Result<(), ressa::Error> {
+    use ressa::spanned::Parser;
     env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
     p.parse()?;
