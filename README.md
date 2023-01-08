@@ -76,10 +76,10 @@ Once you get to the inner `parts` of a `Program` you have a `Vec<ProgramPart>` w
 
 ## The Rust ECMA Crates
 
-- [RESS](https://github.com/freemasen/ress) - Tokenizer or Scanner
-- [RESSA](https://github.com/freemasen/ressa) - Parser
-- [RESAST](https://github.com/freemasen/resast) - AST
-- [RESW](https://github.com/freemasen/resw) - Writer
+- [RESS](https://github.com/rusty-ecma/ress) - Tokenizer or Scanner
+- [RESSA](https://github.com/rusty-ecma/ressa) - Parser
+- [RESAST](https://github.com/rusty-ecma/resast) - AST
+- [RESW](https://github.com/rusty-ecma/resw) - Writer
 
 ## Why So Many?
 
