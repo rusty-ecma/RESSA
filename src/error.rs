@@ -1,5 +1,6 @@
 use ress::{tokens::Keyword, Position};
 use std::fmt::{Display, Formatter, Result};
+
 #[derive(Debug)]
 pub enum Error {
     UnexpectedEoF,
@@ -43,7 +44,8 @@ pub enum Error {
     UndefinedExports(Vec<String>),
     ContinueOfNotIterationLabel(Position, String),
     Scanner(ress::error::Error),
-    Other(Box<dyn ::std::error::Error>),
+    Regex(res_regex::Error),
+    Io(std::io::Error),
     Misc(String),
 }
 
@@ -91,7 +93,8 @@ impl Display for Error {
             Error::UndefinedExports(ref names) => write!(f, "Undefined exports in module: {}", names.join(", ")),
             Error::ContinueOfNotIterationLabel(ref pos, ref token) => write!(f, "Label `{}` is does not label a loop, continue is invalid at {}", token, pos),
             Error::Scanner(ref e) => write!(f, "Error when tokenizing {}", e),
-            Error::Other(ref e) => write!(f, "{}", e),
+            Error::Regex(ref e) => write!(f, "{}", e),
+            Error::Io(ref e) => write!(f, "{}", e),
             Error::Misc(ref e) => write!(f, "{}", e),
         }
     }
@@ -153,7 +156,7 @@ impl Error {
 
 impl From<::std::io::Error> for Error {
     fn from(other: ::std::io::Error) -> Self {
-        Error::Other(Box::new(other))
+        Error::Io(other)
     }
 }
 impl ::std::error::Error for Error {}
@@ -161,5 +164,27 @@ impl ::std::error::Error for Error {}
 impl From<ress::error::Error> for Error {
     fn from(other: ress::error::Error) -> Self {
         Error::Scanner(other)
+    }
+}
+
+impl From<res_regex::Error> for Error {
+    fn from(value: res_regex::Error) -> Self {
+        Self::Regex(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error_is_send_and_sync() {
+        fn print_error<E>(arg: E)
+        where
+            E: std::error::Error + Send + Sync,
+        {
+            println!("{arg}");
+        }
+        print_error(Error::Misc("some misc error".to_string()))
     }
 }
