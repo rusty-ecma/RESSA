@@ -14,7 +14,8 @@ edition = "2021"
 hash-chain = "0.3"
 log = "0.4"
 ress = "0.11"
-resast = "0.5"
+# resast = "0.5"
+resast = { git = "https://github.com/rusty-ecma/resast", branch = "prep-0.6.0" }
 res-regex = "0.1"
 tracing = "0.1"
 

@@ -896,12 +896,23 @@ where
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_all_export(&mut self) -> Res<ModExportSpecifier<'b>> {
         let star = self.expect_punct(Punct::Asterisk)?;
+        let alias = if self.at_contextual_keyword("as") {
+            let keyword = self.next_item()?;
+            let ident = self.parse_ident_name()?;
+            Some(Alias {
+                keyword: self.get_slice(&keyword)?,
+                ident,
+            })
+        } else {
+            None
+        };
         let keyword = self.expect_contextual_keyword("from")?;
         let name = self.parse_module_specifier()?;
         Ok(ModExportSpecifier::All {
             star,
             keyword,
             name,
+            alias,
         })
     }
 

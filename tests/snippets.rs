@@ -1129,7 +1129,31 @@ fn export_all() {
 
     assert_eq!(
         Program::Mod(vec![ProgramPart::Decl(Decl::Export(Box::new(
-            ModExport::All(Lit::String(StringLit::Single(Cow::Borrowed("module"))))
+            ModExport::All {
+                alias: None,
+                name: Lit::String(StringLit::Single(Cow::Borrowed("module"))),
+            }
+        )))]),
+        tokens
+    );
+}
+
+#[test]
+fn export_all_as() {
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder()
+        .js("export * as m from 'module';")
+        .module(true)
+        .build()
+        .unwrap();
+    let tokens = p.parse().unwrap();
+
+    assert_eq!(
+        Program::Mod(vec![ProgramPart::Decl(Decl::Export(Box::new(
+            ModExport::All {
+                alias: Some(Ident { name: Cow::Borrowed("m") }),
+                name: Lit::String(StringLit::Single(Cow::Borrowed("module"))),
+            }
         )))]),
         tokens
     );

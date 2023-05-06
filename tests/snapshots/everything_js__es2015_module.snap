@@ -1323,6 +1323,7 @@ Mod(
                                 },
                             },
                         },
+                        alias: None,
                         keyword: Slice {
                             source: "from",
                             loc: SourceLocation {
