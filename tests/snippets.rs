@@ -1142,6 +1142,22 @@ fn for_lhs() {
 }
 
 #[test]
+fn class_ctor_scope() {
+    env_logger::builder().is_test(true).try_init().ok();
+    run_test("class e {
+    constructor(t) {}
+
+    get a() {
+        let t;
+    }
+
+    get b() {
+        let t;
+    }
+}", false).unwrap();
+}
+
+#[test]
 fn import_default() {
     env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder()

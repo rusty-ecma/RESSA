@@ -3080,7 +3080,9 @@ where
         let id = self.parse_object_property_key()?;
         let open_paren = self.expect_punct(Punct::OpenParen)?;
         let close_paren = self.expect_punct(Punct::CloseParen)?;
+        self.add_scope(lexical_names::Scope::FuncTop);
         let body = self.parse_method_body(true, false)?;
+        self.remove_scope();
         Ok(PropGet {
             keyword_static,
             keyword_get,
@@ -3191,9 +3193,11 @@ where
         );
         let prev_allow_super_call = self.context.allow_super_call;
         self.context.allow_super_call = self.context.allow_super;
+        self.add_scope(lexical_names::Scope::FuncTop);
         let params = self.parse_formal_params()?;
         let body = self.parse_method_body(params.simple, params.found_restricted)?;
         self.context.allow_super_call = prev_allow_super_call;
+        self.remove_scope();
         let ctor = PropCtor {
             keyword: id,
             open_paren: params.open_paren,
