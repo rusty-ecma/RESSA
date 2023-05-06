@@ -737,9 +737,11 @@ where
                 || self.look_ahead.token.matches_keyword(Keyword::Const(()))
             {
                 let _start = self.look_ahead_position;
-                let lex = self.parse_lexical_decl(false)?;
+                let mut lex = self.parse_lexical_decl(false)?;
+                if let Decl::Var { semi_colon, .. } = &mut lex {
+                    semi = semi_colon.take();
+                }
                 let decl = NamedExportDecl::Decl(lex);
-                semi = self.consume_semicolon()?;
                 let spec = ModExportSpecifier::Named(decl);
                 ModExport { keyword, spec }
             } else if self.look_ahead.token.matches_keyword(Keyword::Var(())) {

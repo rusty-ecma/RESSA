@@ -2340,26 +2340,26 @@ Mod(
                                         },
                                     ],
                                 },
-                                semi_colon: Some(
-                                    Slice {
-                                        source: ";",
-                                        loc: SourceLocation {
-                                            start: Position {
-                                                line: 18,
-                                                column: 22,
-                                            },
-                                            end: Position {
-                                                line: 18,
-                                                column: 23,
-                                            },
-                                        },
-                                    },
-                                ),
+                                semi_colon: None,
                             },
                         ),
                     ),
                 },
-                semi_colon: None,
+                semi_colon: Some(
+                    Slice {
+                        source: ";",
+                        loc: SourceLocation {
+                            start: Position {
+                                line: 18,
+                                column: 22,
+                            },
+                            end: Position {
+                                line: 18,
+                                column: 23,
+                            },
+                        },
+                    },
+                ),
             },
         ),
         Decl(
@@ -2526,26 +2526,26 @@ Mod(
                                         },
                                     ],
                                 },
-                                semi_colon: Some(
-                                    Slice {
-                                        source: ";",
-                                        loc: SourceLocation {
-                                            start: Position {
-                                                line: 19,
-                                                column: 29,
-                                            },
-                                            end: Position {
-                                                line: 19,
-                                                column: 30,
-                                            },
-                                        },
-                                    },
-                                ),
+                                semi_colon: None,
                             },
                         ),
                     ),
                 },
-                semi_colon: None,
+                semi_colon: Some(
+                    Slice {
+                        source: ";",
+                        loc: SourceLocation {
+                            start: Position {
+                                line: 19,
+                                column: 29,
+                            },
+                            end: Position {
+                                line: 19,
+                                column: 30,
+                            },
+                        },
+                    },
+                ),
             },
         ),
         Decl(
