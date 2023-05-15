@@ -3106,6 +3106,7 @@ where
         );
         let keyword_set = self.get_slice(&item_set)?;
         let id = self.parse_object_property_key()?;
+        self.add_scope(lexical_names::Scope::FuncTop);
         let mut params = self.parse_formal_params()?;
         if params.params.len() != 1 {
             return Err(Error::InvalidSetterParams(item_set.location.start));
@@ -3120,6 +3121,7 @@ where
         }
 
         let body = self.parse_method_body(params.simple, params.found_restricted)?;
+        self.remove_scope();
         Ok(PropSet {
             keyword_static,
             keyword_set,

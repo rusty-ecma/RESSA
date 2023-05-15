@@ -1278,6 +1278,16 @@ fn obj_expr_stmt() {
 }
 
 #[test]
+fn setter_scope() {
+    let js = "class A {
+        set b(b) { let d; }
+        set c(c) { let d; }
+    }
+    ";
+    run_test(js, false).unwrap();
+}
+
+#[test]
 #[ignore = "Diagnostic to see how badly our recursive decent is performing"]
 fn blow_the_stack() {
     fn do_it(ct: usize) {
