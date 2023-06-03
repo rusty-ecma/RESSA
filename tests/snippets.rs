@@ -1348,7 +1348,7 @@ fn blow_the_stack() {
         for _i in 0..ct {
             js.push('}');
         }
-        run_test(&js, false).unwrap();
+        std::hint::black_box(run_test(&js, false).unwrap());
     }
     for i in 1..u32::MAX {
         do_it(i)
@@ -1370,7 +1370,7 @@ fn blow_the_stack_spanned() {
             js.push('}');
         }
         let mut p = Parser::builder().js(&js).module(false).build().unwrap();
-        p.parse().unwrap();
+        std::hint::black_box(p.parse().unwrap());
     }
     for i in 1..u16::MAX {
         do_it(i)
