@@ -1,16 +1,16 @@
-use resast::prelude::*;
+use resast::{expr::QuasiQuote, prelude::*, spanned::Position};
 use ressa::*;
 use std::borrow::Cow;
 #[test]
 fn doc1() {
     let js = "function helloWorld() { alert('Hello world'); }";
     let p = Parser::new(&js).unwrap();
-    let f = ProgramPart::decl(Decl::Func(Func {
-        id: Some(Ident::from("helloWorld")),
+    let f: ProgramPart<Cow<'static, str>> = ProgramPart::decl(Decl::Func(Func {
+        id: Some(Ident::from(Cow::Borrowed("helloWorld"))),
         params: vec![],
         body: FuncBody(vec![ProgramPart::Stmt(Stmt::Expr(Expr::Call(CallExpr {
-            callee: Box::new(Expr::ident_from("alert")),
-            arguments: vec![Expr::Lit(Lit::single_string_from("Hello world"))],
+            callee: Box::new(Expr::ident_from("alert".into())),
+            arguments: vec![Expr::Lit(Lit::single_string_from("Hello world".into()))],
         })))]),
         generator: false,
         is_async: false,
@@ -25,13 +25,13 @@ fn readme_iter_example() {
     let js = "function helloWorld() { alert('Hello world'); }";
     let p = Parser::new(&js).unwrap();
     let f = ProgramPart::decl(Decl::Func(Func {
-        id: Some(Ident::from("helloWorld")),
+        id: Some(Ident::from(Cow::Borrowed("helloWorld"))),
         params: vec![],
         body: FuncBody(vec![ProgramPart::Stmt(Stmt::Expr(Expr::Call(CallExpr {
-            callee: Box::new(Expr::ident_from("alert")),
-            arguments: vec![Expr::Lit(Lit::String(StringLit::Single(Cow::Owned(
-                "Hello world".to_string(),
-            ))))],
+            callee: Box::new(Expr::ident_from(Cow::Borrowed("alert"))),
+            arguments: vec![Expr::Lit(Lit::String(StringLit::Single(
+                Cow::Borrowed("Hello world").into(),
+            )))],
         })))]),
         generator: false,
         is_async: false,
@@ -734,7 +734,7 @@ fn async_func_tokens() {
         Program::Script(vec![ProgramPart::Decl(Decl::Func(Func {
             body: FuncBody(vec![]),
             generator: false,
-            id: Some(Ident::new("f".to_owned())),
+            id: Some(Ident::from(Cow::Borrowed("f"))),
             is_async: true,
             params: vec![],
         }))]),
@@ -750,7 +750,7 @@ fn func_decl_tokens() {
         Program::Script(vec![ProgramPart::Decl(Decl::Func(Func {
             body: FuncBody(vec![]),
             generator: false,
-            id: Some(Ident::new("f".to_owned())),
+            id: Some(Ident::from(Cow::Borrowed("f"))),
             is_async: false,
             params: vec![],
         }))]),
@@ -766,7 +766,7 @@ fn class_extended_by_call() {
         .build()
         .unwrap();
     let tokens = p.parse().unwrap();
-    let callee = Ident::new("D".to_owned());
+    let callee = Ident::from(Cow::Borrowed("D"));
     let callee = Expr::Ident(callee);
     let callee = Box::new(callee);
     let super_class = CallExpr {
@@ -779,7 +779,7 @@ fn class_extended_by_call() {
     assert_eq!(
         Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
             body: ClassBody(vec![]),
-            id: Some(Ident::new("C".to_owned())),
+            id: Some(Ident::from(Cow::Borrowed("C"))),
             super_class,
         }))]),
         tokens
@@ -793,7 +793,7 @@ fn class_anon_extended_by_call() {
         .build()
         .unwrap();
     let tokens = p.parse().unwrap();
-    let callee = Ident::new("D".to_owned());
+    let callee = Ident::from(Cow::Borrowed("D"));
     let callee = Expr::Ident(callee);
     let callee = Box::new(callee);
     let super_class = CallExpr {
@@ -807,7 +807,7 @@ fn class_anon_extended_by_call() {
         Program::Script(vec![ProgramPart::Decl(Decl::Var(
             VarKind::Let,
             vec![VarDecl {
-                id: Pat::Ident(Ident::new("c".to_owned())),
+                id: Pat::Ident(Ident::from(Cow::Borrowed("c"))),
                 init: Some(Expr::Class(Class {
                     body: ClassBody(vec![]),
                     id: None,
@@ -832,7 +832,7 @@ fn class_async_static_method() {
     assert_eq!(
         Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
             body: ClassBody(vec![Prop {
-                key: PropKey::Expr(Expr::Ident(Ident::new("m".to_owned()))),
+                key: PropKey::Expr(Expr::Ident(Ident::from(Cow::Borrowed("m")))),
                 value: PropValue::Expr(Expr::Func(Func {
                     id: None,
                     params: vec![],
@@ -846,7 +846,7 @@ fn class_async_static_method() {
                 short_hand: false,
                 is_static: true
             }]),
-            id: Some(Ident::new("C".to_owned())),
+            id: Some(Ident::from(Cow::Borrowed("C"))),
             super_class: None,
         }))]),
         tokens
@@ -913,7 +913,7 @@ fn generator_prop() {
             ObjProp::Prop(Prop {
                 computed: false,
                 is_static: false,
-                key: PropKey::Expr(Expr::Ident(Ident::new("g".to_owned()))),
+                key: PropKey::Expr(Expr::Ident(Ident::from(Cow::Borrowed("g")))),
                 kind: PropKind::Method,
                 method: true,
                 short_hand: false,
@@ -945,12 +945,12 @@ fn super_tagged_template_in_ctor() {
 
     assert_eq!(
         Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
-            id: Some(Ident::from("X")),
+            id: Some(Ident::from(Cow::Borrowed("X"))),
             super_class: None,
             body: ClassBody(vec![Prop {
                 computed: false,
                 is_static: false,
-                key: PropKey::Expr(Expr::Ident(Ident::from("constructor"))),
+                key: PropKey::Expr(Expr::Ident(Ident::from(Cow::Borrowed("constructor")))),
                 kind: PropKind::Ctor,
                 method: true,
                 short_hand: false,
@@ -968,9 +968,9 @@ fn super_tagged_template_in_ctor() {
                             quasi: TemplateLit {
                                 expressions: vec![],
                                 quasis: vec![TemplateElement {
-                                    tail: true,
-                                    cooked: std::borrow::Cow::Borrowed("template"),
-                                    raw: std::borrow::Cow::Borrowed("`template`"),
+                                    open_quote: QuasiQuote::BackTick,
+                                    content: std::borrow::Cow::Borrowed("template").into(),
+                                    close_quote: QuasiQuote::BackTick,
                                 }]
                             }
                         }
@@ -1010,12 +1010,12 @@ fn super_in_new_class_expr() {
         arguments: vec![],
     };
     let call_arrow = Expr::Call(call_arrow);
-    let assign_left = Box::new(Pat::ident_from("a"));
+    let assign_left = Box::new(Pat::ident_from(Cow::Borrowed("a")));
     let assign_arrow = AssignPat {
         left: assign_left,
         right: Box::new(call_arrow),
     };
-    let key = PropKey::Expr(Expr::ident_from("constructor"));
+    let key = PropKey::Expr(Expr::ident_from(Cow::Borrowed("constructor")));
     let value = Func {
         id: None,
         params: vec![FuncArg::Pat(Pat::Assign(assign_arrow))],
@@ -1039,7 +1039,7 @@ fn super_in_new_class_expr() {
             arguments: vec![],
             callee: Box::new(Expr::Class(Class {
                 id: None,
-                super_class: Some(Box::new(Expr::Ident(Ident::from("X")))),
+                super_class: Some(Box::new(Expr::Ident(Ident::from(Cow::Borrowed("X"))))),
                 body: ClassBody(vec![ctor])
             }))
         })))]),
@@ -1060,12 +1060,12 @@ fn static_get_method() {
 
     assert_eq!(
         Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
-            id: Some(Ident::from("X")),
+            id: Some(Ident::from(Cow::Borrowed("X"))),
             super_class: None,
             body: ClassBody(vec![Prop {
                 computed: false,
                 is_static: true,
-                key: PropKey::Expr(Expr::Ident(Ident::from("e"))),
+                key: PropKey::Expr(Expr::Ident(Ident::from(Cow::Borrowed("e")))),
                 kind: PropKind::Get,
                 method: false,
                 short_hand: false,
@@ -1095,12 +1095,12 @@ fn generator_method() {
 
     assert_eq!(
         Program::Script(vec![ProgramPart::Decl(Decl::Class(Class {
-            id: Some(Ident::from("X")),
+            id: Some(Ident::from(Cow::Borrowed("X"))),
             super_class: None,
             body: ClassBody(vec![Prop {
                 computed: false,
                 is_static: true,
-                key: PropKey::Expr(Expr::Ident(Ident::from("e"))),
+                key: PropKey::Expr(Expr::Ident(Ident::from(Cow::Borrowed("e")))),
                 kind: PropKind::Method,
                 method: true,
                 short_hand: false,
@@ -1129,7 +1129,10 @@ fn export_all() {
 
     assert_eq!(
         Program::Mod(vec![ProgramPart::Decl(Decl::Export(Box::new(
-            ModExport::All(Lit::String(StringLit::Single(Cow::Borrowed("module"))))
+            ModExport::All {
+                alias: None,
+                name: Lit::String(StringLit::Single(Cow::Borrowed("module").into()))
+            }
         )))]),
         tokens
     );
@@ -1144,7 +1147,8 @@ fn for_lhs() {
 #[test]
 fn class_ctor_scope() {
     env_logger::builder().is_test(true).try_init().ok();
-    run_test("class e {
+    run_test(
+        "class e {
     constructor(t) {}
 
     get a() {
@@ -1154,7 +1158,10 @@ fn class_ctor_scope() {
     get b() {
         let t;
     }
-}", false).unwrap();
+}",
+        false,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -1169,8 +1176,8 @@ fn import_default() {
 
     assert_eq!(
         Program::Mod(vec![ProgramPart::Decl(Decl::Import(Box::new(ModImport {
-            source: Lit::String(StringLit::Single(Cow::Borrowed("module"))),
-            specifiers: vec![ImportSpecifier::Default(Ident::from("i"))]
+            source: Lit::String(StringLit::Single(Cow::Borrowed("module").into())),
+            specifiers: vec![ImportSpecifier::Default(Ident::from(Cow::Borrowed("i")))]
         })))]),
         tokens
     );
@@ -1193,9 +1200,9 @@ fn loop_yield() {
         Program::Script(vec![ProgramPart::Decl(Decl::Var(
             VarKind::Var,
             vec![VarDecl {
-                id: Pat::Ident(Ident::from("x")),
+                id: Pat::Ident(Ident::from(Cow::Borrowed("x"))),
                 init: Some(Expr::Obj(vec![ObjProp::Prop(Prop {
-                    key: PropKey::Lit(Lit::String(StringLit::Single(Cow::Borrowed("y")))),
+                    key: PropKey::Lit(Lit::String(StringLit::Single(Cow::Borrowed("y").into()))),
                     computed: true,
                     is_static: false,
                     kind: PropKind::Method,
@@ -1206,15 +1213,15 @@ fn loop_yield() {
                         params: vec![],
                         body: FuncBody(vec![
                             ProgramPart::Stmt(Stmt::Expr(Expr::Yield(YieldExpr {
-                                argument: Some(Box::new(Expr::Lit(Lit::Number(Cow::Borrowed(
-                                    "0"
-                                ))))),
+                                argument: Some(Box::new(Expr::Lit(Lit::Number(
+                                    Cow::Borrowed("0").into()
+                                )))),
                                 delegate: false,
                             }))),
                             ProgramPart::Stmt(Stmt::Expr(Expr::Yield(YieldExpr {
-                                argument: Some(Box::new(Expr::Lit(Lit::Number(Cow::Borrowed(
-                                    "0"
-                                ))))),
+                                argument: Some(Box::new(Expr::Lit(Lit::Number(
+                                    Cow::Borrowed("0").into()
+                                )))),
                                 delegate: false,
                             }))),
                         ]),
@@ -1233,20 +1240,14 @@ fn obj_expr_stmt() {
     use resast::spanned::{
         expr::{Expr, ObjExpr, WrappedExpr},
         stmt::Stmt,
-        Program, ProgramPart, Slice, SourceLocation,
+        Program, ProgramPart,
     };
     use ressa::spanned::Parser;
     env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder().js("({});").build().unwrap();
     let tokens = p.parse().unwrap();
-    let open_brace = Slice {
-        source: "{".into(),
-        loc: SourceLocation::new(1, 2, 1, 3),
-    };
-    let close_brace = Slice {
-        source: "}".into(),
-        loc: SourceLocation::new(1, 3, 1, 4),
-    };
+    let open_brace = Position::new(1, 2).into();
+    let close_brace = Position::new(1, 3).into();
     let obj = ObjExpr {
         open_brace,
         close_brace,
@@ -1254,24 +1255,15 @@ fn obj_expr_stmt() {
     };
     let expr = Expr::Obj(obj);
     let wrapped = WrappedExpr {
-        open_paren: Slice {
-            source: "(".into(),
-            loc: SourceLocation::new(1, 1, 1, 2),
-        },
+        open_paren: Position::new(1, 1).into(),
         expr,
-        close_paren: Slice {
-            source: ")".into(),
-            loc: SourceLocation::new(1, 4, 1, 5),
-        },
+        close_paren: Position::new(1, 4).into(),
     };
     let expr = Expr::Wrapped(Box::new(wrapped));
     assert_eq!(
         Program::Script(vec![ProgramPart::Stmt(Stmt::Expr {
             expr,
-            semi_colon: Some(Slice {
-                source: ";".into(),
-                loc: SourceLocation::new(1, 5, 1, 6)
-            })
+            semi_colon: Some(Position::new(1, 5).into())
         })]),
         tokens
     );
@@ -1288,9 +1280,66 @@ fn setter_scope() {
 }
 
 #[test]
+fn array_pattern_with_empty_entry() {
+    use resast::spanned::{
+        decl::{Decl, VarDecl, VarDecls},
+        pat::{ArrayPat, ArrayPatPart, Pat},
+        expr::Expr,
+        Ident, ListEntry, Program, ProgramPart, Slice, SourceLocation, VarKind,
+    };
+    let js = "let [x,,] = y";
+    let p = generate_spanned_program(js, false).unwrap();
+    assert_eq!(
+        p,
+        Program::Script(vec![ProgramPart::decl(Decl::Var {
+            decls: VarDecls {
+                keyword: VarKind::Let(Position::new(1, 1).into()),
+                decls: vec![ListEntry {
+                    item: VarDecl {
+                        id: Pat::Array(ArrayPat {
+                            open_bracket: Position::new(1, 5).into(),
+                            elements: vec![ListEntry {
+                                item: Some(ArrayPatPart::Pat(Pat::Ident(Ident {
+                                    slice: Slice {
+                                        source: Cow::Borrowed("x").into(),
+                                        loc: SourceLocation {
+                                            start: Position::new(1, 6),
+                                            end: Position::new(1, 7)
+                                        }
+                                    }
+                                }))),
+                                comma: Some(Position::new(1, 7).into()),
+                            }, ListEntry {
+                                item: None,
+                                comma: Some(Position::new(1, 8).into()),
+                            }],
+                            close_bracket: Position::new(1, 9).into()
+                        }),
+                        eq: Some(Position::new(1, 11).into()),
+                        init: Some(Expr::Ident(
+                            Ident {
+                                slice: Slice {
+                                    source: Cow::Borrowed("y").into(),
+                                    loc: SourceLocation {
+                                        start: Position::new(1, 13),
+                                        end: Position::new(1, 14)
+                                    }
+                                }
+                            }
+                        )),
+                    },
+                    comma: None
+                }]
+            },
+            semi_colon: None
+        })])
+    );
+}
+
+#[test]
 #[ignore = "Diagnostic to see how badly our recursive decent is performing"]
 fn blow_the_stack() {
-    fn do_it(ct: usize) {
+    fn do_it(ct: u32) {
         eprintln!("do_it {}", ct);
         let mut js = String::from("function x() {");
         for _i in 1..ct {
@@ -1301,16 +1350,17 @@ fn blow_the_stack() {
         }
         run_test(&js, false).unwrap();
     }
-    for i in 1..7 {
+    for i in 1..u32::MAX {
         do_it(i)
     }
 }
+
 #[test]
 #[ignore = "Diagnostic to see how badly our recursive decent is performing"]
 fn blow_the_stack_spanned() {
     use ressa::spanned::Parser;
     env_logger::builder().is_test(true).try_init().ok();
-    fn do_it(ct: usize) {
+    fn do_it(ct: u16) {
         eprintln!("do_it {}", ct);
         let mut js = String::from("function x() {");
         for _i in 1..ct {
@@ -1321,24 +1371,46 @@ fn blow_the_stack_spanned() {
         }
         let mut p = Parser::builder().js(&js).module(false).build().unwrap();
         p.parse().unwrap();
-        // run_test(&js, false).unwrap();
     }
-    for i in 1..100 {
+    for i in 1..u16::MAX {
         do_it(i)
     }
 }
 
+#[test]
+fn call_args() {
+    run_spanned_test("call(/.+/, '')", false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
-    env_logger::builder().is_test(true).try_init().ok();
-    let mut p = Parser::builder().js(js).module(as_mod).build()?;
-    p.parse()?;
+    let p = generate_program(js, as_mod);
+    log::debug!("{:#?}", p);
+    p?;
     Ok(())
 }
 
 fn run_spanned_test<'a>(js: &'a str, as_mod: bool) -> Result<(), ressa::Error> {
+    let p = generate_spanned_program(js, as_mod);
+    log::debug!("{:#?}", p);
+    p?;
+    Ok(())
+}
+
+fn generate_program<'a>(
+    js: &'a str,
+    as_mod: bool,
+) -> Result<resast::Program<Cow<'a, str>>, ressa::Error> {
+    env_logger::builder().is_test(true).try_init().ok();
+    let mut p = Parser::builder().js(js).module(as_mod).build()?;
+    p.parse()
+}
+
+fn generate_spanned_program<'a>(
+    js: &'a str,
+    as_mod: bool,
+) -> Result<resast::spanned::Program<Cow<'a, str>>, ressa::Error> {
     use ressa::spanned::Parser;
     env_logger::builder().is_test(true).try_init().ok();
     let mut p = Parser::builder().js(js).module(as_mod).build()?;
-    p.parse()?;
-    Ok(())
+    p.parse()
 }

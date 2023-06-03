@@ -780,7 +780,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "x",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -792,7 +792,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "|",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -804,7 +804,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "|||",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -816,7 +816,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "^$\\b\\B",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -828,7 +828,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "(?=(?!(?:(.))))",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -840,7 +840,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "a.\\f\\n\\r\\t\\v\\0\\[\\-\\/\\\\\\x00\\u0000",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -852,7 +852,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "\\d\\D\\s\\S\\w\\W",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -864,7 +864,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "\\ca\\cb\\cc\\cd\\ce\\cf\\cg\\ch\\ci\\cj\\ck\\cl\\cm\\cn\\co\\cp\\cq\\cr\\cs\\ct\\cu\\cv\\cw\\cx\\cy\\cz",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -876,7 +876,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "\\cA\\cB\\cC\\cD\\cE\\cF\\cG\\cH\\cI\\cJ\\cK\\cL\\cM\\cN\\cO\\cP\\cQ\\cR\\cS\\cT\\cU\\cV\\cW\\cX\\cY\\cZ",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -888,7 +888,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "[a-z-]",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -900,7 +900,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "[^\\b\\-^]",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -912,7 +912,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: "[/\\]\\\\]",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -924,7 +924,9 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".",
-                            flags: "i",
+                            flags: Some(
+                                "i",
+                            ),
                         },
                     ),
                 ),
@@ -936,7 +938,9 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".",
-                            flags: "g",
+                            flags: Some(
+                                "g",
+                            ),
                         },
                     ),
                 ),
@@ -948,7 +952,9 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".",
-                            flags: "m",
+                            flags: Some(
+                                "m",
+                            ),
                         },
                     ),
                 ),
@@ -960,7 +966,9 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".",
-                            flags: "igm",
+                            flags: Some(
+                                "igm",
+                            ),
                         },
                     ),
                 ),
@@ -972,7 +980,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".*",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -984,7 +992,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".*?",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -996,7 +1004,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".+",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -1008,7 +1016,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".+?",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -1020,7 +1028,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".?",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -1032,7 +1040,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".??",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -1044,7 +1052,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".{0}",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -1056,7 +1064,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".{0,}",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),
@@ -1068,7 +1076,7 @@ Script(
                     RegEx(
                         RegEx {
                             pattern: ".{0,0}",
-                            flags: "",
+                            flags: None,
                         },
                     ),
                 ),

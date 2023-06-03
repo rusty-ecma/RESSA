@@ -163,12 +163,17 @@ impl<'a> DuplicateNameDetector<'a> {
             }
         }
     }
-    pub fn declare_pat(&mut self, pat: &Pat<'a>, kind: DeclKind, pos: Position) -> Res<()> {
+    pub fn declare_pat(
+        &mut self,
+        pat: &Pat<Cow<'a, str>>,
+        kind: DeclKind,
+        pos: Position,
+    ) -> Res<()> {
         log::trace!("declare_pat {:?} {:?} {:?}", pat, kind, pos);
         match pat {
             Pat::Ident(ref i) => {
                 log::trace!("add_pat ident {:?}", i.slice.source);
-                self.declare(i.slice.source.clone(), kind, pos)
+                self.declare(i.slice.source.0.clone(), kind, pos)
             }
             Pat::Array(ref a) => {
                 for part in &a.elements {
@@ -195,7 +200,12 @@ impl<'a> DuplicateNameDetector<'a> {
         }
     }
 
-    fn declare_prop(&mut self, prop: &Prop<'a>, kind: DeclKind, pos: Position) -> Res<()> {
+    fn declare_prop(
+        &mut self,
+        prop: &Prop<Cow<'a, str>>,
+        kind: DeclKind,
+        pos: Position,
+    ) -> Res<()> {
         log::trace!("declare_prop {:?} {:?} {:?}", prop, kind, pos);
         match &prop {
             Prop::Init(prop) => match &prop.value {
@@ -213,18 +223,28 @@ impl<'a> DuplicateNameDetector<'a> {
             _ => Ok(()),
         }
     }
-    fn declare_literal_ident(&mut self, lit: &Lit<'a>, kind: DeclKind, pos: Position) -> Res<()> {
+    fn declare_literal_ident(
+        &mut self,
+        lit: &Lit<Cow<'a, str>>,
+        kind: DeclKind,
+        pos: Position,
+    ) -> Res<()> {
         log::trace!("declare_literal_ident {:?} {:?} {:?}", lit, kind, pos);
         match lit {
-            Lit::String(s) => self.declare(s.content.source.clone(), kind, pos),
+            Lit::String(s) => self.declare(s.content.source.0.clone(), kind, pos),
             _ => Err(Error::RestrictedIdent(pos)),
         }
     }
-    pub fn declare_expr(&mut self, expr: &Expr<'a>, kind: DeclKind, pos: Position) -> Res<()> {
+    pub fn declare_expr(
+        &mut self,
+        expr: &Expr<Cow<'a, str>>,
+        kind: DeclKind,
+        pos: Position,
+    ) -> Res<()> {
         log::trace!("declare_expr {:?} {:?} {:?}", expr, kind, pos);
         if let Expr::Ident(ref i) = expr {
             log::trace!("add_expr ident {:?}", i.slice.source);
-            self.declare(i.slice.source.clone(), kind, pos)
+            self.declare(i.slice.source.0.clone(), kind, pos)
         } else {
             Ok(())
         }
@@ -305,16 +325,20 @@ impl<'a> DuplicateNameDetector<'a> {
         }
     }
 
-    pub fn add_export_spec(&mut self, spec: &ExportSpecifier<'a>, pos: Position) -> Res<()> {
+    pub fn add_export_spec(
+        &mut self,
+        spec: &ExportSpecifier<Cow<'a, str>>,
+        pos: Position,
+    ) -> Res<()> {
         log::trace!("add_export_spec {:?} {:?}", spec, pos);
-        self.add_export_ident(&spec.local.slice.source, pos)?;
-        self.undefined_module_export_guard(spec.local.slice.source.clone());
+        self.add_export_ident(&spec.local.slice.source.0.clone(), pos)?;
+        self.undefined_module_export_guard(spec.local.slice.source.0.clone());
         Ok(())
     }
 
-    pub fn removed_undefined_export(&mut self, id: &Ident<'a>) {
+    pub fn removed_undefined_export(&mut self, id: &Ident<Cow<'a, str>>) {
         log::trace!("removed_undefined_export {:?}", id);
-        self.undefined_module_exports.remove(&id.slice.source);
+        self.undefined_module_exports.remove(&id.slice.source.0);
     }
 
     pub fn add_export_ident(&mut self, id: &Cow<'a, str>, pos: Position) -> Res<()> {

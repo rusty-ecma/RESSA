@@ -77,8 +77,13 @@ use resast::spanned::{
         ForOfStmt, ForStmt, IfStmt, LabeledStmt, LoopInit, LoopLeft, Stmt, SwitchCase, SwitchStmt,
         TryStmt, WhileStmt, WithStmt,
     },
-    AssignOp, BinaryOp, Class, ClassBody, Dir, Func, FuncArg, FuncBody, Ident, ListEntry,
-    LogicalOp, Node, Program, ProgramPart, Slice, SuperClass, UnaryOp, UpdateOp, VarKind,
+    tokens::{
+        AssignOp, Asterisk, Async, BinaryOp, Break, CloseParen, Comma, Continue, FatArrow, For,
+        Function, Get, LogicalOp, OpenParen, QuasiQuote, Return, Semicolon, Set, Static,
+        SwitchCaseKeyword, Throw, Token as _, UnaryOp, UpdateOp,
+    },
+    Class, ClassBody, Dir, Func, FuncArg, FuncBody, Ident, ListEntry, Node, Program, ProgramPart,
+    Slice, SuperClass, VarKind,
 };
 use ress::prelude::*;
 use ress::Span;
@@ -350,7 +355,7 @@ where
     /// }
     /// ```
     #[tracing::instrument(level = "trace", skip(self))]
-    pub fn parse(&mut self) -> Res<Program> {
+    pub fn parse(&mut self) -> Res<Program<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_script {:?}",
             self.look_ahead.span.start,
@@ -359,7 +364,7 @@ where
         if self.context.is_module {
             self.context.strict = true;
         }
-        let body: Res<Vec<ProgramPart>> = self.collect();
+        let body: Res<Vec<ProgramPart<Cow<'b, str>>>> = self.collect();
         Ok(if self.context.is_module {
             Program::Mod(body?)
         } else {
@@ -369,7 +374,7 @@ where
 
     /// Parse all of the directives into a single prologue
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_directive_prologues(&mut self) -> Res<Vec<ProgramPart<'b>>> {
+    fn parse_directive_prologues(&mut self) -> Res<Vec<ProgramPart<Cow<'b, str>>>> {
         log::debug!(
             "{}: parse_directive_prologues {:?}",
             self.look_ahead.span.start,
@@ -387,7 +392,7 @@ where
 
     /// Parse a single directive
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_directive(&mut self) -> Res<ProgramPart<'b>> {
+    fn parse_directive(&mut self) -> Res<ProgramPart<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_directive {:?}",
             self.look_ahead.span.start,
@@ -442,7 +447,10 @@ where
     /// statement or declaration (import/export/function/const/let/class)
     /// otherwise we move on to `Parser::parse_statement`
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_statement_list_item(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<ProgramPart<'b>> {
+    fn parse_statement_list_item(
+        &mut self,
+        ctx: Option<StmtCtx<'b>>,
+    ) -> Res<ProgramPart<Cow<'b, str>>> {
         log::debug!("{}: parse_statement_list_item", self.look_ahead.span.start);
         self.context.set_is_assignment_target(true);
         self.context.set_is_binding_element(true);
@@ -539,7 +547,7 @@ where
     /// import 'place';
     /// ```
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_import_decl(&mut self) -> Res<(ModImport<'b>, Option<Slice<'b>>)> {
+    fn parse_import_decl(&mut self) -> Res<(ModImport<Cow<'b, str>>, Option<Semicolon>)> {
         if let Some(scope) = self.context.lexical_names.last_scope() {
             if !scope.is_top() {
                 return Err(Error::InvalidImportError(self.current_position));
@@ -601,7 +609,7 @@ where
             }
         }
         let keyword_from = self.next_item()?;
-        let keyword_from = self.get_slice(&keyword_from)?;
+        let keyword_from = self.position_from(&keyword_from).into();
         // capture the source string for where this import
         // comes from
         let source = self.parse_module_specifier()?;
@@ -621,7 +629,7 @@ where
     /// import {Thing} from 'place';
     /// ```
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_named_imports(&mut self) -> Res<NormalImportSpecs<'b>> {
+    fn parse_named_imports(&mut self) -> Res<NormalImportSpecs<Cow<'b, str>>> {
         let open_brace = self.expect_punct(Punct::OpenBrace)?;
         let mut ret = Vec::new();
         while !self.at_punct(Punct::CloseBrace) {
@@ -643,19 +651,19 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_import_specifier(&mut self) -> Res<NormalImportSpec<'b>> {
+    fn parse_import_specifier(&mut self) -> Res<NormalImportSpec<Cow<'b, str>>> {
         let start = self.look_ahead_position;
         let imported = self.parse_ident_name()?;
         let alias = if self.at_contextual_keyword("as") {
             let keyword = self.next_item()?;
-            let keyword = self.get_slice(&keyword)?;
+            let keyword = self.position_from(&keyword).into();
             let alias = self.parse_var_ident(false)?;
             self.context.lexical_names.declare(
-                alias.slice.source.clone(),
+                alias.slice.source.0.clone(),
                 DeclKind::Lex(true),
                 start,
             )?;
-            if alias.slice.source == "arguments" || alias.slice.source == "eval" {
+            if alias.slice.source.as_ref() == "arguments" || alias.slice.source.as_ref() == "eval" {
                 return Err(Error::StrictModeArgumentsOrEval(start));
             }
             Some(Alias {
@@ -664,11 +672,13 @@ where
             })
         } else {
             self.context.lexical_names.declare(
-                imported.slice.source.clone(),
+                imported.slice.source.0.clone(),
                 DeclKind::Lex(true),
                 start,
             )?;
-            if imported.slice.source == "arguments" || imported.slice.source == "eval" {
+            if imported.slice.source.as_ref() == "arguments"
+                || imported.slice.source.as_ref() == "eval"
+            {
                 return Err(Error::StrictModeArgumentsOrEval(start));
             }
             None
@@ -677,17 +687,17 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_import_namespace_specifier(&mut self) -> Res<NamespaceImportSpec<'b>> {
+    fn parse_import_namespace_specifier(&mut self) -> Res<NamespaceImportSpec<Cow<'b, str>>> {
         let star = self.expect_punct(Punct::Asterisk)?;
         if !self.at_contextual_keyword("as") {
             return self.expected_token_error(&self.look_ahead, &["as"]);
         }
         let keyword_as = self.next_item()?;
-        let keyword = self.get_slice(&keyword_as)?;
+        let keyword = self.position_from(&keyword_as).into();
         let start = self.look_ahead_position;
         let ident = self.parse_ident_name()?;
         self.context.lexical_names.declare(
-            ident.slice.source.clone(),
+            ident.slice.source.0.clone(),
             DeclKind::Lex(true),
             start,
         )?;
@@ -699,17 +709,19 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_import_default_specifier(&mut self) -> Res<DefaultImportSpec<'b>> {
+    fn parse_import_default_specifier(&mut self) -> Res<DefaultImportSpec<Cow<'b, str>>> {
         let start = self.look_ahead_position;
         let id = self.parse_ident_name()?;
-        self.context
-            .lexical_names
-            .declare(id.slice.source.clone(), DeclKind::Lex(true), start)?;
+        self.context.lexical_names.declare(
+            id.slice.source.0.clone(),
+            DeclKind::Lex(true),
+            start,
+        )?;
         Ok(DefaultImportSpec { id })
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_export_decl(&mut self) -> Res<(ModExport<'b>, Option<Slice<'b>>)> {
+    fn parse_export_decl(&mut self) -> Res<(ModExport<Cow<'b, str>>, Option<Semicolon>)> {
         log::debug!("{} parse_export_decl", self.look_ahead_position);
         let mut semi = None;
         if let Some(scope) = self.context.lexical_names.last_scope() {
@@ -853,7 +865,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_default_export(&mut self) -> Res<ModExportSpecifier<'b>> {
+    fn parse_default_export(&mut self) -> Res<ModExportSpecifier<Cow<'b, str>>> {
         let keyword_default = self.next_item()?;
         if let Token::Keyword(k) = &keyword_default.token {
             if k.has_unicode_escape() {
@@ -863,7 +875,7 @@ where
                 );
             }
         }
-        let keyword = self.get_slice(&keyword_default)?;
+        let keyword = self.position_from(&keyword_default).into();
         let value = if self.at_keyword(Keyword::Function(())) {
             let decl = self.parse_export_decl_func()?;
             DefaultExportDeclValue::Decl(decl)
@@ -894,43 +906,51 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_all_export(&mut self) -> Res<ModExportSpecifier<'b>> {
+    fn parse_all_export(&mut self) -> Res<ModExportSpecifier<Cow<'b, str>>> {
         let star = self.expect_punct(Punct::Asterisk)?;
+        let alias = if self.at_contextual_keyword("as") {
+            let keyword = self.expect_contextual_keyword("as")?;
+            let ident = self.parse_ident_name()?;
+            Some(Alias { keyword, ident })
+        } else {
+            None
+        };
         let keyword = self.expect_contextual_keyword("from")?;
         let name = self.parse_module_specifier()?;
         Ok(ModExportSpecifier::All {
             star,
+            alias,
             keyword,
             name,
         })
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_export_decl_func(&mut self) -> Res<Decl<'b>> {
+    fn parse_export_decl_func(&mut self) -> Res<Decl<Cow<'b, str>>> {
         let start = self.look_ahead_position;
         let func = self.parse_function_decl(true)?;
         if let Some(id) = &func.id {
             self.context
                 .lexical_names
-                .add_export_ident(&id.slice.source, start)?;
+                .add_export_ident(&id.slice.source.0.clone(), start)?;
         }
         Ok(Decl::Func(func))
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_export_decl_class(&mut self) -> Res<Decl<'b>> {
+    fn parse_export_decl_class(&mut self) -> Res<Decl<Cow<'b, str>>> {
         let start = self.look_ahead_position;
         let class = self.parse_class_decl(true, true)?;
         if let Some(id) = &class.id {
             self.context
                 .lexical_names
-                .add_export_ident(&id.slice.source, start)?;
+                .add_export_ident(&id.slice.source.0.clone(), start)?;
         }
         Ok(Decl::Class(class))
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_async_export(&mut self) -> Res<DefaultExportDeclValue<'b>> {
+    fn parse_async_export(&mut self) -> Res<DefaultExportDeclValue<Cow<'b, str>>> {
         let exp = if self.at_async_function() {
             let _start = self.look_ahead_position;
             let func = self.parse_function_decl(true)?;
@@ -946,15 +966,13 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_export_specifier(&mut self) -> Res<ExportSpecifier<'b>> {
+    fn parse_export_specifier(&mut self) -> Res<ExportSpecifier<Cow<'b, str>>> {
         let local = self.parse_ident_name()?;
         let alias = if self.at_contextual_keyword("as") {
             let keyword = self.next_item()?;
+            let keyword = self.position_from(&keyword).into();
             let ident = self.parse_ident_name()?;
-            Some(Alias {
-                keyword: self.get_slice(&keyword)?,
-                ident,
-            })
+            Some(Alias { keyword, ident })
         } else {
             None
         };
@@ -962,7 +980,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_module_specifier(&mut self) -> Res<Lit<'b>> {
+    fn parse_module_specifier(&mut self) -> Res<Lit<Cow<'b, str>>> {
         let item = self.next_item()?;
         match &item.token {
             Token::String(_) => {
@@ -973,7 +991,7 @@ where
         }
     }
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_statement(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<Stmt<'b>> {
+    fn parse_statement(&mut self, ctx: Option<StmtCtx<'b>>) -> Res<Stmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_statement {:?}",
             self.look_ahead.span.start,
@@ -1001,7 +1019,7 @@ where
                 }
                 Punct::SemiColon => {
                     let semi = self.next_item()?;
-                    let slice = self.get_slice(&semi)?;
+                    let slice = self.position_from(&semi).into();
                     Stmt::Empty(slice)
                 }
                 _ => {
@@ -1116,7 +1134,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_with_stmt(&mut self) -> Res<WithStmt<'b>> {
+    fn parse_with_stmt(&mut self) -> Res<WithStmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_with_stmt {:?}",
             self.look_ahead.span.start,
@@ -1129,7 +1147,7 @@ where
             ))?;
         }
         let keyword = self.expect_keyword(Keyword::With(()))?;
-        let open_paren = self.expect_punct(Punct::OpenParen)?;
+        let open_paren: resast::spanned::Position = self.expect_punct(Punct::OpenParen)?;
         let object = self.parse_expression()?;
         Ok(if !self.at_punct(Punct::CloseParen) {
             if !self.config.tolerant {
@@ -1137,10 +1155,10 @@ where
             }
             WithStmt {
                 keyword,
-                open_paren: open_paren.clone(),
+                open_paren: open_paren.clone().into(),
                 object,
-                close_paren: open_paren.clone(),
-                body: Box::new(Stmt::Empty(open_paren)),
+                close_paren: open_paren.clone().into(),
+                body: Box::new(Stmt::Empty(open_paren.into())),
             }
         } else {
             let close_paren = self.expect_punct(Punct::CloseParen)?;
@@ -1155,7 +1173,7 @@ where
             }
             WithStmt {
                 keyword,
-                open_paren,
+                open_paren: open_paren.into(),
                 object,
                 close_paren,
                 body: Box::new(body),
@@ -1164,7 +1182,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_while_stmt(&mut self) -> Res<WhileStmt<'b>> {
+    fn parse_while_stmt(&mut self) -> Res<WhileStmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_while_stmt {:?}",
             self.look_ahead.span.start,
@@ -1202,7 +1220,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_var_stmt(&mut self) -> Res<Stmt<'b>> {
+    fn parse_var_stmt(&mut self) -> Res<Stmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_var_stmt {:?}",
             self.look_ahead.span.start,
@@ -1222,7 +1240,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_var_decl_list(&mut self, in_for: bool) -> Res<Vec<ListEntry<'b, VarDecl<'b>>>> {
+    fn parse_var_decl_list(&mut self, in_for: bool) -> Res<Vec<ListEntry<VarDecl<Cow<'b, str>>>>> {
         log::debug!(
             "{} parse_var_decl_list {:?}",
             self.look_ahead.span.start,
@@ -1238,7 +1256,7 @@ where
         let mut ret = vec![ListEntry::no_comma(first)];
         while self.at_punct(Punct::Comma) {
             let comma = self.next_item()?;
-            let comma = self.get_slice(&comma)?;
+            let comma = self.position_from(&comma).into();
             if let Some(last) = ret.last_mut() {
                 last.comma = Some(comma);
             }
@@ -1255,7 +1273,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_var_decl(&mut self, in_for: bool) -> Res<VarDecl<'b>> {
+    fn parse_var_decl(&mut self, in_for: bool) -> Res<VarDecl<Cow<'b, str>>> {
         log::debug!(
             "{} parse_variable_decl_list in_for: {}",
             self.look_ahead.span.start,
@@ -1277,7 +1295,7 @@ where
         let (init, eq) = if self.at_punct(Punct::Equal) {
             let eq = self.next_item()?;
             let init = isolate_cover_grammar!(self, parse_assignment_expr)?;
-            (Some(init), self.slice_from(&eq))
+            (Some(init), Some(self.position_from(&eq).into()))
         } else if !Self::is_pat_ident(&patt) && !in_for {
             return self.expected_token_error(&self.look_ahead, &["="]);
         } else {
@@ -1287,7 +1305,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_try_stmt(&mut self) -> Res<TryStmt<'b>> {
+    fn parse_try_stmt(&mut self) -> Res<TryStmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_try_stmt {:?}",
             self.look_ahead.span.start,
@@ -1333,7 +1351,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_catch_clause(&mut self) -> Res<CatchClause<'b>> {
+    fn parse_catch_clause(&mut self) -> Res<CatchClause<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_catch_clause {:?}",
             self.look_ahead.span.start,
@@ -1401,7 +1419,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_finally_clause(&mut self) -> Res<FinallyClause<'b>> {
+    fn parse_finally_clause(&mut self) -> Res<FinallyClause<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_finally_clause {:?}",
             self.look_ahead.span.start,
@@ -1413,7 +1431,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_throw_stmt(&mut self) -> Res<(Slice<'b>, Expr<'b>, Option<Slice<'b>>)> {
+    fn parse_throw_stmt(&mut self) -> Res<(Throw, Expr<Cow<'b, str>>, Option<Semicolon>)> {
         log::debug!(
             "{}: parse_throw_stmt {:?}",
             self.look_ahead.span.start,
@@ -1429,7 +1447,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_switch_stmt(&mut self) -> Res<SwitchStmt<'b>> {
+    fn parse_switch_stmt(&mut self) -> Res<SwitchStmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_switch_stmt {:?}",
             self.look_ahead.span.start,
@@ -1473,19 +1491,18 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_switch_case(&mut self) -> Res<SwitchCase<'b>> {
+    fn parse_switch_case(&mut self) -> Res<SwitchCase<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_switch_case {:?}",
             self.look_ahead.span.start,
             self.look_ahead.token
         );
         let (keyword, test) = if self.at_keyword(Keyword::Default(())) {
-            (self.expect_keyword(Keyword::Default(()))?, None)
+            let tok = self.expect_keyword(Keyword::Default(()))?;
+            (SwitchCaseKeyword::Default(tok), None)
         } else {
-            (
-                self.expect_keyword(Keyword::Case(()))?,
-                Some(self.parse_expression()?),
-            )
+            let tok = self.expect_keyword(Keyword::Case(()))?;
+            (SwitchCaseKeyword::Case(tok), Some(self.parse_expression()?))
         };
         let colon = self.expect_punct(Punct::Colon)?;
         let mut consequent = Vec::new();
@@ -1507,7 +1524,9 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_return_stmt(&mut self) -> Res<(Slice<'b>, Option<Expr<'b>>, Option<Slice<'b>>)> {
+    fn parse_return_stmt(
+        &mut self,
+    ) -> Res<(Return, Option<Expr<Cow<'b, str>>>, Option<Semicolon>)> {
         log::debug!(
             "{}: parse_return_stmt {:?}",
             self.look_ahead.span.start,
@@ -1534,7 +1553,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_if_stmt(&mut self) -> Res<IfStmt<'b>> {
+    fn parse_if_stmt(&mut self) -> Res<IfStmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_if_stmt {:?}",
             self.look_ahead.span.start,
@@ -1584,7 +1603,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_if_clause(&mut self) -> Res<Stmt<'b>> {
+    fn parse_if_clause(&mut self) -> Res<Stmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_if_clause {:?}",
             self.look_ahead.span.start,
@@ -1596,7 +1615,7 @@ where
         self.parse_statement(Some(StmtCtx::If))
     }
 
-    fn parse_fn_stmt(&mut self, decl_pos: bool) -> Res<Func<'b>> {
+    fn parse_fn_stmt(&mut self, decl_pos: bool) -> Res<Func<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_fn_stmt {:?} {}",
             self.look_ahead.span.start,
@@ -1605,7 +1624,7 @@ where
         );
         let async_keyword = if self.at_contextual_keyword("async") {
             let keyword = self.next_item()?;
-            self.slice_from(&keyword)
+            Some(self.position_from(&keyword).into())
         } else {
             None
         };
@@ -1615,7 +1634,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_for_stmt(&mut self) -> Res<Stmt<'b>> {
+    fn parse_for_stmt(&mut self) -> Res<Stmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_for_stmt {:?}",
             self.look_ahead.span.start,
@@ -1698,10 +1717,11 @@ where
                     }
                 }
             }
-            let var_kind = match &kind.token {
+            match &kind.token {
                 Token::Keyword(ref k) => match k {
-                    Keyword::Const(_) => VarKind::Const(self.get_slice(&kind)?),
-                    Keyword::Let(_) => VarKind::Let(self.get_slice(&kind)?),
+                    Keyword::Const(_) | Keyword::Let(_) => {
+                        VarKind::Const(self.position_from(&kind).into())
+                    }
                     _ => return self.expected_token_error(&kind, &["const", "let"]),
                 },
                 _ => return self.expected_token_error(&kind, &["const", "let"]),
@@ -1709,10 +1729,11 @@ where
             if !self.context.strict && self.look_ahead.token.matches_keyword(Keyword::In(())) {
                 let keyword_in = self.expect_keyword(Keyword::In(()))?;
                 //const or let becomes an ident
-                let k = match var_kind {
-                    VarKind::Var(Some(slice)) => slice,
-                    VarKind::Let(slice) => slice,
-                    VarKind::Const(slice) => slice,
+                let k = match kind.token {
+                    Token::Keyword(ref k) => match k {
+                        Keyword::Const(_) | Keyword::Let(_) => self.get_slice(&kind)?,
+                        _ => unreachable!(),
+                    },
                     _ => unreachable!(),
                 };
                 let left = LoopLeft::Expr(Expr::Ident(Ident { slice: k }));
@@ -1738,6 +1759,7 @@ where
             } else {
                 let prev_in = self.context.allow_in;
                 self.context.allow_in = false;
+                let var_kind = self.var_kind_from(&kind)?;
                 let mut decls = self.parse_binding_list(&var_kind, true)?;
                 log::debug!("{:?}", decls);
                 self.context.allow_in = prev_in;
@@ -1834,7 +1856,7 @@ where
                 }
                 lhs::check_loop_head_expr(&init, init_start)?;
                 let keyword_of = self.next_item()?;
-                let keyword_of = self.get_slice(&keyword_of)?;
+                let keyword_of = self.position_from(&keyword_of).into();
                 let left = LoopLeft::Expr(init);
                 let right = self.parse_assignment_expr()?;
                 let close_paren = self.expect_punct(Punct::CloseParen)?;
@@ -1885,10 +1907,10 @@ where
 
     fn parse_for_loop(
         &mut self,
-        kind: VarKind<'b>,
-        for_keyword: Slice<'b>,
-        open_paren: Slice<'b>,
-    ) -> Res<ForStmt<'b>> {
+        kind: VarKind,
+        for_keyword: For,
+        open_paren: OpenParen,
+    ) -> Res<ForStmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_for_loop {:?}",
             self.look_ahead.span.start,
@@ -1905,10 +1927,10 @@ where
 
     fn parse_for_loop_cont(
         &mut self,
-        init: Option<LoopInit<'b>>,
-        keyword_for: Slice<'b>,
-        open_paren: Slice<'b>,
-    ) -> Res<ForStmt<'b>> {
+        init: Option<LoopInit<Cow<'b, str>>>,
+        keyword_for: For,
+        open_paren: OpenParen,
+    ) -> Res<ForStmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_for_loop_cont {:?}",
             self.look_ahead.span.start,
@@ -1947,10 +1969,10 @@ where
 
     fn parse_for_in_loop(
         &mut self,
-        left: LoopLeft<'b>,
-        keyword_for: Slice<'b>,
-        open_paren: Slice<'b>,
-    ) -> Res<ForInStmt<'b>> {
+        left: LoopLeft<Cow<'b, str>>,
+        keyword_for: For,
+        open_paren: OpenParen,
+    ) -> Res<ForInStmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_for_in_loop {:?}",
             self.look_ahead.span.start,
@@ -2008,11 +2030,11 @@ where
 
     fn parse_for_of_loop(
         &mut self,
-        left: LoopLeft<'b>,
+        left: LoopLeft<Cow<'b, str>>,
         is_await: bool,
-        keyword_for: Slice<'b>,
-        open_paren: Slice<'b>,
-    ) -> Res<ForOfStmt<'b>> {
+        keyword_for: For,
+        open_paren: OpenParen,
+    ) -> Res<ForOfStmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_for_of_loop {:?}",
             self.look_ahead.span.start,
@@ -2025,7 +2047,7 @@ where
             ));
         }
         let keyword_of = self.next_item()?;
-        let keyword_of = self.get_slice(&keyword_of)?;
+        let keyword_of = self.position_from(&keyword_of).into();
         let right = self.parse_assignment_expr()?;
         let close_paren = self.expect_punct(Punct::CloseParen)?;
         let body_start = self.look_ahead_position;
@@ -2051,7 +2073,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_loop_body(&mut self) -> Res<Stmt<'b>> {
+    fn parse_loop_body(&mut self) -> Res<Stmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_loop_body {:?}",
             self.look_ahead.span.start,
@@ -2065,7 +2087,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_do_while_stmt(&mut self) -> Res<DoWhileStmt<'b>> {
+    fn parse_do_while_stmt(&mut self) -> Res<DoWhileStmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_do_while_stmt {:?}",
             self.look_ahead.span.start,
@@ -2101,29 +2123,38 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_break_stmt(&mut self) -> Res<(Slice<'b>, Option<Ident<'b>>, Option<Slice<'b>>)> {
+    fn parse_break_stmt(&mut self) -> Res<(Break, Option<Ident<Cow<'b, str>>>, Option<Semicolon>)> {
         log::debug!(
             "{}: parse_break_stmt {:?}",
             self.look_ahead.span.start,
             self.look_ahead.token
         );
-        self.parse_optionally_labeled_statement(Keyword::Break(()))
+        let (keyword, ident, semi) = self.parse_optionally_labeled_statement(Keyword::Break(()))?;
+        Ok((keyword.into(), ident, semi))
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_continue_stmt(&mut self) -> Res<(Slice<'b>, Option<Ident<'b>>, Option<Slice<'b>>)> {
+    fn parse_continue_stmt(
+        &mut self,
+    ) -> Res<(Continue, Option<Ident<Cow<'b, str>>>, Option<Semicolon>)> {
         log::debug!(
             "{}: parse_continue_stmt {:?}",
             self.look_ahead.span.start,
             self.look_ahead.token
         );
-        self.parse_optionally_labeled_statement(Keyword::Continue(()))
+        let (keyword, ident, semi) =
+            self.parse_optionally_labeled_statement(Keyword::Continue(()))?;
+        Ok((keyword.into(), ident, semi))
     }
 
     fn parse_optionally_labeled_statement(
         &mut self,
         k: Keyword<()>,
-    ) -> Res<(Slice<'b>, Option<Ident<'b>>, Option<Slice<'b>>)> {
+    ) -> Res<(
+        resast::spanned::Position,
+        Option<Ident<Cow<'b, str>>>,
+        Option<Semicolon>,
+    )> {
         log::debug!(
             "{}: parse_optionally_labeled_statement",
             self.look_ahead.span.start
@@ -2132,18 +2163,18 @@ where
         let start = self.look_ahead_position;
         let label = if self.look_ahead.token.is_ident() && !self.context.has_line_term {
             let id = self.parse_var_ident(false)?;
-            if let Some(label_kind) = self.context.label_set.get(&*id.slice.source) {
+            if let Some(label_kind) = self.context.label_set.get(id.slice.source.as_ref()) {
                 if k == Keyword::Continue(()) && label_kind != &LabelKind::Iteration {
                     return Err(Error::ContinueOfNotIterationLabel(
                         start,
-                        id.slice.source.to_string(),
+                        id.slice.source.as_ref().to_string(),
                     ));
                 }
             } else {
                 return Err(Error::UnknownOptionalLabel(
                     self.current_position,
                     k,
-                    id.slice.source.to_string(),
+                    id.slice.source.as_ref().to_string(),
                 ));
             }
             Some(id)
@@ -2162,7 +2193,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_debugger_stmt(&mut self) -> Res<Stmt<'b>> {
+    fn parse_debugger_stmt(&mut self) -> Res<Stmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_debugger_stmt {:?}",
             self.look_ahead.span.start,
@@ -2177,7 +2208,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_labelled_statement(&mut self) -> Res<Stmt<'b>> {
+    fn parse_labelled_statement(&mut self) -> Res<Stmt<Cow<'b, str>>> {
         log::debug!("parse_labelled_statement, {:?}", self.look_ahead.token);
         let start = self.look_ahead.span;
         let pos = self.look_ahead_position;
@@ -2199,11 +2230,11 @@ where
                     .insert(label, LabelKind::Unknown)
                     .is_some()
                 {
-                    return Err(self.redecl_error(&ident.slice.source));
+                    return Err(self.redecl_error(ident.slice.source.as_ref()));
                 }
                 let body = if self.at_keyword(Keyword::Class(())) {
                     let class = self.next_item()?;
-                    let keyword = self.get_slice(&class)?;
+                    let keyword = self.position_from(&class).into();
                     if !self.config.tolerant {
                         return self.unexpected_token_error(&class, "");
                     }
@@ -2253,7 +2284,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_expression_statement(&mut self) -> Res<(Expr<'b>, Option<Slice<'b>>)> {
+    fn parse_expression_statement(&mut self) -> Res<(Expr<Cow<'b, str>>, Option<Semicolon>)> {
         log::debug!(
             "{}: parse_expression_statement {:?}",
             self.look_ahead.span.start,
@@ -2308,7 +2339,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_expression(&mut self) -> Res<Expr<'b>> {
+    fn parse_expression(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_expression {:?}",
             self.look_ahead.span.start,
@@ -2333,7 +2364,7 @@ where
         Ok(ret)
     }
 
-    fn parse_block(&mut self, new_scope: bool) -> Res<BlockStmt<'b>> {
+    fn parse_block(&mut self, new_scope: bool) -> Res<BlockStmt<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_block {:?}",
             self.look_ahead.span.start,
@@ -2373,7 +2404,7 @@ where
         })
     }
 
-    fn parse_lexical_decl(&mut self, in_for: bool) -> Res<Decl<'b>> {
+    fn parse_lexical_decl(&mut self, in_for: bool) -> Res<Decl<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_lexical_decl {:?}",
             self.look_ahead.span.start,
@@ -2382,8 +2413,8 @@ where
         let next = self.next_item()?;
         let kind = match next.token {
             Token::Keyword(ref k) => match k {
-                Keyword::Let(_) => VarKind::Let(self.get_slice(&next)?),
-                Keyword::Const(_) => VarKind::Const(self.get_slice(&next)?),
+                Keyword::Let(_) => VarKind::Let(self.position_from(&next).into()),
+                Keyword::Const(_) => VarKind::Const(self.position_from(&next).into()),
                 _ => return self.expected_token_error(&next, &["let", "const"]),
             },
             _ => return self.expected_token_error(&next, &["let", "const"]),
@@ -2401,7 +2432,7 @@ where
         &mut self,
         kind: &VarKind,
         in_for: bool,
-    ) -> Res<Vec<ListEntry<'b, VarDecl<'b>>>> {
+    ) -> Res<Vec<ListEntry<VarDecl<Cow<'b, str>>>>> {
         log::debug!(
             "{}: parse_binding_list {:?}",
             self.look_ahead.span.start,
@@ -2431,7 +2462,10 @@ where
         Ok(ret)
     }
 
-    fn parse_variable_decl_list(&mut self, in_for: bool) -> Res<Vec<ListEntry<'b, VarDecl<'b>>>> {
+    fn parse_variable_decl_list(
+        &mut self,
+        in_for: bool,
+    ) -> Res<Vec<ListEntry<VarDecl<Cow<'b, str>>>>> {
         log::debug!(
             "{} parse_variable_decl_list in_for: {}",
             self.look_ahead.span.start,
@@ -2450,14 +2484,18 @@ where
         Ok(ret)
     }
 
-    fn is_pat_ident(pat: &Pat) -> bool {
+    fn is_pat_ident(pat: &Pat<Cow<'b, str>>) -> bool {
         match pat {
             Pat::Ident(_) => true,
             _ => false,
         }
     }
 
-    fn parse_lexical_binding(&mut self, kind: &VarKind, in_for: bool) -> Res<VarDecl<'b>> {
+    fn parse_lexical_binding(
+        &mut self,
+        kind: &VarKind,
+        in_for: bool,
+    ) -> Res<VarDecl<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_lexical_binding {:?}",
             self.look_ahead.span.start,
@@ -2491,16 +2529,16 @@ where
         Ok(VarDecl { id, eq, init })
     }
 
-    fn is_restricted(id: &Pat) -> bool {
+    fn is_restricted(id: &Pat<Cow<'b, str>>) -> bool {
         match id {
             Pat::Ident(ref ident) => {
-                ident.slice.source == "eval" || ident.slice.source == "arguments"
+                ident.slice.source.as_ref() == "eval" || ident.slice.source.as_ref() == "arguments"
             }
             _ => false,
         }
     }
 
-    fn parse_function_decl(&mut self, opt_ident: bool) -> Res<Func<'b>> {
+    fn parse_function_decl(&mut self, opt_ident: bool) -> Res<Func<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_function_decl {:?}",
             self.look_ahead.span.start,
@@ -2509,14 +2547,14 @@ where
         let start_pos = self.look_ahead_position;
         let keyword_async = if self.at_contextual_keyword("async") {
             let keyword_async = self.next_item()?;
-            self.slice_from(&keyword_async)
+            Some(self.position_from(&keyword_async).into())
         } else {
             None
         };
         let keyword = self.expect_keyword(Keyword::Function(()))?;
         let star = if self.at_punct(Punct::Asterisk) {
             let keyword_async = self.next_item()?;
-            self.slice_from(&keyword_async)
+            Some(self.position_from(&keyword_async).into())
         } else {
             None
         };
@@ -2608,12 +2646,12 @@ where
 
     fn parse_func(
         &mut self,
-        keyword: Slice<'b>,
+        keyword: Function,
         is_stmt: bool,
         opt_id: bool,
         is_hanging: bool,
-        keyword_async: Option<Slice<'b>>,
-    ) -> Res<Func<'b>> {
+        keyword_async: Option<Async>,
+    ) -> Res<Func<Cow<'b, str>>> {
         log::debug!(
             "{} parse_func( is_stmt: {}, opt_id: {}, is_hanging: {}",
             self.look_ahead.span.start,
@@ -2623,7 +2661,7 @@ where
         );
         let star = if self.at_punct(Punct::Asterisk) {
             let star = self.next_item()?;
-            self.slice_from(&star)
+            Some(self.position_from(&star).into())
         } else {
             None
         };
@@ -2666,7 +2704,7 @@ where
                     };
                     self.context
                         .lexical_names
-                        .declare(id.slice.source.clone(), kind, start)?;
+                        .declare(id.slice.source.0.clone(), kind, start)?;
                 }
                 Some(id)
             }
@@ -2739,7 +2777,7 @@ where
         log::trace!("{} add_scope {:?}", self.look_ahead.span.start, scope);
         self.context.lexical_names.new_child(scope);
     }
-    fn declare_pat(&mut self, pat: &Pat<'b>, kind: DeclKind, pos: Position) -> Res<()> {
+    fn declare_pat(&mut self, pat: &Pat<Cow<'b, str>>, kind: DeclKind, pos: Position) -> Res<()> {
         log::info!(
             "{} declare_pat {:?} {:?}",
             self.look_ahead.span.start,
@@ -2768,7 +2806,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_function_source_el(&mut self) -> Res<FuncBody<'b>> {
+    fn parse_function_source_el(&mut self) -> Res<FuncBody<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_function_source_el {:?}",
             self.look_ahead.span.start,
@@ -2802,7 +2840,7 @@ where
         })
     }
 
-    fn parse_class_decl(&mut self, opt_ident: bool, check_id: bool) -> Res<Class<'b>> {
+    fn parse_class_decl(&mut self, opt_ident: bool, check_id: bool) -> Res<Class<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_class_decl {:?}",
             self.look_ahead.span.start,
@@ -2850,7 +2888,7 @@ where
         if check_id {
             if let Some(ref i) = id {
                 self.context.lexical_names.declare(
-                    i.slice.source.clone(),
+                    i.slice.source.0.clone(),
                     lexical_names::DeclKind::Lex(self.context.is_module),
                     start,
                 )?;
@@ -2870,7 +2908,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_class_body(&mut self) -> Res<ClassBody<'b>> {
+    fn parse_class_body(&mut self) -> Res<ClassBody<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_class_body {:?}",
             self.look_ahead.span.start,
@@ -2899,7 +2937,7 @@ where
     /// Parse a single class element returning a (true, Prop) if that property is a constructor
     /// and (false, Prop) otherwise
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_class_el(&mut self, has_ctor: bool) -> Res<Prop<'b>> {
+    fn parse_class_el(&mut self, has_ctor: bool) -> Res<Prop<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_class_el {:?}",
             self.look_ahead.span.start,
@@ -2916,8 +2954,7 @@ where
                 };
                 return self.method_def_cont(None, None, None, id);
             }
-            let slice = self.slice_from(&keyword_static);
-            slice
+            Some(self.position_from(&keyword_static).into())
         } else {
             None
         };
@@ -2932,7 +2969,7 @@ where
                 };
                 return self.method_def_cont(keyword_static, None, None, id);
             }
-            self.slice_from(&keyword_async)
+            Some(self.position_from(&keyword_async).into())
         } else {
             None
         };
@@ -2940,7 +2977,7 @@ where
         let star = if self.at_punct(Punct::Asterisk) {
             log::debug!("found leading asterisk");
             let star = self.next_item()?;
-            self.slice_from(&star)
+            Some(self.position_from(&star).into())
         } else {
             None
         };
@@ -2995,7 +3032,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn prop_key_from(&self, item: &Item<&'b str>) -> Res<PropKey<'b>> {
+    fn prop_key_from(&self, item: &Item<&'b str>) -> Res<PropKey<Cow<'b, str>>> {
         let ret = match &item.token {
             Token::Boolean(_) => PropKey::Pat(Pat::Ident(self.get_slice(&item)?.into())),
             Token::EoF => return Err(Error::UnexpectedEoF),
@@ -3015,9 +3052,9 @@ where
     #[tracing::instrument(level = "trace", skip(self))]
     fn method_def(
         &mut self,
-        keyword_static: Option<Slice<'b>>,
-        mut star: Option<Slice<'b>>,
-    ) -> Res<Prop<'b>> {
+        keyword_static: Option<Static>,
+        mut star: Option<Asterisk>,
+    ) -> Res<Prop<Cow<'b, str>>> {
         log::debug!(
             "{}: method_def {:?}",
             self.look_ahead.span.start,
@@ -3048,7 +3085,7 @@ where
         } else {
             if self.at_contextual_keyword("async") {
                 let keyword = self.next_item()?;
-                let keyword = self.get_slice(&keyword)?;
+                let keyword = self.position_from(&keyword).into();
                 keyword_async = Some(keyword);
             }
             if self.at_punct(Punct::Asterisk) {
@@ -3068,15 +3105,15 @@ where
     #[tracing::instrument(level = "trace", skip(self))]
     fn get_method_def(
         &mut self,
-        keyword_static: Option<Slice<'b>>,
+        keyword_static: Option<Static>,
         item_get: Item<&'b str>,
-    ) -> Res<PropGet<'b>> {
+    ) -> Res<PropGet<Cow<'b, str>>> {
         log::debug!(
             "{}: get_method_def {:?}",
             self.look_ahead.span.start,
             self.look_ahead.token
         );
-        let keyword_get = self.get_slice(&item_get)?;
+        let keyword_get = self.position_from(&item_get).into();
         let id = self.parse_object_property_key()?;
         let open_paren = self.expect_punct(Punct::OpenParen)?;
         let close_paren = self.expect_punct(Punct::CloseParen)?;
@@ -3096,15 +3133,15 @@ where
     #[tracing::instrument(level = "trace", skip(self))]
     fn set_method_def(
         &mut self,
-        keyword_static: Option<Slice<'b>>,
+        keyword_static: Option<Static>,
         item_set: Item<&'b str>,
-    ) -> Res<PropSet<'b>> {
+    ) -> Res<PropSet<Cow<'b, str>>> {
         log::debug!(
             "{}: set_method_def {:?}",
             self.look_ahead.span.start,
             self.look_ahead.token
         );
-        let keyword_set = self.get_slice(&item_set)?;
+        let keyword_set = self.position_from(&item_set).into();
         let id = self.parse_object_property_key()?;
         self.add_scope(lexical_names::Scope::FuncTop);
         let mut params = self.parse_formal_params()?;
@@ -3115,8 +3152,8 @@ where
         if Self::is_rest(&arg.item) {
             let loc = arg.loc();
             return Err(Error::InvalidSetterParams(Position {
-                line: loc.start.line,
-                column: loc.start.column,
+                line: loc.start.line as _,
+                column: loc.start.column as _,
             }));
         }
 
@@ -3136,11 +3173,11 @@ where
     #[tracing::instrument(level = "trace", skip(self))]
     fn method_def_cont(
         &mut self,
-        keyword_static: Option<Slice<'b>>,
-        keyword_async: Option<Slice<'b>>,
-        star: Option<Slice<'b>>,
-        id: PropInitKey<'b>,
-    ) -> Res<Prop<'b>> {
+        keyword_static: Option<Static>,
+        keyword_async: Option<Async>,
+        star: Option<Asterisk>,
+        id: PropInitKey<Cow<'b, str>>,
+    ) -> Res<Prop<Cow<'b, str>>> {
         log::debug!(
             "{}: method_def_cont {:?}",
             self.look_ahead.span.start,
@@ -3187,7 +3224,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_class_ctor(&mut self, id: PropInitKey<'b>) -> Res<Prop<'b>> {
+    fn parse_class_ctor(&mut self, id: PropInitKey<Cow<'b, str>>) -> Res<Prop<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_class_ctor {:?}",
             self.look_ahead.span.start,
@@ -3214,19 +3251,19 @@ where
     /// match, this takes into account all of the
     /// different shapes that `key` could be, including
     /// identifiers and literals
-    fn is_key(key: &PropKey, other: &str) -> bool {
+    fn is_key(key: &PropKey<Cow<'b, str>>, other: &str) -> bool {
         log::trace!("is_key: {:?} <-> {}", key, other);
         match key {
             PropKey::Lit(ref l) => match l {
-                Lit::String(ref s) => s.content.source == other,
+                Lit::String(ref s) => s.content.source.as_ref() == other,
                 _ => false,
             },
             PropKey::Expr(ref e) => match e {
-                Expr::Ident(ref s) => s.slice.source == other,
+                Expr::Ident(ref s) => s.slice.source.as_ref() == other,
                 _ => false,
             },
             PropKey::Pat(ref p) => match p {
-                Pat::Ident(ref s) => s.slice.source == other,
+                Pat::Ident(ref s) => s.slice.source.as_ref() == other,
                 _ => false,
             },
         }
@@ -3235,9 +3272,9 @@ where
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_async_property_method(
         &mut self,
-        keyword_async: Slice<'b>,
-        id: PropInitKey<'b>,
-    ) -> Res<PropMethod<'b>> {
+        keyword_async: Async,
+        id: PropInitKey<Cow<'b, str>>,
+    ) -> Res<PropMethod<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_property_method_async_fn",
             self.look_ahead.span.start
@@ -3271,7 +3308,10 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_property_method(&mut self, id: PropInitKey<'b>) -> Res<PropMethod<'b>> {
+    fn parse_property_method(
+        &mut self,
+        id: PropInitKey<Cow<'b, str>>,
+    ) -> Res<PropMethod<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_property_method {:?}",
             self.look_ahead.span.start,
@@ -3308,10 +3348,10 @@ where
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_getter_method(
         &mut self,
-        key: PropInitKey<'b>,
-        keyword_static: Option<Slice<'b>>,
-        keyword_get: Slice<'b>,
-    ) -> Res<Prop<'b>> {
+        key: PropInitKey<Cow<'b, str>>,
+        keyword_static: Option<Static>,
+        keyword_get: Get,
+    ) -> Res<Prop<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_getter_method {:?}",
             self.look_ahead.span.start,
@@ -3345,7 +3385,11 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_method_body(&mut self, simple: bool, found_restricted: bool) -> Res<FuncBody<'b>> {
+    fn parse_method_body(
+        &mut self,
+        simple: bool,
+        found_restricted: bool,
+    ) -> Res<FuncBody<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_method_body {:?}",
             self.look_ahead.span.start,
@@ -3371,10 +3415,10 @@ where
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_setter_method(
         &mut self,
-        keyword_static: Option<Slice<'b>>,
-        keyword_set: Slice<'b>,
-        key: PropInitKey<'b>,
-    ) -> Res<Prop<'b>> {
+        keyword_static: Option<Static>,
+        keyword_set: Set,
+        key: PropInitKey<Cow<'b, str>>,
+    ) -> Res<Prop<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_setter_method {:?}",
             self.look_ahead.span.start,
@@ -3411,7 +3455,7 @@ where
         }))
     }
 
-    fn is_rest(arg: &FuncArg) -> bool {
+    fn is_rest(arg: &FuncArg<Cow<'b, str>>) -> bool {
         match arg {
             FuncArg::Expr(ref e) => match e {
                 Expr::Spread(_) => true,
@@ -3427,7 +3471,7 @@ where
         &mut self,
         simple: bool,
         found_restricted: bool,
-    ) -> Res<FuncBody<'b>> {
+    ) -> Res<FuncBody<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_property_method_fn {:?}",
             self.look_ahead.span.start,
@@ -3463,7 +3507,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_object_property_key(&mut self) -> Res<PropInitKey<'b>> {
+    fn parse_object_property_key(&mut self) -> Res<PropInitKey<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_object_property_key {:?}",
             self.look_ahead.span.start,
@@ -3530,7 +3574,7 @@ where
             } else {
                 PropKey::Expr(key)
             };
-            let open_bracket = self.get_slice(&item)?;
+            let open_bracket = self.position_from(&item).into();
             let close_bracket = self.expect_punct(Punct::CloseBracket)?;
             let id = PropInitKey {
                 brackets: Some((open_bracket, close_bracket)),
@@ -3583,7 +3627,7 @@ where
         Ok(())
     }
 
-    fn is_valid_property_key_lit(expr: &Expr) -> bool {
+    fn is_valid_property_key_lit(expr: &Expr<Cow<'b, str>>) -> bool {
         match expr {
             Expr::Lit(ref l) => match l {
                 Lit::String(_) | Lit::Number(_) | Lit::Boolean(_) => true,
@@ -3594,7 +3638,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_primary_expression(&mut self) -> Res<Expr<'b>> {
+    fn parse_primary_expression(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_primary_expression {:?}",
             self.look_ahead.span.start,
@@ -3653,7 +3697,12 @@ where
             self.context.set_is_binding_element(false);
             let item = self.next_item()?;
             let lit = match item.token {
-                Token::Boolean(_) => Lit::Boolean(self.get_slice(&item)?),
+                Token::Boolean(Boolean::True) => Lit::Boolean(
+                    resast::spanned::expr::Boolean::True(self.position_from(&item).into()),
+                ),
+                Token::Boolean(Boolean::False) => Lit::Boolean(
+                    resast::spanned::expr::Boolean::False(self.position_from(&item).into()),
+                ),
                 _ => unreachable!(),
             };
             Ok(Expr::Lit(lit))
@@ -3661,7 +3710,7 @@ where
             self.context.set_is_assignment_target(false);
             self.context.set_is_binding_element(false);
             let item = self.next_item()?;
-            Ok(Expr::Lit(Lit::Null(self.get_slice(&item)?)))
+            Ok(Expr::Lit(Lit::Null(self.position_from(&item).into())))
         } else if self.look_ahead.is_template() {
             let lit = self.parse_template_lit(false)?;
             Ok(Expr::Lit(Lit::Template(lit)))
@@ -3684,7 +3733,7 @@ where
             let lit = match &regex.token {
                 Token::RegEx(_) => {
                     let slice = self.get_slice(&regex)?;
-                    crate::regex::validate_regex(&slice.source)?;
+                    crate::regex::validate_regex(slice.source.as_ref())?;
                     self.regex_lit_from(&regex)?
                 }
                 _ => unreachable!(),
@@ -3707,7 +3756,7 @@ where
                     self.parse_function_expr()
                 } else if self.at_keyword(Keyword::This(())) {
                     let item = self.next_item()?;
-                    let slice = self.get_slice(&item)?;
+                    let slice = self.position_from(&item).into();
                     Ok(Expr::This(slice))
                 } else if self.at_keyword(Keyword::Class(())) {
                     let cls = self.parse_class_decl(true, false)?;
@@ -3744,7 +3793,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_group_expr(&mut self) -> Res<Expr<'b>> {
+    fn parse_group_expr(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_group_expr {:?}",
             self.look_ahead.span.start,
@@ -3754,7 +3803,7 @@ where
         if self.at_punct(Punct::CloseParen) {
             let close_paren = self.expect_punct(Punct::CloseParen)?;
             if !self.at_punct(Punct::EqualGreaterThan) {
-                self.expect_punct(Punct::EqualGreaterThan)?;
+                self.expect_punct::<FatArrow>(Punct::EqualGreaterThan)?;
             }
             let inner = ArrowParamPlaceHolder {
                 keyword: None,
@@ -3770,7 +3819,7 @@ where
                 let arg = FuncArg::Rest(Box::new(expr));
                 let close_paren = self.expect_punct(Punct::CloseParen)?;
                 if !self.at_punct(Punct::EqualGreaterThan) {
-                    self.expect_punct(Punct::EqualGreaterThan)?;
+                    self.expect_punct::<FatArrow>(Punct::EqualGreaterThan)?;
                 }
                 let inner = ArrowParamPlaceHolder {
                     keyword: None,
@@ -3948,7 +3997,10 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn convert_expr_to_func_arg_strict(&self, expr: Expr<'b>) -> Res<FuncArg<'b>> {
+    fn convert_expr_to_func_arg_strict(
+        &self,
+        expr: Expr<Cow<'b, str>>,
+    ) -> Res<FuncArg<Cow<'b, str>>> {
         if !self.context.strict {
             return Ok(FuncArg::Expr(expr));
         }
@@ -3967,7 +4019,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_array_init(&mut self) -> Res<Expr<'b>> {
+    fn parse_array_init(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_array_init {:?}",
             self.look_ahead.span.start,
@@ -4020,7 +4072,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_obj_init(&mut self) -> Res<Expr<'b>> {
+    fn parse_obj_init(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_obj_init {:?}",
             self.look_ahead.span.start,
@@ -4068,7 +4120,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_obj_prop(&mut self) -> Res<(bool, ObjProp<'b>)> {
+    fn parse_obj_prop(&mut self) -> Res<(bool, ObjProp<Cow<'b, str>>)> {
         log::debug!(
             "{}: parse_obj_prop {:?}",
             self.look_ahead.span.start,
@@ -4127,103 +4179,108 @@ where
         };
         let at_qualified = self.at_qualified_prop_key();
         let prev_super = self.context.allow_super;
-        let prop =
-            if keyword_get.is_some() && at_qualified && keyword_async.is_none() && star.is_none() {
-                let keyword_get = keyword_get.unwrap();
-                let key = self.parse_object_property_key()?;
+        let prop = if keyword_get.is_some()
+            && at_qualified
+            && keyword_async.is_none()
+            && star.is_none()
+        {
+            let keyword_get = keyword_get.unwrap();
+            let keyword_get = keyword_get.loc.start.into();
+            let key = self.parse_object_property_key()?;
+            self.context.set_allow_super(true);
+            let value = self.parse_getter_method(key, None, keyword_get)?;
+            self.context.set_allow_super(prev_super);
+            ObjProp::Prop(value)
+        } else if keyword_set.is_some() && at_qualified && keyword_async.is_none() {
+            let keyword_set = keyword_set.unwrap();
+            let keyword_set = keyword_set.loc.start.into();
+            let key = self.parse_object_property_key()?;
+            self.context.set_allow_super(true);
+            let value = self.parse_setter_method(None, keyword_set, key)?;
+            self.context.set_allow_super(prev_super);
+            ObjProp::Prop(value)
+        } else if star.is_some() && at_qualified {
+            let value = self.method_def(None, star)?;
+            ObjProp::Prop(value)
+        } else if let Some(key) = key {
+            if self.at_punct(Punct::Colon) && keyword_async.is_none() {
+                if !computed && Self::is_proto_(&key.value) {
+                    is_proto = true;
+                }
+                let colon = self.expect_punct(Punct::Colon)?;
+                let value = inherit_cover_grammar!(self, parse_assignment_expr)?;
+                let value = PropValue::Expr(value);
+                let prop = PropInit {
+                    key,
+                    colon: Some(colon),
+                    value: Some(value),
+                };
+                ObjProp::Prop(Prop::Init(prop))
+            } else if self.at_punct(Punct::OpenParen) {
                 self.context.set_allow_super(true);
-                let value = self.parse_getter_method(key, None, keyword_get)?;
+                let value = if let Some(keyword_async) = keyword_async {
+                    self.parse_async_property_method(keyword_async.loc.start.into(), key.clone())?
+                } else {
+                    self.parse_property_method(key)?
+                };
                 self.context.set_allow_super(prev_super);
-                ObjProp::Prop(value)
-            } else if keyword_set.is_some() && at_qualified && keyword_async.is_none() {
-                let keyword_set = keyword_set.unwrap();
-                let key = self.parse_object_property_key()?;
-                self.context.set_allow_super(true);
-                let value = self.parse_setter_method(None, keyword_set, key)?;
-                self.context.set_allow_super(prev_super);
-                ObjProp::Prop(value)
-            } else if star.is_some() && at_qualified {
-                let value = self.method_def(None, star)?;
-                ObjProp::Prop(value)
-            } else if let Some(key) = key {
-                if self.at_punct(Punct::Colon) && keyword_async.is_none() {
-                    if !computed && Self::is_proto_(&key.value) {
-                        is_proto = true;
-                    }
-                    let colon = self.expect_punct(Punct::Colon)?;
-                    let value = inherit_cover_grammar!(self, parse_assignment_expr)?;
-                    let value = PropValue::Expr(value);
+
+                ObjProp::Prop(Prop::Method(value))
+            } else if start.token.is_ident()
+                || start.token == Token::Keyword(Keyword::Yield("yield"))
+                || (!self.context.strict && start.token.matches_keyword(Keyword::Let(())))
+            {
+                if self.at_punct(Punct::Equal) {
+                    self.context.first_covert_initialized_name_error =
+                        Some(self.look_ahead.clone());
+                    let operator = AssignOp::Equal(self.expect_punct(Punct::Equal)?);
+                    let inner = isolate_cover_grammar!(self, parse_assignment_expr)?;
+                    let value = if let Token::Ident(_) = &start.token {
+                        let slice = self.get_slice(&start)?;
+                        let p = AssignPat {
+                            left: Box::new(Pat::Ident(slice.into())),
+                            operator,
+                            right: Box::new(inner),
+                        };
+                        PropValue::Pat(Pat::Assign(p))
+                    } else {
+                        PropValue::Expr(inner)
+                    };
+                    // self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
                     let prop = PropInit {
                         key,
-                        colon: Some(colon),
+                        colon: None,
                         value: Some(value),
                     };
                     ObjProp::Prop(Prop::Init(prop))
-                } else if self.at_punct(Punct::OpenParen) {
-                    self.context.set_allow_super(true);
-                    let value = if let Some(keyword_async) = keyword_async {
-                        self.parse_async_property_method(keyword_async, key.clone())?
-                    } else {
-                        self.parse_property_method(key)?
-                    };
-                    self.context.set_allow_super(prev_super);
-
-                    ObjProp::Prop(Prop::Method(value))
-                } else if start.token.is_ident()
-                    || start.token == Token::Keyword(Keyword::Yield("yield"))
-                    || (!self.context.strict && start.token.matches_keyword(Keyword::Let(())))
-                {
-                    if self.at_punct(Punct::Equal) {
-                        self.context.first_covert_initialized_name_error =
-                            Some(self.look_ahead.clone());
-                        let operator = AssignOp::Equal(self.expect_punct(Punct::Equal)?);
-                        let inner = isolate_cover_grammar!(self, parse_assignment_expr)?;
-                        let value = if let Token::Ident(_) = &start.token {
-                            let slice = self.get_slice(&start)?;
-                            let p = AssignPat {
-                                left: Box::new(Pat::Ident(slice.into())),
-                                operator,
-                                right: Box::new(inner),
-                            };
-                            PropValue::Pat(Pat::Assign(p))
-                        } else {
-                            PropValue::Expr(inner)
-                        };
-                        // self.set_isolate_cover_grammar_state(prev_bind, prev_assign, prev_first)?;
-                        let prop = PropInit {
-                            key,
-                            colon: None,
-                            value: Some(value),
-                        };
-                        ObjProp::Prop(Prop::Init(prop))
-                    } else {
-                        let prop = Prop::Init(PropInit {
-                            key,
-                            colon: None,
-                            value: None,
-                        });
-
-                        ObjProp::Prop(prop)
-                    }
                 } else {
-                    return self.expected_token_error(&start, &["object property value"]);
+                    let prop = Prop::Init(PropInit {
+                        key,
+                        colon: None,
+                        value: None,
+                    });
+
+                    ObjProp::Prop(prop)
                 }
             } else {
-                return self.expected_token_error(&start, &["object property key"]);
-            };
+                return self.expected_token_error(&start, &["object property value"]);
+            }
+        } else {
+            return self.expected_token_error(&start, &["object property key"]);
+        };
         log::trace!("prop: {:?}", prop);
         Ok((is_proto, prop))
     }
 
-    fn is_proto_(key: &PropKey) -> bool {
+    fn is_proto_(key: &PropKey<Cow<'b, str>>) -> bool {
         log::trace!("is_proto {:?}", key);
         match key {
             PropKey::Lit(ref l) => match l {
-                Lit::String(ref s) => s.content.source == "__proto__",
+                Lit::String(ref s) => s.content.source.as_ref() == "__proto__",
                 _ => false,
             },
             PropKey::Expr(Expr::Ident(ref ident)) | PropKey::Pat(Pat::Ident(ref ident)) => {
-                ident.slice.source == "__proto__"
+                ident.slice.source.as_ref() == "__proto__"
             }
             _ => false,
         }
@@ -4241,7 +4298,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_template_lit(&mut self, is_tagged: bool) -> Res<TemplateLit<'b>> {
+    fn parse_template_lit(&mut self, is_tagged: bool) -> Res<TemplateLit<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_template_Lit {:?}",
             self.look_ahead.span.start,
@@ -4268,8 +4325,7 @@ where
         })
     }
 
-    #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_template_element(&mut self, is_tagged: bool) -> Res<TemplateElement<'b>> {
+    fn parse_template_element(&mut self, is_tagged: bool) -> Res<TemplateElement<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_template_element {:?}",
             self.look_ahead.span.start,
@@ -4279,28 +4335,30 @@ where
         let item = self.next_item()?;
         if let Token::Template(t) = &item.token {
             let raw = self.get_slice(&item)?;
-            let (cooked, lit) = match t {
-                Template::Head(c) | Template::Middle(c) => (
-                    Slice {
-                        loc: SourceLocation {
-                            start: raw.loc.start + Position { line: 0, column: 1 },
-                            end: raw.loc.end - Position { line: 0, column: 2 },
-                        },
-                        source: Cow::Borrowed(c.content),
-                    },
-                    c,
+            let start_pos = raw.loc.start;
+            let (open_quote, lit, close_quote) = match t {
+                Template::NoSub(inner) => (
+                    QuasiQuote::BackTick(start_pos.into()),
+                    inner,
+                    QuasiQuote::BackTick((raw.loc.end - Position { line: 0, column: 1 }).into()),
                 ),
-                Template::Tail(c) | Template::NoSub(c) => (
-                    Slice {
-                        loc: SourceLocation {
-                            start: raw.loc.start + Position { line: 0, column: 1 },
-                            end: raw.loc.end - Position { line: 0, column: 1 },
-                        },
-                        source: Cow::Borrowed(c.content),
-                    },
-                    c,
+                Template::Head(inner) => (
+                    QuasiQuote::BackTick(start_pos.into()),
+                    inner,
+                    QuasiQuote::OpenBrace((raw.loc.end - Position { line: 0, column: 2 }).into()),
+                ),
+                Template::Middle(inner) => (
+                    QuasiQuote::CloseBrace(start_pos.into()),
+                    inner,
+                    QuasiQuote::OpenBrace((raw.loc.end - Position { line: 0, column: 2 }).into()),
+                ),
+                Template::Tail(inner) => (
+                    QuasiQuote::CloseBrace(start_pos.into()),
+                    inner,
+                    QuasiQuote::BackTick((raw.loc.end - Position { line: 0, column: 1 }).into()),
                 ),
             };
+
             if !is_tagged && lit.contains_octal_escape {
                 return Err(Error::OctalLiteral(item.location.start));
             }
@@ -4313,15 +4371,25 @@ where
                     "Invalid unicode escape in template literal".to_string(),
                 ));
             }
-
-            Ok(TemplateElement { cooked, raw })
+            let content = Slice {
+                source: Cow::Borrowed(lit.content).into(),
+                loc: SourceLocation {
+                    start: open_quote.end(),
+                    end: close_quote.start(),
+                },
+            };
+            Ok(TemplateElement {
+                open_quote,
+                content,
+                close_quote,
+            })
         } else {
             self.expected_token_error(&self.look_ahead, &["Template part"])
         }
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_function_expr(&mut self) -> Res<Expr<'b>> {
+    fn parse_function_expr(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_function_expr {:?}",
             self.look_ahead.span.start,
@@ -4331,7 +4399,7 @@ where
         let is_async = self.at_contextual_keyword("async");
         let keyword_async = if self.at_contextual_keyword("async") {
             let keyword = self.next_item()?;
-            self.slice_from(&keyword)
+            Some(self.position_from(&keyword).into())
         } else {
             None
         };
@@ -4428,7 +4496,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_fn_name(&mut self, is_gen: bool) -> Res<resast::spanned::Ident<'b>> {
+    fn parse_fn_name(&mut self, is_gen: bool) -> Res<resast::spanned::Ident<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_fn_name {:?}",
             self.look_ahead.span.start,
@@ -4442,7 +4510,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_ident_name(&mut self) -> Res<resast::spanned::Ident<'b>> {
+    fn parse_ident_name(&mut self) -> Res<resast::spanned::Ident<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_ident_name {:?}",
             self.look_ahead.span.start,
@@ -4459,7 +4527,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_var_ident(&mut self, is_var: bool) -> Res<resast::spanned::Ident<'b>> {
+    fn parse_var_ident(&mut self, is_var: bool) -> Res<resast::spanned::Ident<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_var_ident {:?}",
             self.look_ahead.span.start,
@@ -4476,7 +4544,7 @@ where
                     ident.location.start,
                     format!(
                         "{} is a strict reserved word",
-                        self.get_slice(&ident)?.source,
+                        self.get_slice(&ident)?.source.as_ref(),
                     ),
                 ));
             } else if self.context.strict
@@ -4567,7 +4635,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_formal_param(&mut self, simple: bool) -> Res<(bool, bool, FuncArg<'b>)> {
+    fn parse_formal_param(&mut self, simple: bool) -> Res<(bool, bool, FuncArg<Cow<'b, str>>)> {
         log::debug!(
             "{}: parse_formal_param {:?}",
             self.look_ahead.span.start,
@@ -4589,7 +4657,10 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_rest_element(&mut self, params: &mut Vec<Item<&'b str>>) -> Res<(bool, RestPat<'b>)> {
+    fn parse_rest_element(
+        &mut self,
+        params: &mut Vec<Item<&'b str>>,
+    ) -> Res<(bool, RestPat<Cow<'b, str>>)> {
         log::debug!(
             "{}: parse_rest_element {:?}",
             self.look_ahead.span.start,
@@ -4608,7 +4679,10 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_binding_rest_el(&mut self, params: &mut Vec<Item<&'b str>>) -> Res<RestPat<'b>> {
+    fn parse_binding_rest_el(
+        &mut self,
+        params: &mut Vec<Item<&'b str>>,
+    ) -> Res<RestPat<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_binding_rest_el {:?}",
             self.look_ahead.span.start,
@@ -4623,7 +4697,7 @@ where
     fn parse_pattern_with_default(
         &mut self,
         params: &mut Vec<Item<&'b str>>,
-    ) -> Res<(bool, Pat<'b>)> {
+    ) -> Res<(bool, Pat<Cow<'b, str>>)> {
         log::debug!(
             "{}: parse_pattern_with_default {:?}",
             self.look_ahead.span.start,
@@ -4653,7 +4727,7 @@ where
         &mut self,
         is_var: bool,
         params: &mut Vec<Item<&'b str>>,
-    ) -> Res<(bool, Pat<'b>)> {
+    ) -> Res<(bool, Pat<Cow<'b, str>>)> {
         log::debug!(
             "{}: parse_pattern {:?}",
             self.look_ahead.span.start,
@@ -4665,17 +4739,21 @@ where
             self.parse_object_pattern()
         } else {
             let ident = self.parse_var_ident(is_var)?;
-            if !is_var && ident.slice.source == "let" {
+            if !is_var && ident.slice.source.as_ref() == "let" {
                 return self.expected_token_error(&self.look_ahead, &["identifier"]);
             }
-            let restricted = ident.slice.source == "eval" || ident.slice.source == "arguments";
+            let restricted =
+                ident.slice.source.as_ref() == "eval" || ident.slice.source.as_ref() == "arguments";
             params.push(self.look_ahead.clone());
             Ok((restricted, Pat::Ident(ident)))
         }
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_array_pattern(&mut self, params: &mut Vec<Item<&'b str>>) -> Res<(bool, Pat<'b>)> {
+    fn parse_array_pattern(
+        &mut self,
+        params: &mut Vec<Item<&'b str>>,
+    ) -> Res<(bool, Pat<Cow<'b, str>>)> {
         log::debug!(
             "{}: parse_array_pattern {:?}",
             self.look_ahead.span.start,
@@ -4685,14 +4763,13 @@ where
         let mut elements = Vec::new();
         while !self.at_punct(Punct::CloseBracket) {
             if self.at_punct(Punct::Comma) {
-                let comma = self.slice_from(&self.look_ahead);
-                let _ = self.next_item()?;
+                let comma = Some(self.expect_punct(Punct::Comma)?);
                 elements.push(ListEntry { item: None, comma });
             } else {
                 if self.at_punct(Punct::Ellipsis) {
                     let el = self.parse_binding_rest_el(params)?;
                     let comma = if self.at_punct(Punct::Comma) {
-                        self.slice_from(&self.look_ahead)
+                        Some(self.expect_punct(Punct::Comma)?)
                     } else {
                         None
                     };
@@ -4705,8 +4782,11 @@ where
                 } else {
                     let (_, el) = self.parse_pattern_with_default(params)?;
                     let comma = if self.at_punct(Punct::Comma) {
-                        self.slice_from(&self.look_ahead)
+                        Some(self.expect_punct(Punct::Comma)?)
                     } else {
+                        if !self.at_punct(Punct::CloseBracket) {
+                            self.expect_punct::<Comma>(Punct::Comma)?;
+                        }
                         None
                     };
                     let ele = ListEntry {
@@ -4715,9 +4795,7 @@ where
                     };
                     elements.push(ele);
                 }
-                if !self.at_punct(Punct::CloseBracket) {
-                    self.expect_punct(Punct::Comma)?;
-                }
+                
             }
         }
         let close_bracket = self.expect_punct(Punct::CloseBracket)?;
@@ -4730,7 +4808,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_object_pattern(&mut self) -> Res<(bool, Pat<'b>)> {
+    fn parse_object_pattern(&mut self) -> Res<(bool, Pat<Cow<'b, str>>)> {
         log::debug!(
             "{}: parse_object_pattern {:?}",
             self.look_ahead.span.start,
@@ -4761,7 +4839,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_rest_prop(&mut self) -> Res<ObjPatPart<'b>> {
+    fn parse_rest_prop(&mut self) -> Res<ObjPatPart<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_rest_prop {:?}",
             self.look_ahead.span.start,
@@ -4781,7 +4859,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_property_pattern(&mut self) -> Res<ObjPatPart<'b>> {
+    fn parse_property_pattern(&mut self) -> Res<ObjPatPart<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_property_pattern {:?}",
             self.look_ahead.span.start,
@@ -4826,7 +4904,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_assignment_expr(&mut self) -> Res<Expr<'b>> {
+    fn parse_assignment_expr(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_assignment_expr {:?}",
             self.look_ahead.span.start,
@@ -4862,7 +4940,7 @@ where
                 let arg = self.reinterpret_expr_as_pat(arg)?;
                 let arg = FuncArg::Pat(arg);
                 let inner = ArrowParamPlaceHolder {
-                    keyword: keyword.clone(),
+                    keyword: keyword.as_ref().map(|k| k.loc.start.into()),
                     args: vec![ListEntry::no_comma(arg)],
                     open_paren: None,
                     close_paren: None,
@@ -4919,7 +4997,7 @@ where
                         self.context.allow_in = prev_in;
                         self.context.allow_strict_directive = prev_strict;
                         let afe = ArrowFuncExpr {
-                            keyword: keyword.clone(),
+                            keyword: keyword.map(|k| k.loc.start.into()),
                             star: None,
                             open_paren: params.open_paren,
                             params: params.params,
@@ -4933,7 +5011,7 @@ where
                         self.context.allow_await = prev_await;
                         self.remove_scope();
                         current = Expr::ArrowFunc(ArrowFuncExpr {
-                            keyword,
+                            keyword: keyword.map(|k| k.loc.start.into()),
                             star: None,
                             open_paren: params.open_paren,
                             params: params.params,
@@ -4957,7 +5035,10 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_assignment_after_start(&mut self, start: Expr<'b>) -> Res<AssignExpr<'b>> {
+    fn parse_assignment_after_start(
+        &mut self,
+        start: Expr<Cow<'b, str>>,
+    ) -> Res<AssignExpr<Cow<'b, str>>> {
         if self.context.strict && Self::is_ident(&start) {
             if let Expr::Ident(ref i) = start {
                 if Self::is_restricted_word(i) || Self::is_strict_reserved(i) {
@@ -5014,7 +5095,7 @@ where
     }
     /// Check if an arg is a strict mode restricted identifier
     /// returns true if the arg _is_ an error
-    fn check_arg_strict_mode(arg: &FuncArg<'b>) -> bool {
+    fn check_arg_strict_mode(arg: &FuncArg<Cow<'b, str>>) -> bool {
         match arg {
             FuncArg::Expr(Expr::Ident(ref ident)) | FuncArg::Pat(Pat::Ident(ref ident)) => {
                 ident.name() == "arguments" || ident.name() == "eval"
@@ -5023,22 +5104,22 @@ where
         }
     }
 
-    fn assignment_operator(&self, p: Punct, item: &Item<&'b str>) -> Option<AssignOp<'b>> {
-        let slice = self.slice_from(item)?;
+    fn assignment_operator(&self, p: Punct, item: &Item<&'b str>) -> Option<AssignOp> {
+        let slice = self.position_from(item);
         match p {
-            Punct::Equal => Some(AssignOp::Equal(slice)),
-            Punct::PlusEqual => Some(AssignOp::PlusEqual(slice)),
-            Punct::DashEqual => Some(AssignOp::MinusEqual(slice)),
-            Punct::AsteriskEqual => Some(AssignOp::TimesEqual(slice)),
-            Punct::ForwardSlashEqual => Some(AssignOp::DivEqual(slice)),
-            Punct::PercentEqual => Some(AssignOp::ModEqual(slice)),
-            Punct::DoubleLessThanEqual => Some(AssignOp::LeftShiftEqual(slice)),
-            Punct::DoubleGreaterThanEqual => Some(AssignOp::RightShiftEqual(slice)),
-            Punct::TripleGreaterThanEqual => Some(AssignOp::UnsignedRightShiftEqual(slice)),
-            Punct::PipeEqual => Some(AssignOp::OrEqual(slice)),
-            Punct::CaretEqual => Some(AssignOp::XOrEqual(slice)),
-            Punct::AmpersandEqual => Some(AssignOp::AndEqual(slice)),
-            Punct::DoubleAsteriskEqual => Some(AssignOp::PowerOfEqual(slice)),
+            Punct::Equal => Some(AssignOp::Equal(slice.into())),
+            Punct::PlusEqual => Some(AssignOp::PlusEqual(slice.into())),
+            Punct::DashEqual => Some(AssignOp::MinusEqual(slice.into())),
+            Punct::AsteriskEqual => Some(AssignOp::TimesEqual(slice.into())),
+            Punct::ForwardSlashEqual => Some(AssignOp::DivEqual(slice.into())),
+            Punct::PercentEqual => Some(AssignOp::ModEqual(slice.into())),
+            Punct::DoubleLessThanEqual => Some(AssignOp::LeftShiftEqual(slice.into())),
+            Punct::DoubleGreaterThanEqual => Some(AssignOp::RightShiftEqual(slice.into())),
+            Punct::TripleGreaterThanEqual => Some(AssignOp::UnsignedRightShiftEqual(slice.into())),
+            Punct::PipeEqual => Some(AssignOp::OrEqual(slice.into())),
+            Punct::CaretEqual => Some(AssignOp::XOrEqual(slice.into())),
+            Punct::AmpersandEqual => Some(AssignOp::AndEqual(slice.into())),
+            Punct::DoubleAsteriskEqual => Some(AssignOp::PowerOfEqual(slice.into())),
             _ => None,
         }
     }
@@ -5049,7 +5130,7 @@ where
     #[tracing::instrument(level = "trace", skip(self))]
     fn reinterpret_as_cover_formals_list(
         &mut self,
-        expr: Expr<'b>,
+        expr: Expr<Cow<'b, str>>,
         pos: Position,
     ) -> Res<FormalsList<'b>> {
         let mut formals_list = if let Expr::Ident(ref ident) = expr {
@@ -5113,7 +5194,12 @@ where
                                                 "strict reserved word as an identifier".to_string(),
                                             ));
                                         }
-                                        let ident = y.keyword.clone().into();
+                                        let ident = resast::spanned::Ident {
+                                            slice: Slice {
+                                                loc: y.loc(),
+                                                source: Cow::Borrowed("yield").into(),
+                                            },
+                                        };
                                         let entry = ListEntry {
                                             item: FuncArg::Pat(Pat::Ident(ident)),
                                             comma: param.comma,
@@ -5144,7 +5230,12 @@ where
                                                 "strict reserved word as an identifier".to_string(),
                                             ));
                                         }
-                                        let ident = y.keyword.clone().into();
+                                        let ident = resast::spanned::Ident {
+                                            slice: Slice {
+                                                loc: y.loc(),
+                                                source: Cow::Borrowed("yield").into(),
+                                            },
+                                        };
                                         let entry = ListEntry {
                                             item: FuncArg::Pat(Pat::Ident(ident)),
                                             comma: param.comma,
@@ -5248,21 +5339,21 @@ where
         Ok(formals_list)
     }
 
-    fn is_await(arg: &FuncArg) -> bool {
+    fn is_await(arg: &FuncArg<Cow<'b, str>>) -> bool {
         match arg {
             FuncArg::Expr(ref e) => match e {
-                Expr::Ident(ref i) => i.slice.source == "await",
+                Expr::Ident(ref i) => i.slice.source.as_ref() == "await",
                 _ => false,
             },
             FuncArg::Pat(ref p) => match p {
-                Pat::Ident(ref i) => i.slice.source == "await",
+                Pat::Ident(ref i) => i.slice.source.as_ref() == "await",
                 _ => false,
             },
             FuncArg::Rest(_) => false,
         }
     }
 
-    fn is_assignment(arg: &FuncArg) -> bool {
+    fn is_assignment(arg: &FuncArg<Cow<'b, str>>) -> bool {
         match arg {
             FuncArg::Pat(ref p) => match p {
                 Pat::Assign(_) => true,
@@ -5275,7 +5366,7 @@ where
             FuncArg::Rest(_) => false,
         }
     }
-    pub fn is_simple(arg: &FuncArg) -> bool {
+    pub fn is_simple(arg: &FuncArg<Cow<'b, str>>) -> bool {
         match arg {
             FuncArg::Pat(ref p) => match p {
                 Pat::Ident(_) => true,
@@ -5289,7 +5380,7 @@ where
         }
     }
 
-    fn is_invalid_await(arg: &FuncArg) -> bool {
+    fn is_invalid_await(arg: &FuncArg<Cow<'b, str>>) -> bool {
         match arg {
             FuncArg::Expr(Expr::Assign(AssignExpr { right, .. }))
             | FuncArg::Pat(Pat::Assign(AssignPat { right, .. })) => match &**right {
@@ -5312,7 +5403,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn reinterpret_expr_as_pat(&self, ex: Expr<'b>) -> Res<Pat<'b>> {
+    fn reinterpret_expr_as_pat(&self, ex: Expr<Cow<'b, str>>) -> Res<Pat<Cow<'b, str>>> {
         log::debug!(
             "{}: reinterpret_expr_as_pat {:?}",
             self.look_ahead.span.start,
@@ -5392,7 +5483,10 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn reinterpret_array_pat_part(&self, part: Expr<'b>) -> Res<ArrayPatPart<'b>> {
+    fn reinterpret_array_pat_part(
+        &self,
+        part: Expr<Cow<'b, str>>,
+    ) -> Res<ArrayPatPart<Cow<'b, str>>> {
         log::debug!(
             "{}: reinterpret_array_pat_part {:?}",
             self.look_ahead.span.start,
@@ -5415,7 +5509,7 @@ where
         Ok(ret)
     }
 
-    fn is_reinterpret_target(ex: &Expr) -> bool {
+    fn is_reinterpret_target(ex: &Expr<Cow<'b, str>>) -> bool {
         match ex {
             Expr::Ident(_) => true,
             Expr::Spread(ref s) => Self::is_reinterpret_target(&s.expr),
@@ -5430,7 +5524,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn reinterpret_prop(&self, mut p: Prop<'b>) -> Res<Prop<'b>> {
+    fn reinterpret_prop(&self, mut p: Prop<Cow<'b, str>>) -> Res<Prop<Cow<'b, str>>> {
         if let Prop::Init(inner) = &mut p {
             let prop_key = std::mem::replace(&mut inner.key.value, Self::dummy_prop_key());
             if let PropKey::Expr(expr) = prop_key {
@@ -5457,34 +5551,28 @@ where
         Ok(p)
     }
 
-    fn dummy_prop_key() -> PropKey<'static> {
-        use resast::spanned::{Position, SourceLocation};
+    fn dummy_prop_key() -> PropKey<Cow<'static, str>> {
+        use resast::spanned::Position;
         let zero = Position { line: 0, column: 0 };
-        PropKey::Expr(Expr::This(Slice {
-            source: Cow::Borrowed(""),
-            loc: SourceLocation {
-                start: zero,
-                end: zero,
-            },
-        }))
+        PropKey::Expr(Expr::This(zero.into()))
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_yield_expr(&mut self) -> Res<Expr<'b>> {
+    fn parse_yield_expr(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_yield_expr {:?}",
             self.look_ahead.span.start,
             self.look_ahead.token
         );
         let keyword = self.expect_keyword(Keyword::Yield(()))?;
-        let mut argument: Option<Box<Expr>> = None;
+        let mut argument: Option<Box<Expr<Cow<'b, str>>>> = None;
         let mut star = None;
         if !self.context.has_line_term {
             let prev_yield = self.context.allow_yield;
             self.context.allow_yield = false;
             if self.at_punct(Punct::Asterisk) {
                 let start = self.next_item()?;
-                star = Some(self.get_slice(&start)?);
+                star = Some(self.position_from(&start).into());
                 argument = Some(Box::new(self.parse_assignment_expr()?));
             } else if self.is_start_of_expr() {
                 argument = Some(Box::new(self.parse_assignment_expr()?));
@@ -5500,7 +5588,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_conditional_expr(&mut self) -> Res<Expr<'b>> {
+    fn parse_conditional_expr(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_conditional_expr {:?}",
             self.look_ahead.span.start,
@@ -5532,7 +5620,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_binary_expression(&mut self) -> Res<Expr<'b>> {
+    fn parse_binary_expression(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_binary_expression {:?}",
             self.look_ahead.span.start,
@@ -5633,7 +5721,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_exponentiation_expression(&mut self) -> Res<Expr<'b>> {
+    fn parse_exponentiation_expression(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_exponentiation_expression",
             self.look_ahead.span.start
@@ -5648,7 +5736,7 @@ where
                 ));
             }
             let stars = self.next_item()?;
-            let stars = self.get_slice(&stars)?;
+            let stars = self.position_from(&stars).into();
             self.context.set_is_assignment_target(false);
             self.context.set_is_binding_element(false);
             let left = expr;
@@ -5664,7 +5752,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_unary_expression(&mut self) -> Res<Expr<'b>> {
+    fn parse_unary_expression(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_unary_expression {:?} allow_await: {}",
             self.look_ahead.span.start,
@@ -5707,66 +5795,66 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn unary_operator(&self, item: Item<&str>) -> Option<UnaryOp<'b>> {
-        let slice = self.slice_from(&item)?;
+    fn unary_operator(&self, item: Item<&str>) -> Option<UnaryOp> {
+        let slice = self.position_from(&item);
         match &item.token {
             Token::Punct(ref p) => match p {
-                Punct::Dash => Some(UnaryOp::Minus(slice)),
-                Punct::Plus => Some(UnaryOp::Plus(slice)),
-                Punct::Bang => Some(UnaryOp::Not(slice)),
-                Punct::Tilde => Some(UnaryOp::Tilde(slice)),
+                Punct::Dash => Some(UnaryOp::Minus(slice.into())),
+                Punct::Plus => Some(UnaryOp::Plus(slice.into())),
+                Punct::Bang => Some(UnaryOp::Not(slice.into())),
+                Punct::Tilde => Some(UnaryOp::Tilde(slice.into())),
                 _ => None,
             },
             Token::Keyword(ref k) => match k {
-                Keyword::TypeOf(_) => Some(UnaryOp::TypeOf(slice)),
-                Keyword::Void(_) => Some(UnaryOp::Void(slice)),
-                Keyword::Delete(_) => Some(UnaryOp::Delete(slice)),
+                Keyword::TypeOf(_) => Some(UnaryOp::TypeOf(slice.into())),
+                Keyword::Void(_) => Some(UnaryOp::Void(slice.into())),
+                Keyword::Delete(_) => Some(UnaryOp::Delete(slice.into())),
                 _ => None,
             },
             _ => None,
         }
     }
 
-    fn binary_operator(&self, token: &Item<&str>) -> Option<BinaryOp<'b>> {
-        let slice = self.slice_from(token)?;
+    fn binary_operator(&self, token: &Item<&str>) -> Option<BinaryOp> {
+        let slice = self.position_from(token);
         match &token.token {
             Token::Keyword(ref key) => match key {
-                Keyword::InstanceOf(_) => Some(BinaryOp::InstanceOf(slice)),
-                Keyword::In(_) => Some(BinaryOp::In(slice)),
+                Keyword::InstanceOf(_) => Some(BinaryOp::InstanceOf(slice.into())),
+                Keyword::In(_) => Some(BinaryOp::In(slice.into())),
                 _ => None,
             },
             Token::Punct(ref p) => match p {
-                Punct::DoubleEqual => Some(BinaryOp::Equal(slice)),
-                Punct::BangEqual => Some(BinaryOp::NotEqual(slice)),
-                Punct::TripleEqual => Some(BinaryOp::StrictEqual(slice)),
-                Punct::BangDoubleEqual => Some(BinaryOp::StrictNotEqual(slice)),
-                Punct::LessThan => Some(BinaryOp::LessThan(slice)),
-                Punct::LessThanEqual => Some(BinaryOp::LessThanEqual(slice)),
-                Punct::GreaterThan => Some(BinaryOp::GreaterThan(slice)),
-                Punct::GreaterThanEqual => Some(BinaryOp::GreaterThanEqual(slice)),
-                Punct::DoubleLessThan => Some(BinaryOp::LeftShift(slice)),
-                Punct::DoubleGreaterThan => Some(BinaryOp::RightShift(slice)),
-                Punct::TripleGreaterThan => Some(BinaryOp::UnsignedRightShift(slice)),
-                Punct::Plus => Some(BinaryOp::Plus(slice)),
-                Punct::Dash => Some(BinaryOp::Minus(slice)),
-                Punct::Asterisk => Some(BinaryOp::Times(slice)),
-                Punct::ForwardSlash => Some(BinaryOp::Over(slice)),
-                Punct::Percent => Some(BinaryOp::Mod(slice)),
-                Punct::Ampersand => Some(BinaryOp::And(slice)),
-                Punct::Pipe => Some(BinaryOp::Or(slice)),
-                Punct::Caret => Some(BinaryOp::XOr(slice)),
+                Punct::DoubleEqual => Some(BinaryOp::Equal(slice.into())),
+                Punct::BangEqual => Some(BinaryOp::NotEqual(slice.into())),
+                Punct::TripleEqual => Some(BinaryOp::StrictEqual(slice.into())),
+                Punct::BangDoubleEqual => Some(BinaryOp::StrictNotEqual(slice.into())),
+                Punct::LessThan => Some(BinaryOp::LessThan(slice.into())),
+                Punct::LessThanEqual => Some(BinaryOp::LessThanEqual(slice.into())),
+                Punct::GreaterThan => Some(BinaryOp::GreaterThan(slice.into())),
+                Punct::GreaterThanEqual => Some(BinaryOp::GreaterThanEqual(slice.into())),
+                Punct::DoubleLessThan => Some(BinaryOp::LeftShift(slice.into())),
+                Punct::DoubleGreaterThan => Some(BinaryOp::RightShift(slice.into())),
+                Punct::TripleGreaterThan => Some(BinaryOp::UnsignedRightShift(slice.into())),
+                Punct::Plus => Some(BinaryOp::Plus(slice.into())),
+                Punct::Dash => Some(BinaryOp::Minus(slice.into())),
+                Punct::Asterisk => Some(BinaryOp::Times(slice.into())),
+                Punct::ForwardSlash => Some(BinaryOp::Over(slice.into())),
+                Punct::Percent => Some(BinaryOp::Mod(slice.into())),
+                Punct::Ampersand => Some(BinaryOp::And(slice.into())),
+                Punct::Pipe => Some(BinaryOp::Or(slice.into())),
+                Punct::Caret => Some(BinaryOp::XOr(slice.into())),
                 _ => None,
             },
             _ => None,
         }
     }
 
-    fn logical_operator(&self, token: &Item<&str>) -> Option<LogicalOp<'b>> {
-        let slice = self.slice_from(token)?;
+    fn logical_operator(&self, token: &Item<&str>) -> Option<LogicalOp> {
+        let slice = self.position_from(token);
         match &token.token {
             Token::Punct(ref p) => match p {
-                Punct::DoubleAmpersand => Some(LogicalOp::And(slice)),
-                Punct::DoublePipe => Some(LogicalOp::Or(slice)),
+                Punct::DoubleAmpersand => Some(LogicalOp::And(slice.into())),
+                Punct::DoublePipe => Some(LogicalOp::Or(slice.into())),
                 _ => None,
             },
             _ => None,
@@ -5774,7 +5862,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_await_expr(&mut self) -> Res<Expr<'b>> {
+    fn parse_await_expr(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_await_expr {:?}",
             self.look_ahead.span.start,
@@ -5784,14 +5872,14 @@ where
             self.unexpected_token_error(&self.look_ahead, "await is not valid in this context")?;
         }
         let keyword = self.next_item()?;
-        let keyword = self.get_slice(&keyword)?;
+        let keyword = self.position_from(&keyword).into();
         let expr = self.parse_unary_expression()?;
         let ret = AwaitExpr { keyword, expr };
         Ok(Expr::Await(Box::new(ret)))
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_update_expr(&mut self) -> Res<Expr<'b>> {
+    fn parse_update_expr(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_update_expr {:?}",
             self.look_ahead.span.start,
@@ -5800,11 +5888,11 @@ where
         let start = self.look_ahead.clone();
         if self.at_punct(Punct::DoublePlus) || self.at_punct(Punct::DoubleDash) {
             let op = self.next_item()?;
-            let slice = self.get_slice(&op)?;
+            let slice = self.position_from(&op);
             let operator = match op.token {
                 Token::Punct(ref p) => match p {
-                    Punct::DoublePlus => UpdateOp::Increment(slice),
-                    Punct::DoubleDash => UpdateOp::Decrement(slice),
+                    Punct::DoublePlus => UpdateOp::Increment(slice.into()),
+                    Punct::DoubleDash => UpdateOp::Decrement(slice.into()),
                     _ => unreachable!("Already validated that the next token would be ++ or --"),
                 },
                 _ => unreachable!("Already validated that the next token would be ++ or --"),
@@ -5847,12 +5935,12 @@ where
                 }
                 self.context.set_is_assignment_target(false);
                 self.context.set_is_binding_element(false);
-                let slice = self.get_slice(&op)?;
+                let slice = self.position_from(&op);
                 let ret = UpdateExpr {
                     operator: if op.token.matches_punct(Punct::DoublePlus) {
-                        UpdateOp::Increment(slice)
+                        UpdateOp::Increment(slice.into())
                     } else if op.token.matches_punct(Punct::DoubleDash) {
-                        UpdateOp::Decrement(slice)
+                        UpdateOp::Decrement(slice.into())
                     } else {
                         return self.expected_token_error(&op, &["++", "--"]);
                     },
@@ -5864,7 +5952,7 @@ where
         }
     }
 
-    fn is_func_decl(stmt: &Stmt) -> bool {
+    fn is_func_decl(stmt: &Stmt<Cow<'b, str>>) -> bool {
         if let Stmt::Expr {
             expr: Expr::Func(_),
             ..
@@ -5876,7 +5964,7 @@ where
         }
     }
 
-    fn is_labeled_func(stmt: &Stmt) -> bool {
+    fn is_labeled_func(stmt: &Stmt<Cow<'b, str>>) -> bool {
         match stmt {
             Stmt::Labeled(stmt) => {
                 Self::is_func_decl(&stmt.body) || Self::is_labeled_func(&stmt.body)
@@ -5885,7 +5973,7 @@ where
         }
     }
 
-    fn is_ident(expr: &Expr) -> bool {
+    fn is_ident(expr: &Expr<Cow<'b, str>>) -> bool {
         match expr {
             Expr::Ident(_) => true,
             _ => false,
@@ -5893,7 +5981,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_left_hand_side_expr(&mut self) -> Res<Expr<'b>> {
+    fn parse_left_hand_side_expr(&mut self) -> Res<Expr<Cow<'b, str>>> {
         if !self.context.allow_in {
             return Err(Error::InvalidUseOfContextualKeyword(
                 self.current_position,
@@ -5958,7 +6046,7 @@ where
     /// > note: This will handle any invalid super expression
     /// scenarios
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_super(&mut self) -> Res<Expr<'b>> {
+    fn parse_super(&mut self) -> Res<Expr<Cow<'b, str>>> {
         let super_position = self.look_ahead_position;
         if !self.context.allow_super {
             log::trace!("super when not allowed");
@@ -5979,7 +6067,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_left_hand_side_expr_allow_call(&mut self) -> Res<Expr<'b>> {
+    fn parse_left_hand_side_expr_allow_call(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_left_hand_side_expr_allow_call",
             self.look_ahead.span.start
@@ -6083,7 +6171,9 @@ where
     }
     /// Parse the arguments of an async function
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_async_args(&mut self) -> Res<(Slice<'b>, Vec<ListEntry<'b, Expr<'b>>>, Slice<'b>)> {
+    fn parse_async_args(
+        &mut self,
+    ) -> Res<(OpenParen, Vec<ListEntry<Expr<Cow<'b, str>>>>, CloseParen)> {
         log::debug!(
             "{}: parse_async_args {:?}",
             self.look_ahead.span.start,
@@ -6131,7 +6221,7 @@ where
     /// Parse an argument of an async function
     /// note: not sure this is needed
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_async_arg(&mut self) -> Res<Expr<'b>> {
+    fn parse_async_arg(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_async_arg {:?}",
             self.look_ahead.span.start,
@@ -6145,7 +6235,7 @@ where
     /// if parsing with tolerance we can tolerate
     /// a non-existent comma
     #[tracing::instrument(level = "trace", skip(self))]
-    fn expect_comma_sep(&mut self) -> Res<Slice<'b>> {
+    fn expect_comma_sep(&mut self) -> Res<Comma> {
         log::debug!(
             "{}: expect_comma_sep {:?}",
             self.look_ahead.span.start,
@@ -6156,7 +6246,7 @@ where
 
     /// Parse an expression preceded by the `...` operator
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_spread_element(&mut self) -> Res<SpreadExpr<'b>> {
+    fn parse_spread_element(&mut self) -> Res<SpreadExpr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_spread_element {:?}",
             self.look_ahead.span.start,
@@ -6169,7 +6259,7 @@ where
 
     /// Parse function arguments, expecting to open with `(` and close with `)`
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_args(&mut self) -> Res<(Slice<'b>, Vec<ListEntry<'b, Expr<'b>>>, Slice<'b>)> {
+    fn parse_args(&mut self) -> Res<(OpenParen, Vec<ListEntry<Expr<Cow<'b, str>>>>, CloseParen)> {
         log::debug!(
             "{}: parse_args {:?}",
             self.look_ahead.span.start,
@@ -6206,7 +6296,7 @@ where
     /// or `new.target`. The later is only valid in a function
     /// body
     #[tracing::instrument(level = "trace", skip(self))]
-    fn parse_new_expr(&mut self) -> Res<Expr<'b>> {
+    fn parse_new_expr(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
             "{}: parse_new_expr {:?}",
             self.look_ahead.span.start,
@@ -6246,7 +6336,7 @@ where
             self.context.set_is_assignment_target(false);
             self.context.set_is_binding_element(false);
             let new = NewExpr {
-                keyword,
+                keyword: keyword.loc.start.into(),
                 callee: Box::new(callee),
                 open_paren,
                 arguments,
@@ -6408,16 +6498,15 @@ where
     /// Get the next token and validate that it matches
     /// the punct provided, discarding the result
     /// if it does
-    fn expect_punct(&mut self, p: Punct) -> Res<Slice<'b>> {
+    fn expect_punct<T: From<resast::spanned::Position>>(&mut self, p: Punct) -> Res<T> {
         let next = self.next_item()?;
         if !next.token.matches_punct(p) {
             return self.expected_token_error(&next, &[&format!("{:?}", p)]);
         }
 
-        self.slice_from(&next)
-            .ok_or_else(|| self.op_error("extracting slice from item"))
+        Ok(self.position_from(&next).into())
     }
-    fn expect_assign_op(&mut self, p: Punct) -> Res<AssignOp<'b>> {
+    fn expect_assign_op(&mut self, p: Punct) -> Res<AssignOp> {
         let item = self.next_item()?;
         if let Some(op) = self.assignment_operator(p, &item) {
             Ok(op)
@@ -6427,13 +6516,13 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    fn expect_fat_arrow(&mut self) -> Res<Slice<'b>> {
+    fn expect_fat_arrow(&mut self) -> Res<FatArrow> {
         if self.look_ahead.token.matches_punct(Punct::EqualGreaterThan) {
             if self.context.has_line_term {
                 Err(Error::NewLineAfterFatArrow(self.look_ahead_position))
             } else {
                 let item = self.next_item()?;
-                self.get_slice(&item)
+                Ok(self.position_from(&item).into())
             }
         } else {
             self.expected_token_error(&self.look_ahead, &["=>"])
@@ -6442,20 +6531,23 @@ where
     /// move on to the next item and validate it matches
     /// the keyword provided, discarding the result
     /// if it does
-    fn expect_keyword(&mut self, k: Keyword<()>) -> Res<Slice<'b>> {
+    fn expect_keyword<T: From<resast::spanned::Position>>(&mut self, k: Keyword<()>) -> Res<T> {
         let next = self.next_item()?;
         if !next.token.matches_keyword(k) {
             return self.expected_token_error(&next, &[&format!("{:?}", k)]);
         }
-        self.get_slice(&next)
+        Ok(self.position_from(&next).into())
     }
 
-    fn expect_contextual_keyword(&mut self, target: &str) -> Res<Slice<'b>> {
+    fn expect_contextual_keyword<T: From<resast::spanned::Position>>(
+        &mut self,
+        target: &str,
+    ) -> Res<T> {
         let next = self.next_item()?;
         if !next.token.matches_ident_str(target) {
             return self.expected_token_error(&next, &[target]);
         }
-        self.get_slice(&next)
+        Ok(self.position_from(&next).into())
     }
 
     fn at_return_arg(&self) -> bool {
@@ -6607,11 +6699,11 @@ where
     /// consume it otherwise we need to either be at a line terminator
     /// EoF or a close brace
     #[tracing::instrument(level = "trace", skip(self))]
-    fn consume_semicolon(&mut self) -> Res<Option<Slice<'b>>> {
+    fn consume_semicolon(&mut self) -> Res<Option<Semicolon>> {
         log::trace!("consume_semicolon {}", self.context.has_line_term);
         if self.at_punct(Punct::SemiColon) {
             let semi = self.next_item()?;
-            return Ok(self.slice_from(&semi));
+            return Ok(Some(self.position_from(&semi).into()));
         } else if !self.context.has_line_term
             && !self.look_ahead.token.is_eof()
             && !self.at_punct(Punct::CloseBrace)
@@ -6625,31 +6717,47 @@ where
     fn at_contextual_keyword(&self, s: &str) -> bool {
         log::debug!("at_contextual_keyword {:?}", s);
         if let Ok(slice) = self.get_slice(&self.look_ahead) {
-            slice.source == s
+            slice.source.as_ref() == s
         } else {
             false
         }
     }
 
-    fn slice_from(&self, item: &Item<&str>) -> Option<Slice<'b>> {
+    fn slice_from(&self, item: &Item<&str>) -> Option<Slice<Cow<'b, str>>> {
         let slice = self.scanner.str_for(&item.span)?;
         Some(Slice {
             loc: resast::spanned::SourceLocation {
                 start: resast::spanned::Position {
-                    line: item.location.start.line,
-                    column: item.location.start.column,
+                    line: item.location.start.line as _,
+                    column: item.location.start.column as _,
                 },
                 end: resast::spanned::Position {
-                    line: item.location.end.line,
-                    column: item.location.end.column,
+                    line: item.location.end.line as _,
+                    column: item.location.end.column as _,
                 },
             },
-            source: Cow::Borrowed(slice),
+            source: Cow::Borrowed(slice).into(),
         })
     }
 
+    fn var_kind_from(&self, item: &Item<&'b str>) -> Res<VarKind> {
+        Ok(match &item.token {
+            Token::Keyword(Keyword::Var(_)) => VarKind::Var(Some(self.position_from(&item).into())),
+            Token::Keyword(Keyword::Let(_)) => VarKind::Let(self.position_from(&item).into()),
+            Token::Keyword(Keyword::Const(_)) => VarKind::Const(self.position_from(&item).into()),
+            _ => return self.expected_token_error(item, &["var", "let", "const"]),
+        })
+    }
+
+    fn position_from(&self, item: &Item<&str>) -> resast::spanned::Position {
+        resast::spanned::Position::new(
+            item.location.start.line as _,
+            item.location.start.column as _,
+        )
+    }
+
     /// Converts a ress::Item into a resast::StringLit
-    fn string_lit_from(&self, item: &Item<&'b str>) -> Res<StringLit<'b>> {
+    fn string_lit_from(&self, item: &Item<&'b str>) -> Res<StringLit<Cow<'b, str>>> {
         use resast::spanned::{Position, SourceLocation};
         static NEW_LINES: &[char] = &['\n', '\r', '\u{2028}', '\u{2029}'];
         let slice = self.scanner.str_for(&item.span).unwrap();
@@ -6666,48 +6774,37 @@ where
             }
         };
         let open = Cow::Borrowed(&slice[0..1]);
-        let open = Slice {
-            loc: SourceLocation {
-                start: Position {
-                    line: item.location.start.line,
-                    column: item.location.start.column,
-                },
-                end: Position {
-                    line: item.location.start.line,
-                    column: item.location.start.column + 1,
-                },
-            },
-            source: open,
+        let open_pos = self.position_from(item);
+        let open = if open == "'" {
+            resast::spanned::tokens::Quote::Single(open_pos.into())
+        } else {
+            resast::spanned::tokens::Quote::Double(open_pos.into())
         };
         let close = Cow::Borrowed(&slice[slice.len() - 1..]);
-        let close = Slice {
-            loc: SourceLocation {
-                start: Position {
-                    line: item.location.end.line,
-                    column: item.location.end.column - 1,
-                },
-                end: Position {
-                    line: item.location.end.line,
-                    column: item.location.end.column,
-                },
-            },
-            source: close,
+        let close_pos = Position::new(
+            item.location.end.line as u32,
+            item.location.end.column as u32 - 1,
+        );
+        let close = if close == "'" {
+            resast::spanned::tokens::Quote::Single(close_pos.into())
+        } else {
+            resast::spanned::tokens::Quote::Double(close_pos.into())
         };
         let start = if contents.starts_with(NEW_LINES) {
-            let line = item.location.start.line + 1;
+            let line = item.location.start.line as u32 + 1;
             Position { line, column: 1 }
         } else {
             Position {
-                line: item.location.start.line,
-                column: item.location.start.column + 1,
+                line: item.location.start.line as _,
+                column: item.location.start.column as u32 + 1,
             }
         };
         let content = Slice {
             loc: SourceLocation {
                 start,
-                end: close.loc.start,
+                end: close_pos,
             },
-            source: Cow::Borrowed(contents),
+            source: Cow::Borrowed(contents).into(),
         };
         Ok(StringLit {
             open_quote: open,
@@ -6716,68 +6813,42 @@ where
         })
     }
 
-    fn regex_lit_from(&self, item: &Item<&'b str>) -> Res<resast::spanned::expr::RegEx<'b>> {
-        use resast::spanned::{expr::RegEx, Position, SourceLocation};
-        let source = self
-            .scanner
-            .str_for(&item.span)
-            .ok_or(Error::UnexpectedEoF)?;
+    fn regex_lit_from(
+        &self,
+        item: &Item<&'b str>,
+    ) -> Res<resast::spanned::expr::RegEx<Cow<'b, str>>> {
+        use resast::spanned::{expr::RegEx, tokens::ForwardSlash, Position, SourceLocation};
         // regex will be on 1 line if `validate` is successful
         let line = item.location.start.line;
-        let open_slash = Slice {
-            loc: SourceLocation {
-                start: Position {
-                    line,
-                    column: item.location.start.column,
-                },
-                end: Position {
-                    line,
-                    column: item.location.start.column + 1,
-                },
-            },
-            source: Cow::Borrowed(&source[0..1]),
+        let Token::RegEx(token) = &item.token else {
+            return self.expected_token_error(item, &["<regex literal>"])
         };
-        // this should be safe to unwrap because of `validate` above
-        let close_slash_idx = source.rfind('/').unwrap();
+        let open_slash_pos = Position {
+            line: line as u32,
+            column: item.location.start.column as u32,
+        };
+        let open_slash: ForwardSlash = open_slash_pos.into();
+        let pattern_start = open_slash.end();
+        let pattern_end = resast::spanned::Position {
+            line: pattern_start.line,
+            column: pattern_start.column + token.body.len() as u32,
+        };
         let pattern = Slice {
             loc: SourceLocation {
-                start: Position {
-                    line,
-                    column: item.location.start.column + 1,
-                },
-                end: Position {
-                    line,
-                    column: item.location.start.column + close_slash_idx,
-                },
+                start: pattern_start,
+                end: pattern_end,
             },
-            source: Cow::Borrowed(&source[1..close_slash_idx]),
+            source: Cow::Borrowed(token.body).into(),
         };
-        let close_slash = Slice {
-            loc: SourceLocation {
-                start: Position {
-                    line,
-                    column: item.location.start.column + close_slash_idx,
-                },
-                end: Position {
-                    line,
-                    column: item.location.start.column + close_slash_idx + 1,
-                },
-            },
-            source: Cow::Borrowed(&source[close_slash_idx..close_slash_idx + 1]),
-        };
-        let flags = if let Some(flags_slice) = source.get(close_slash_idx + 1..) {
+        let close_slash: ForwardSlash = pattern_end.into();
+        let flags = if let Some(flags_slice) = token.flags {
+            let flags_start = close_slash.end();
             Some(Slice {
                 loc: SourceLocation {
-                    start: Position {
-                        line,
-                        column: item.location.start.column + close_slash_idx + 1,
-                    },
-                    end: Position {
-                        line,
-                        column: item.location.end.column,
-                    },
+                    start: flags_start,
+                    end: flags_start + flags_slice.len() as u32,
                 },
-                source: Cow::Borrowed(flags_slice),
+                source: Cow::Borrowed(flags_slice).into(),
             })
         } else {
             None
@@ -6793,21 +6864,21 @@ where
     /// Sort of keywords `eval` and `arguments` have
     /// a special meaning and will cause problems
     /// if used in the wrong scope
-    fn is_restricted_word(word: &resast::spanned::Ident) -> bool {
-        &word.slice.source == "eval" || &word.slice.source == "arguments"
+    fn is_restricted_word(word: &resast::spanned::Ident<Cow<'b, str>>) -> bool {
+        word.slice.source.as_ref() == "eval" || word.slice.source.as_ref() == "arguments"
     }
     /// Check if this &str is in the list of reserved
     /// words in the context of 'use strict'
-    fn is_strict_reserved(word: &resast::spanned::Ident) -> bool {
-        word.slice.source == "implements"
-            || word.slice.source == "interface"
-            || word.slice.source == "package"
-            || word.slice.source == "private"
-            || word.slice.source == "protected"
-            || word.slice.source == "public"
-            || word.slice.source == "static"
-            || word.slice.source == "yield"
-            || word.slice.source == "let"
+    fn is_strict_reserved(word: &resast::spanned::Ident<Cow<'b, str>>) -> bool {
+        word.slice.source.as_ref() == "implements"
+            || word.slice.source.as_ref() == "interface"
+            || word.slice.source.as_ref() == "package"
+            || word.slice.source.as_ref() == "private"
+            || word.slice.source.as_ref() == "protected"
+            || word.slice.source.as_ref() == "public"
+            || word.slice.source.as_ref() == "static"
+            || word.slice.source.as_ref() == "yield"
+            || word.slice.source.as_ref() == "let"
     }
     /// Tests if the parser is currently at the
     /// start of an expression. This consists of a
@@ -6850,7 +6921,7 @@ where
         &self.original[start..end] == "n"
     }
 
-    fn get_slice(&self, item: &Item<&str>) -> Res<Slice<'b>> {
+    fn get_slice(&self, item: &Item<&str>) -> Res<Slice<Cow<'b, str>>> {
         self.slice_from(item)
             .ok_or_else(|| self.op_error("Unable to get slice from scanner"))
     }
@@ -6904,7 +6975,7 @@ where
         self.look_ahead.location
     }
 
-    pub(crate) fn next_part(&mut self) -> Res<ProgramPart<'b>> {
+    pub(crate) fn next_part(&mut self) -> Res<ProgramPart<Cow<'b, str>>> {
         log::trace!(
             "next_part past_prolog: {}, strict: {}",
             self.context.past_prolog,
@@ -6956,7 +7027,7 @@ impl<'b, CH> Iterator for Parser<'b, CH>
 where
     CH: CommentHandler<'b> + Sized,
 {
-    type Item = Res<ProgramPart<'b>>;
+    type Item = Res<ProgramPart<Cow<'b, str>>>;
     #[tracing::instrument(level = "trace", skip(self))]
     fn next(&mut self) -> Option<Self::Item> {
         if self.look_ahead.token.is_eof() || self.context.errored {
