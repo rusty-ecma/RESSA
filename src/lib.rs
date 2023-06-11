@@ -73,6 +73,7 @@ pub use crate::error::Error;
 
 use resast::prelude::*;
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 /// The current configuration options.
@@ -333,7 +334,7 @@ where
     ///     //assert_eq!(program, expectation);
     /// }
     /// ```
-    pub fn parse(&mut self) -> Res<Program> {
+    pub fn parse(&mut self) -> Res<Program<Cow<'b, str>>> {
         let ret = self.inner.parse()?;
         Ok(ret.into())
     }
@@ -354,7 +355,7 @@ impl<'b, CH> Iterator for Parser<'b, CH>
 where
     CH: CommentHandler<'b> + Sized,
 {
-    type Item = Res<ProgramPart<'b>>;
+    type Item = Res<ProgramPart<Cow<'b, str>>>;
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.inner.next()?;
         Some(ret.map(Into::into))

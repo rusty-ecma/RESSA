@@ -71,10 +71,10 @@ fn run_test(name: &str, normal: String, min: String) {
     handle_result(r, &format!("{}.min", name));
 }
 
-fn handle_result<'a>(
-    result: Result<resast::Program<'a>, ressa::Error>,
+fn handle_result<T>(
+    result: Result<resast::Program<T>, ressa::Error>,
     name: &str,
-) -> resast::Program<'a> {
+) -> resast::Program<T> {
     match result {
         Ok(result) => result,
         Err(e) => panic!("Unable to parse {0}\n{1}\n{1:?}", name, e),

@@ -12,7 +12,7 @@ use resast::spanned::{
 use std::{borrow::Cow, collections::HashSet};
 type Res = Result<(), Error>;
 
-pub fn is_simple_expr<'a>(expr: &Expr<'a>) -> bool {
+pub fn is_simple_expr<'a>(expr: &Expr<Cow<'a, str>>) -> bool {
     log::trace!("is_simple_expr {:?}", expr);
     match expr {
         Expr::This(_) => false,
@@ -20,17 +20,22 @@ pub fn is_simple_expr<'a>(expr: &Expr<'a>) -> bool {
     }
 }
 
-pub fn is_simple_pat<'a>(pat: &Pat<'a>) -> bool {
+pub fn is_simple_pat<'a>(pat: &Pat<Cow<'a, str>>) -> bool {
     log::trace!("is_simple_pat {:?}", pat);
     match pat {
-        Pat::Ident(ref id) => match &*id.slice.source {
+        Pat::Ident(ref id) => match id.slice.source.as_ref() {
             "this" => false,
             _ => true,
         },
         _ => true,
     }
 }
-pub fn check_lhs_expr<'a>(expr: &Expr<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
+pub fn check_lhs_expr<'a>(
+    expr: &Expr<Cow<'a, str>>,
+    allow_let: bool,
+    pos: Position,
+    strict: bool,
+) -> Res {
     match expr {
         Expr::Ident(ref id) => check_ident(id, allow_let, pos, strict),
         Expr::Obj(ref obj) => check_obj_expr(obj, allow_let, pos, strict),
@@ -41,7 +46,12 @@ pub fn check_lhs_expr<'a>(expr: &Expr<'a>, allow_let: bool, pos: Position, stric
     }
 }
 
-pub fn check_lhs_pat<'a>(pat: &Pat<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
+pub fn check_lhs_pat<'a>(
+    pat: &Pat<Cow<'a, str>>,
+    allow_let: bool,
+    pos: Position,
+    strict: bool,
+) -> Res {
     match pat {
         Pat::Ident(ref id) => check_ident(id, allow_let, pos, strict),
         Pat::Obj(ref obj) => check_obj_pat(&obj.props, allow_let, pos, strict),
@@ -50,8 +60,8 @@ pub fn check_lhs_pat<'a>(pat: &Pat<'a>, allow_let: bool, pos: Position, strict: 
     }
 }
 
-fn check_ident<'a>(id: &Ident<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
-    if !allow_let && &id.slice.source == "let" {
+fn check_ident<'a>(id: &Ident<Cow<'a, str>>, allow_let: bool, pos: Position, strict: bool) -> Res {
+    if !allow_let && id.slice.source.as_ref() == "let" {
         Err(Error::InvalidUseOfContextualKeyword(pos, "let".to_string()))
     } else if strict && is_strict_reserved(&id) || is_restricted_word(&id) {
         Err(Error::RestrictedIdent(pos))
@@ -60,7 +70,12 @@ fn check_ident<'a>(id: &Ident<'a>, allow_let: bool, pos: Position, strict: bool)
     }
 }
 
-fn check_obj_expr<'a>(obj: &ObjExpr<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
+fn check_obj_expr<'a>(
+    obj: &ObjExpr<Cow<'a, str>>,
+    allow_let: bool,
+    pos: Position,
+    strict: bool,
+) -> Res {
     for part in &obj.props {
         check_obj_prop(&part.item, allow_let, pos, strict)?;
     }
@@ -68,7 +83,7 @@ fn check_obj_expr<'a>(obj: &ObjExpr<'a>, allow_let: bool, pos: Position, strict:
 }
 
 fn check_obj_pat<'a>(
-    obj: &[ListEntry<'a, ObjPatPart<'a>>],
+    obj: &[ListEntry<ObjPatPart<Cow<'a, str>>>],
     allow_let: bool,
     pos: Position,
     strict: bool,
@@ -80,7 +95,7 @@ fn check_obj_pat<'a>(
 }
 
 fn check_assign_expr<'a>(
-    assign: &AssignExpr<'a>,
+    assign: &AssignExpr<Cow<'a, str>>,
     allow_let: bool,
     pos: Position,
     strict: bool,
@@ -92,7 +107,7 @@ fn check_assign_expr<'a>(
 }
 
 fn check_assign_pat<'a>(
-    assign: &resast::spanned::pat::AssignPat<'a>,
+    assign: &resast::spanned::pat::AssignPat<Cow<'a, str>>,
     allow_let: bool,
     pos: Position,
     strict: bool,
@@ -100,7 +115,12 @@ fn check_assign_pat<'a>(
     check_lhs_pat(&*assign.left, allow_let, pos, strict)
 }
 
-fn check_array_expr<'a>(array: &ArrayExpr, allow_let: bool, pos: Position, strict: bool) -> Res {
+fn check_array_expr<'a>(
+    array: &ArrayExpr<Cow<'a, str>>,
+    allow_let: bool,
+    pos: Position,
+    strict: bool,
+) -> Res {
     for part in &array.elements {
         if let Some(expr) = &part.item {
             check_lhs_expr(expr, allow_let, pos, strict)?;
@@ -110,7 +130,7 @@ fn check_array_expr<'a>(array: &ArrayExpr, allow_let: bool, pos: Position, stric
 }
 
 fn check_array_pat<'a>(
-    array: &[ListEntry<'a, Option<ArrayPatPart<'a>>>],
+    array: &[ListEntry<Option<ArrayPatPart<Cow<'a, str>>>>],
     allow_let: bool,
     pos: Position,
     strict: bool,
@@ -129,7 +149,12 @@ fn check_array_pat<'a>(
     Ok(())
 }
 
-fn check_obj_prop<'a>(prop: &ObjProp<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
+fn check_obj_prop<'a>(
+    prop: &ObjProp<Cow<'a, str>>,
+    allow_let: bool,
+    pos: Position,
+    strict: bool,
+) -> Res {
     match prop {
         ObjProp::Prop(ref p) => check_prop(p, allow_let, pos, strict),
         ObjProp::Spread(ref p) => check_lhs_expr(&p.expr, allow_let, pos, strict),
@@ -137,7 +162,7 @@ fn check_obj_prop<'a>(prop: &ObjProp<'a>, allow_let: bool, pos: Position, strict
 }
 
 fn check_obj_pat_part<'a>(
-    part: &ObjPatPart<'a>,
+    part: &ObjPatPart<Cow<'a, str>>,
     allow_let: bool,
     pos: Position,
     strict: bool,
@@ -148,14 +173,19 @@ fn check_obj_pat_part<'a>(
     }
 }
 
-fn check_prop<'a>(prop: &Prop<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
+fn check_prop<'a>(prop: &Prop<Cow<'a, str>>, allow_let: bool, pos: Position, strict: bool) -> Res {
     match prop {
         Prop::Init(value) => check_prop_key(&value.key.value, allow_let, pos, strict),
         _ => Err(Error::InvalidLHS(pos)),
     }
 }
 
-pub fn check_prop_key<'a>(key: &PropKey<'a>, allow_let: bool, pos: Position, strict: bool) -> Res {
+pub fn check_prop_key<'a>(
+    key: &PropKey<Cow<'a, str>>,
+    allow_let: bool,
+    pos: Position,
+    strict: bool,
+) -> Res {
     match &key {
         PropKey::Lit(_value) => Err(Error::InvalidLHS(pos)),
         PropKey::Expr(value) => check_lhs_expr(value, allow_let, pos, strict),
@@ -163,7 +193,7 @@ pub fn check_prop_key<'a>(key: &PropKey<'a>, allow_let: bool, pos: Position, str
     }
 }
 
-pub fn check_loop_left<'a>(left: &LoopLeft<'a>, pos: Position) -> Res {
+pub fn check_loop_left<'a>(left: &LoopLeft<Cow<'a, str>>, pos: Position) -> Res {
     let mut set = HashSet::new();
     match left {
         LoopLeft::Expr(expr) => check_loop_left_expr(expr, pos, &mut set),
@@ -178,7 +208,7 @@ pub fn check_loop_left<'a>(left: &LoopLeft<'a>, pos: Position) -> Res {
     }
 }
 
-pub fn check_loop_head_expr<'a>(left: &Expr<'a>, pos: Position) -> Res {
+pub fn check_loop_head_expr<'a>(left: &Expr<Cow<'a, str>>, pos: Position) -> Res {
     log::debug!("check_loop_head_expr");
     let mut set = HashSet::new();
     match left {
@@ -190,7 +220,7 @@ pub fn check_loop_head_expr<'a>(left: &Expr<'a>, pos: Position) -> Res {
 }
 
 fn check_binding_obj<'a>(
-    obj: &[ListEntry<'a, ObjProp<'a>>],
+    obj: &[ListEntry<ObjProp<Cow<'a, str>>>],
     pos: Position,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Res {
@@ -209,7 +239,7 @@ fn check_binding_obj<'a>(
 }
 
 pub fn check_binding_array<'a>(
-    a: &[ListEntry<'a, Option<Expr<'a>>>],
+    a: &[ListEntry<Option<Expr<Cow<'a, str>>>>],
     pos: Position,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Res {
@@ -226,7 +256,7 @@ pub fn check_binding_array<'a>(
 }
 
 fn check_loop_left_prop_key<'a>(
-    prop: &PropKey<'a>,
+    prop: &PropKey<Cow<'a, str>>,
     pos: Position,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Res {
@@ -239,7 +269,7 @@ fn check_loop_left_prop_key<'a>(
 }
 
 fn check_loop_left_expr<'a>(
-    expr: &Expr<'a>,
+    expr: &Expr<Cow<'a, str>>,
     pos: Position,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Res {
@@ -256,7 +286,11 @@ fn check_loop_left_expr<'a>(
     }
 }
 
-fn check_loop_left_pat<'a>(pat: &Pat<'a>, pos: Position, set: &mut HashSet<Cow<'a, str>>) -> Res {
+fn check_loop_left_pat<'a>(
+    pat: &Pat<Cow<'a, str>>,
+    pos: Position,
+    set: &mut HashSet<Cow<'a, str>>,
+) -> Res {
     log::debug!("check_loop_left_pat");
     match pat {
         Pat::Ident(ident) => {
@@ -285,20 +319,20 @@ fn check_loop_left_pat<'a>(pat: &Pat<'a>, pos: Position, set: &mut HashSet<Cow<'
 }
 
 #[inline]
-fn is_restricted_word(word: &Ident) -> bool {
-    &word.slice.source == "eval" || &word.slice.source == "arguments"
+fn is_restricted_word<'a>(word: &Ident<Cow<'a, str>>) -> bool {
+    word.slice.source.as_ref() == "eval" || word.slice.source.as_ref() == "arguments"
 }
 /// Check if this &str is in the list of reserved
 /// words in the context of 'use strict'
 #[inline]
-fn is_strict_reserved(word: &Ident) -> bool {
-    word.slice.source == "implements"
-        || word.slice.source == "interface"
-        || word.slice.source == "package"
-        || word.slice.source == "private"
-        || word.slice.source == "protected"
-        || word.slice.source == "public"
-        || word.slice.source == "static"
-        || word.slice.source == "yield"
-        || word.slice.source == "let"
+fn is_strict_reserved<'a>(word: &Ident<Cow<'a, str>>) -> bool {
+    word.slice.source.as_ref() == "implements"
+        || word.slice.source.as_ref() == "interface"
+        || word.slice.source.as_ref() == "package"
+        || word.slice.source.as_ref() == "private"
+        || word.slice.source.as_ref() == "protected"
+        || word.slice.source.as_ref() == "public"
+        || word.slice.source.as_ref() == "static"
+        || word.slice.source.as_ref() == "yield"
+        || word.slice.source.as_ref() == "let"
 }

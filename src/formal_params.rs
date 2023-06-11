@@ -1,28 +1,29 @@
 use resast::spanned::expr::{Lit, ObjProp, Prop, PropKey, PropValue};
 use resast::spanned::pat::{ArrayPatPart, ObjPatPart, Pat};
-use resast::spanned::{FuncArg, ListEntry, Slice};
+use resast::spanned::tokens::{Async, CloseParen, OpenParen};
+use resast::spanned::{FuncArg, ListEntry};
 use std::borrow::Cow;
 use std::collections::HashSet;
 
-type Param<'a> = ListEntry<'a, FuncArg<'a>>;
+type Param<T> = ListEntry<FuncArg<T>>;
 
 pub struct FormalParams<'a> {
     pub simple: bool,
-    pub open_paren: Slice<'a>,
-    pub params: Vec<Param<'a>>,
-    pub close_paren: Slice<'a>,
+    pub open_paren: OpenParen,
+    pub params: Vec<Param<Cow<'a, str>>>,
+    pub close_paren: CloseParen,
     pub strict: bool,
     pub found_restricted: bool,
 }
 
 pub struct FormalsList<'a> {
-    pub keyword_async: Option<Slice<'a>>,
-    pub open_paren: Option<Slice<'a>>,
-    pub params: Vec<Param<'a>>,
-    pub close_paren: Option<Slice<'a>>,
+    pub keyword_async: Option<Async>,
+    pub open_paren: Option<OpenParen>,
+    pub params: Vec<Param<Cow<'a, str>>>,
+    pub close_paren: Option<CloseParen>,
 }
 
-pub fn have_duplicates<'a>(params: &[Param<'a>]) -> bool {
+pub fn have_duplicates<'a>(params: &[Param<Cow<'a, str>>]) -> bool {
     if let Err(first_dupe) = find_duplicate(params) {
         log::error!("Found duplicate parameter: {}", first_dupe);
         true
@@ -30,7 +31,7 @@ pub fn have_duplicates<'a>(params: &[Param<'a>]) -> bool {
         false
     }
 }
-pub fn find_duplicate<'a>(params: &[Param<'a>]) -> Result<(), Cow<'a, str>> {
+pub fn find_duplicate<'a>(params: &[Param<Cow<'a, str>>]) -> Result<(), Cow<'a, str>> {
     let mut set = HashSet::new();
     for param in params.iter() {
         match &param.item {
@@ -48,14 +49,14 @@ pub fn find_duplicate<'a>(params: &[Param<'a>]) -> Result<(), Cow<'a, str>> {
     Ok(())
 }
 pub fn update_with_expr<'a>(
-    expr: &resast::spanned::expr::Expr<'a>,
+    expr: &resast::spanned::expr::Expr<Cow<'a, str>>,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Result<(), Cow<'a, str>> {
     use resast::spanned::expr::{AssignExpr, AssignLeft};
     log::trace!("update_with_expr {:?} {:?}", expr, set);
     match expr {
         resast::spanned::expr::Expr::Ident(id) => {
-            if !set.insert(id.slice.source.clone()) {
+            if !set.insert(id.slice.source.clone().into()) {
                 return Err(id.slice.source.clone());
             }
         }
@@ -84,7 +85,7 @@ pub fn update_with_expr<'a>(
     Ok(())
 }
 pub fn update_with_pat<'a>(
-    pat: &resast::spanned::pat::Pat<'a>,
+    pat: &resast::spanned::pat::Pat<Cow<'a, str>>,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Result<(), Cow<'a, str>> {
     log::trace!("update_with_pat {:?} {:?}", pat, set);
@@ -129,7 +130,7 @@ pub fn update_with_pat<'a>(
 }
 
 fn update_with_prop<'a>(
-    prop: &Prop<'a>,
+    prop: &Prop<Cow<'a, str>>,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Result<(), Cow<'a, str>> {
     match prop {
@@ -148,7 +149,7 @@ fn update_with_prop<'a>(
 }
 
 fn update_with_prop_value<'a>(
-    prop: &PropValue<'a>,
+    prop: &PropValue<Cow<'a, str>>,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Result<(), Cow<'a, str>> {
     log::trace!("update_with_prop {:?}, {:?}", prop, set);
@@ -165,7 +166,7 @@ fn update_with_prop_value<'a>(
 }
 
 fn update_with_prop_key<'a>(
-    key: &PropKey<'a>,
+    key: &PropKey<Cow<'a, str>>,
     set: &mut HashSet<Cow<'a, str>>,
 ) -> Result<(), Cow<'a, str>> {
     match key {
@@ -175,7 +176,10 @@ fn update_with_prop_key<'a>(
     }
 }
 
-fn update_with_lit<'a>(lit: &Lit<'a>, set: &mut HashSet<Cow<'a, str>>) -> Result<(), Cow<'a, str>> {
+fn update_with_lit<'a>(
+    lit: &Lit<Cow<'a, str>>,
+    set: &mut HashSet<Cow<'a, str>>,
+) -> Result<(), Cow<'a, str>> {
     log::trace!("update_with_lit {:?}, {:?}", lit, set);
     if let Lit::String(s) = lit {
         if !set.insert(s.content.source.clone()) {
