@@ -659,7 +659,7 @@ where
             let keyword = self.position_from(&keyword).into();
             let alias = self.parse_var_ident(false)?;
             self.context.lexical_names.declare(
-                alias.slice.source.0.clone(),
+                alias.slice.source.clone(),
                 DeclKind::Lex(true),
                 start,
             )?;
@@ -672,7 +672,7 @@ where
             })
         } else {
             self.context.lexical_names.declare(
-                imported.slice.source.0.clone(),
+                imported.slice.source.clone(),
                 DeclKind::Lex(true),
                 start,
             )?;
@@ -697,7 +697,7 @@ where
         let start = self.look_ahead_position;
         let ident = self.parse_ident_name()?;
         self.context.lexical_names.declare(
-            ident.slice.source.0.clone(),
+            ident.slice.source.clone(),
             DeclKind::Lex(true),
             start,
         )?;
@@ -713,7 +713,7 @@ where
         let start = self.look_ahead_position;
         let id = self.parse_ident_name()?;
         self.context.lexical_names.declare(
-            id.slice.source.0.clone(),
+            id.slice.source.clone(),
             DeclKind::Lex(true),
             start,
         )?;
@@ -932,7 +932,7 @@ where
         if let Some(id) = &func.id {
             self.context
                 .lexical_names
-                .add_export_ident(&id.slice.source.0.clone(), start)?;
+                .add_export_ident(&id.slice.source.clone(), start)?;
         }
         Ok(Decl::Func(func))
     }
@@ -944,7 +944,7 @@ where
         if let Some(id) = &class.id {
             self.context
                 .lexical_names
-                .add_export_ident(&id.slice.source.0.clone(), start)?;
+                .add_export_ident(&id.slice.source.clone(), start)?;
         }
         Ok(Decl::Class(class))
     }
@@ -2704,7 +2704,7 @@ where
                     };
                     self.context
                         .lexical_names
-                        .declare(id.slice.source.0.clone(), kind, start)?;
+                        .declare(id.slice.source.clone(), kind, start)?;
                 }
                 Some(id)
             }
@@ -2888,7 +2888,7 @@ where
         if check_id {
             if let Some(ref i) = id {
                 self.context.lexical_names.declare(
-                    i.slice.source.0.clone(),
+                    i.slice.source.clone(),
                     lexical_names::DeclKind::Lex(self.context.is_module),
                     start,
                 )?;

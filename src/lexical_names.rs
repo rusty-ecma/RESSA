@@ -173,7 +173,7 @@ impl<'a> DuplicateNameDetector<'a> {
         match pat {
             Pat::Ident(ref i) => {
                 log::trace!("add_pat ident {:?}", i.slice.source);
-                self.declare(i.slice.source.0.clone(), kind, pos)
+                self.declare(i.slice.source.clone(), kind, pos)
             }
             Pat::Array(ref a) => {
                 for part in &a.elements {
@@ -231,7 +231,7 @@ impl<'a> DuplicateNameDetector<'a> {
     ) -> Res<()> {
         log::trace!("declare_literal_ident {:?} {:?} {:?}", lit, kind, pos);
         match lit {
-            Lit::String(s) => self.declare(s.content.source.0.clone(), kind, pos),
+            Lit::String(s) => self.declare(s.content.source.clone(), kind, pos),
             _ => Err(Error::RestrictedIdent(pos)),
         }
     }
@@ -244,7 +244,7 @@ impl<'a> DuplicateNameDetector<'a> {
         log::trace!("declare_expr {:?} {:?} {:?}", expr, kind, pos);
         if let Expr::Ident(ref i) = expr {
             log::trace!("add_expr ident {:?}", i.slice.source);
-            self.declare(i.slice.source.0.clone(), kind, pos)
+            self.declare(i.slice.source.clone(), kind, pos)
         } else {
             Ok(())
         }
@@ -331,14 +331,14 @@ impl<'a> DuplicateNameDetector<'a> {
         pos: Position,
     ) -> Res<()> {
         log::trace!("add_export_spec {:?} {:?}", spec, pos);
-        self.add_export_ident(&spec.local.slice.source.0.clone(), pos)?;
-        self.undefined_module_export_guard(spec.local.slice.source.0.clone());
+        self.add_export_ident(&spec.local.slice.source.clone(), pos)?;
+        self.undefined_module_export_guard(spec.local.slice.source.clone());
         Ok(())
     }
 
     pub fn removed_undefined_export(&mut self, id: &Ident<Cow<'a, str>>) {
         log::trace!("removed_undefined_export {:?}", id);
-        self.undefined_module_exports.remove(&id.slice.source.0);
+        self.undefined_module_exports.remove(&id.slice.source);
     }
 
     pub fn add_export_ident(&mut self, id: &Cow<'a, str>, pos: Position) -> Res<()> {

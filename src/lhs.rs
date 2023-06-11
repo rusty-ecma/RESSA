@@ -276,7 +276,7 @@ fn check_loop_left_expr<'a>(
     log::debug!("check_loop_left_expr");
     match expr {
         Expr::Ident(ident) => {
-            if !set.insert(ident.slice.source.0.clone()) {
+            if !set.insert(ident.slice.source.clone()) {
                 Err(Error::InvalidLHS(pos))
             } else {
                 Ok(())
@@ -294,7 +294,7 @@ fn check_loop_left_pat<'a>(
     log::debug!("check_loop_left_pat");
     match pat {
         Pat::Ident(ident) => {
-            if !set.insert(ident.slice.source.0.clone()) {
+            if !set.insert(ident.slice.source.clone()) {
                 Err(Error::InvalidLHS(pos))
             } else {
                 Ok(())

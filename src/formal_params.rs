@@ -56,8 +56,8 @@ pub fn update_with_expr<'a>(
     log::trace!("update_with_expr {:?} {:?}", expr, set);
     match expr {
         resast::spanned::expr::Expr::Ident(id) => {
-            if !set.insert(id.slice.source.0.clone().into()) {
-                return Err(id.slice.source.0.clone());
+            if !set.insert(id.slice.source.clone().into()) {
+                return Err(id.slice.source.clone());
             }
         }
         resast::spanned::expr::Expr::Assign(AssignExpr { left, .. }) => match left {
@@ -91,8 +91,8 @@ pub fn update_with_pat<'a>(
     log::trace!("update_with_pat {:?} {:?}", pat, set);
     match pat {
         Pat::Ident(id) => {
-            if !set.insert(id.slice.source.0.clone()) {
-                return Err(id.slice.source.0.clone());
+            if !set.insert(id.slice.source.clone()) {
+                return Err(id.slice.source.clone());
             }
         }
         Pat::Array(arr) => {
@@ -182,8 +182,8 @@ fn update_with_lit<'a>(
 ) -> Result<(), Cow<'a, str>> {
     log::trace!("update_with_lit {:?}, {:?}", lit, set);
     if let Lit::String(s) = lit {
-        if !set.insert(s.content.source.0.clone()) {
-            return Err(s.content.source.0.clone());
+        if !set.insert(s.content.source.clone()) {
+            return Err(s.content.source.clone());
         }
     }
     Ok(())
