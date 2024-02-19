@@ -712,11 +712,9 @@ where
     fn parse_import_default_specifier(&mut self) -> Res<DefaultImportSpec<Cow<'b, str>>> {
         let start = self.look_ahead_position;
         let id = self.parse_ident_name()?;
-        self.context.lexical_names.declare(
-            id.slice.source.clone(),
-            DeclKind::Lex(true),
-            start,
-        )?;
+        self.context
+            .lexical_names
+            .declare(id.slice.source.clone(), DeclKind::Lex(true), start)?;
         Ok(DefaultImportSpec { id })
     }
 
@@ -4795,7 +4793,6 @@ where
                     };
                     elements.push(ele);
                 }
-                
             }
         }
         let close_bracket = self.expect_punct(Punct::CloseBracket)?;
@@ -5070,7 +5067,7 @@ where
                         &item,
                         &[
                             "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=", "<<=",
-                            ">>=", ">>>=",
+                            ">>=", ">>>=", "&&=", "||=", "??=",
                         ],
                     );
                 }
@@ -5080,7 +5077,7 @@ where
                     &item,
                     &[
                         "=", "+=", "-=", "/=", "*=", "**=", "|=", "&=", "~=", "%=", "<<=", ">>=",
-                        ">>>=",
+                        ">>>=", "&&=", "||=", "??=",
                     ],
                 );
             }
@@ -5120,6 +5117,9 @@ where
             Punct::CaretEqual => Some(AssignOp::XOrEqual(slice.into())),
             Punct::AmpersandEqual => Some(AssignOp::AndEqual(slice.into())),
             Punct::DoubleAsteriskEqual => Some(AssignOp::PowerOfEqual(slice.into())),
+            Punct::DoubleAmpersandEqual => Some(AssignOp::DoubleAmpersandEqual(slice.into())),
+            Punct::DoublePipeEqual => Some(AssignOp::DoublePipeEqual(slice.into())),
+            Punct::DoubleQuestionMarkEqual => Some(AssignOp::DoubleQuestionmarkEqual(slice.into())),
             _ => None,
         }
     }
@@ -5658,6 +5658,7 @@ where
                     log::debug!("left: {:#?} {}", left, self.context.allow_yield);
                     if op.token.matches_punct(Punct::DoubleAmpersand)
                         || op.token.matches_punct(Punct::DoublePipe)
+                        || op.token.matches_punct(Punct::DoubleQuestionMark)
                     {
                         stack.push(Expr::Logical(LogicalExpr {
                             operator: self.logical_operator(&op).ok_or_else(|| {
@@ -5692,6 +5693,7 @@ where
                     .ok_or_else(|| self.op_error("invalid binary operation, too few operators"))?;
                 if op.token.matches_punct(Punct::DoubleAmpersand)
                     || op.token.matches_punct(Punct::DoublePipe)
+                    || op.token.matches_punct(Punct::DoubleQuestionMark)
                 {
                     let operator = self
                         .logical_operator(&op)
@@ -5855,6 +5857,7 @@ where
             Token::Punct(ref p) => match p {
                 Punct::DoubleAmpersand => Some(LogicalOp::And(slice.into())),
                 Punct::DoublePipe => Some(LogicalOp::Or(slice.into())),
+                Punct::DoubleQuestionMark => Some(LogicalOp::NullishCoalescing(slice.into())),
                 _ => None,
             },
             _ => None,
@@ -6372,7 +6375,7 @@ where
             | Punct::Comma
             | Punct::Equal
             | Punct::CloseBracket => 0,
-            Punct::DoublePipe => 1,
+            Punct::DoublePipe | Punct::DoubleQuestionMark => 1,
             Punct::DoubleAmpersand => 2,
             Punct::Pipe => 3,
             Punct::Caret => 4,
@@ -6668,6 +6671,15 @@ where
             || self.look_ahead.token.matches_punct(Punct::PipeEqual)
             || self.look_ahead.token.matches_punct(Punct::CaretEqual)
             || self.look_ahead.token.matches_punct(Punct::AmpersandEqual)
+            || self
+                .look_ahead
+                .token
+                .matches_punct(Punct::DoubleAmpersandEqual)
+            || self.look_ahead.token.matches_punct(Punct::DoublePipeEqual)
+            || self
+                .look_ahead
+                .token
+                .matches_punct(Punct::DoubleQuestionMarkEqual)
     }
     /// The keyword `async` is conditional, that means to decided
     /// if we are actually at an async function we need to check the
@@ -6763,8 +6775,8 @@ where
         let slice = self.scanner.str_for(&item.span).unwrap();
         let contents = match &item.token {
             Token::String(lit) => match lit {
-                ress::tokens::StringLit::Double(inner) => inner.content.clone(),
-                ress::tokens::StringLit::Single(inner) => inner.content.clone(),
+                ress::tokens::StringLit::Double(inner) => inner.content,
+                ress::tokens::StringLit::Single(inner) => inner.content,
             },
             _ => {
                 return Err(Error::UnexpectedToken(
@@ -6821,7 +6833,7 @@ where
         // regex will be on 1 line if `validate` is successful
         let line = item.location.start.line;
         let Token::RegEx(token) = &item.token else {
-            return self.expected_token_error(item, &["<regex literal>"])
+            return self.expected_token_error(item, &["<regex literal>"]);
         };
         let open_slash_pos = Position {
             line: line as u32,

@@ -1283,8 +1283,8 @@ fn setter_scope() {
 fn array_pattern_with_empty_entry() {
     use resast::spanned::{
         decl::{Decl, VarDecl, VarDecls},
-        pat::{ArrayPat, ArrayPatPart, Pat},
         expr::Expr,
+        pat::{ArrayPat, ArrayPatPart, Pat},
         Ident, ListEntry, Program, ProgramPart, Slice, SourceLocation, VarKind,
     };
     let js = "let [x,,] = y";
@@ -1298,35 +1298,36 @@ fn array_pattern_with_empty_entry() {
                     item: VarDecl {
                         id: Pat::Array(ArrayPat {
                             open_bracket: Position::new(1, 5).into(),
-                            elements: vec![ListEntry {
-                                item: Some(ArrayPatPart::Pat(Pat::Ident(Ident {
-                                    slice: Slice {
-                                        source: Cow::Borrowed("x").into(),
-                                        loc: SourceLocation {
-                                            start: Position::new(1, 6),
-                                            end: Position::new(1, 7)
+                            elements: vec![
+                                ListEntry {
+                                    item: Some(ArrayPatPart::Pat(Pat::Ident(Ident {
+                                        slice: Slice {
+                                            source: Cow::Borrowed("x").into(),
+                                            loc: SourceLocation {
+                                                start: Position::new(1, 6),
+                                                end: Position::new(1, 7)
+                                            }
                                         }
-                                    }
-                                }))),
-                                comma: Some(Position::new(1, 7).into()),
-                            }, ListEntry {
-                                item: None,
-                                comma: Some(Position::new(1, 8).into()),
-                            }],
+                                    }))),
+                                    comma: Some(Position::new(1, 7).into()),
+                                },
+                                ListEntry {
+                                    item: None,
+                                    comma: Some(Position::new(1, 8).into()),
+                                }
+                            ],
                             close_bracket: Position::new(1, 9).into()
                         }),
                         eq: Some(Position::new(1, 11).into()),
-                        init: Some(Expr::Ident(
-                            Ident {
-                                slice: Slice {
-                                    source: Cow::Borrowed("y").into(),
-                                    loc: SourceLocation {
-                                        start: Position::new(1, 13),
-                                        end: Position::new(1, 14)
-                                    }
+                        init: Some(Expr::Ident(Ident {
+                            slice: Slice {
+                                source: Cow::Borrowed("y").into(),
+                                loc: SourceLocation {
+                                    start: Position::new(1, 13),
+                                    end: Position::new(1, 14)
                                 }
                             }
-                        )),
+                        })),
                     },
                     comma: None
                 }]
@@ -1380,6 +1381,26 @@ fn blow_the_stack_spanned() {
 #[test]
 fn call_args() {
     run_spanned_test("call(/.+/, '')", false).unwrap();
+}
+
+#[test]
+fn and_and_equal() {
+    run_spanned_test("x &&= false", false).unwrap();
+}
+
+#[test]
+fn or_or_equal() {
+    run_spanned_test("x ||= false", false).unwrap();
+}
+
+#[test]
+fn q_q_equal() {
+    run_spanned_test("x ??= false", false).unwrap();
+}
+
+#[test]
+fn nullish_coalesce() {
+    run_spanned_test("b ?? false", false).unwrap();
 }
 
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
