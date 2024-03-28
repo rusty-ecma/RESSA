@@ -1403,6 +1403,21 @@ fn nullish_coalesce() {
     run_spanned_test("b ?? false", false).unwrap();
 }
 
+#[test]
+fn optional_chaining1() {
+    run_spanned_test("a?.b", false).unwrap();
+}
+
+#[test]
+fn optional_chaining2() {
+    run_spanned_test("a?.['b']", false).unwrap();
+}
+
+#[test]
+fn optional_chaining3() {
+    run_spanned_test("a?.()", false).unwrap();
+}
+
 fn run_test(js: &str, as_mod: bool) -> Result<(), ressa::Error> {
     let p = generate_program(js, as_mod);
     log::debug!("{:#?}", p);

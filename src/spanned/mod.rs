@@ -98,6 +98,7 @@ use crate::lexical_names::DeclKind;
 use crate::lhs;
 use crate::LabelKind;
 use crate::{Config, Context};
+use resast::spanned::tokens::QuestionMarkDot;
 use std::borrow::Cow;
 use std::{
     collections::{HashMap, HashSet},
@@ -6069,6 +6070,117 @@ where
         Ok(Expr::Super(keyword))
     }
 
+    /// parses calls and optional calls
+    /// a()
+    /// a?.()
+    fn parse_call(
+        &mut self,
+        is_async: bool,
+        start_pos: Position,
+        expr: Expr<Cow<'b, str>>,
+        opt: Option<QuestionMarkDot>,
+    ) -> Res<Expr<Cow<'b, str>>> {
+        let current_pos = self.look_ahead_position;
+        let async_arrow = is_async && start_pos.line == current_pos.line;
+        self.context.set_is_binding_element(false);
+        self.context.set_is_assignment_target(false);
+
+        let (open_paren, args, close_paren) = if async_arrow {
+            self.parse_async_args()?
+        } else {
+            self.parse_args()?
+        };
+        //TODO: check for bad import call
+        if async_arrow && self.at_punct(Punct::EqualGreaterThan) {
+            let args = args
+                .into_iter()
+                .map(|e| {
+                    let ListEntry { item, comma } = e;
+                    ListEntry {
+                        item: FuncArg::Expr(item),
+                        comma,
+                    }
+                })
+                .collect();
+            let inner = ArrowParamPlaceHolder {
+                keyword: None,
+                open_paren: Some(open_paren),
+                args,
+                close_paren: Some(close_paren),
+            };
+            Ok(Expr::ArrowParamPlaceHolder(inner))
+        } else {
+            let inner = CallExpr {
+                callee: Box::new(expr),
+                optional: opt,
+                open_paren,
+                arguments: args,
+                close_paren,
+            };
+            Ok(Expr::Call(inner))
+        }
+    }
+
+    /// parses index
+    /// a.b
+    /// a?.b
+    fn parse_index(
+        &mut self,
+        object: Expr<Cow<'b, str>>,
+        opt: Option<QuestionMarkDot>,
+    ) -> Res<Expr<Cow<'b, str>>> {
+        self.context.set_is_binding_element(false);
+        self.context.set_is_assignment_target(true);
+        let indexer = if let Some(qmd) = opt {
+            MemberIndexer::Optional(qmd)
+        } else {
+            let period = self.expect_punct(Punct::Period)?;
+            MemberIndexer::Period(period)
+        };
+        let prop = Expr::Ident(self.parse_ident_name()?);
+        let expr = Expr::Member(MemberExpr {
+            object: Box::new(object),
+            property: Box::new(prop),
+            indexer,
+        });
+        log::debug!(target: "look_ahead", "1 {:?}", expr);
+        Ok(expr)
+    }
+
+    /// parses computed index
+    /// a['b']
+    /// a?.['b']
+    fn parse_computed_index(
+        &mut self,
+        expr: Expr<Cow<'b, str>>,
+        opt: Option<QuestionMarkDot>,
+    ) -> Res<Expr<Cow<'b, str>>> {
+        self.context.set_is_assignment_target(true);
+        self.context.set_is_binding_element(false);
+        let open_bracket = self.expect_punct(Punct::OpenBracket)?;
+        let prop = isolate_cover_grammar!(self, parse_expression)?;
+        let close_bracket = self.expect_punct(Punct::CloseBracket)?;
+        let indexer = if let Some(qmd) = opt {
+            MemberIndexer::OptionalComputed {
+                optional: qmd,
+                open_bracket,
+                close_bracket,
+            }
+        } else {
+            MemberIndexer::Computed {
+                open_bracket,
+                close_bracket,
+            }
+        };
+        let member = MemberExpr {
+            object: Box::new(expr),
+            indexer,
+            property: Box::new(prop),
+        };
+        log::debug!(target: "look_ahead", "{:?}", member);
+        Ok(Expr::Member(member))
+    }
+
     #[tracing::instrument(level = "trace", skip(self))]
     fn parse_left_hand_side_expr_allow_call(&mut self) -> Res<Expr<Cow<'b, str>>> {
         log::debug!(
@@ -6091,73 +6203,27 @@ where
             ret
         };
         loop {
-            if self.at_punct(Punct::Period) {
-                self.context.set_is_binding_element(false);
-                self.context.set_is_assignment_target(true);
-                let period = self.expect_punct(Punct::Period)?;
-                let indexer = MemberIndexer::Period(period);
-                let prop = Expr::Ident(self.parse_ident_name()?);
-                expr = Expr::Member(MemberExpr {
-                    object: Box::new(expr),
-                    property: Box::new(prop),
-                    indexer,
-                });
-                log::debug!(target: "look_ahead", "1 {:?}", expr);
-            } else if self.at_punct(Punct::OpenParen) {
-                let current_pos = self.look_ahead_position;
-                let async_arrow = is_async && start_pos.line == current_pos.line;
-                self.context.set_is_binding_element(false);
-                self.context.set_is_assignment_target(false);
-                let (open_paren, args, close_paren) = if async_arrow {
-                    self.parse_async_args()?
+            if self.at_punct(Punct::QuestionMarkDot) {
+                let opt = Some(self.expect_punct(Punct::QuestionMarkDot)?);
+                if self.at_punct(Punct::OpenParen) {
+                    // a?.()
+                    expr = self.parse_call(is_async, start_pos, expr, opt)?;
+                } else if self.at_punct(Punct::OpenBracket) {
+                    // a?.['b']
+                    expr = self.parse_computed_index(expr, opt)?
                 } else {
-                    self.parse_args()?
-                };
-                //TODO: check for bad import call
-                if async_arrow && self.at_punct(Punct::EqualGreaterThan) {
-                    let args = args
-                        .into_iter()
-                        .map(|e| {
-                            let ListEntry { item, comma } = e;
-                            ListEntry {
-                                item: FuncArg::Expr(item),
-                                comma,
-                            }
-                        })
-                        .collect();
-                    let inner = ArrowParamPlaceHolder {
-                        keyword: None,
-                        open_paren: Some(open_paren),
-                        args,
-                        close_paren: Some(close_paren),
-                    };
-                    expr = Expr::ArrowParamPlaceHolder(inner);
-                } else {
-                    let inner = CallExpr {
-                        callee: Box::new(expr),
-                        arguments: args,
-                        open_paren,
-                        close_paren,
-                    };
-                    expr = Expr::Call(inner);
+                    // a?.b
+                    expr = self.parse_index(expr, opt)?;
                 }
+            } else if self.at_punct(Punct::Period) {
+                // a.b
+                expr = self.parse_index(expr, None)?;
+            } else if self.at_punct(Punct::OpenParen) {
+                // a()
+                expr = self.parse_call(is_async, start_pos, expr, None)?;
             } else if self.at_punct(Punct::OpenBracket) {
-                self.context.set_is_assignment_target(true);
-                self.context.set_is_binding_element(false);
-                let open_bracket = self.expect_punct(Punct::OpenBracket)?;
-                let prop = isolate_cover_grammar!(self, parse_expression)?;
-                let close_bracket = self.expect_punct(Punct::CloseBracket)?;
-                let indexer = MemberIndexer::Computed {
-                    open_bracket,
-                    close_bracket,
-                };
-                let member = MemberExpr {
-                    object: Box::new(expr),
-                    indexer,
-                    property: Box::new(prop),
-                };
-                log::debug!(target: "look_ahead", "{:?}", member);
-                expr = Expr::Member(member);
+                // a[b]
+                expr = self.parse_computed_index(expr, None)?;
             } else if self.look_ahead.token.is_template_head() {
                 let quasi = self.parse_template_lit(true)?;
                 let temp = TaggedTemplateExpr {
